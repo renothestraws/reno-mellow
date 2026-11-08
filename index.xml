@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<index version="1" name="ReNo Mellow">
+  <category name="Dynamics">
+    <reapack name="RM1176.jsfx" type="effect" desc="RM1176 - ReNo Mellow 1176 (FET Limiting Amplifier)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/limiteur FET inspir\u233? du 1176 : ratios 4/8/12/20 et all-buttons, attaque et release ultra-rapides, Punch, Analog, Calib.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM1176.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM160A.jsfx" type="effect" desc="RM160A - ReNo Mellow 160A (True RMS VCA Compressor/Limiter)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/limiteur VCA \u224? RMS vrai inspir\u233? du dbx 160A : OverEasy, ratios jusqu'\u224? -1:1, vum\u232?tres LED.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM160A.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982.jsfx" type="effect" desc="RM1982 - ReNo Mellow 1982 (Dynamic Window Compressor/Expander)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/expandeur original \u224? fen\u234?tre : signal intact autour du seuil, compression 2/4/20:1 au-dessus, expansion 1:2/1:4/1:8 en dessous, side-chain externe.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM1982.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM2A.jsfx" type="effect" desc="RM2A - ReNo Mellow 2A (Optical Leveling Amplifier)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Leveler optique inspir\u233? du LA-2A : cellule T4 mod\u233?lis\u233?e (release en deux temps avec m\u233?moire), modes Compress/Limit, Classic/Vintage.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM2A.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM33609.jsfx" type="effect" desc="RM33609 - ReNo Mellow 33609 (Diode-Bridge Stereo Limiter/Compressor)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Limiteur/compresseur st\u233?r\u233?o \u224? pont de diodes inspir\u233? du Neve 33609 : sections Limit et Compress, auto-recovery a1/a2, couleur transfos et classe A.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM33609.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM3A.jsfx" type="effect" desc="RM3A - ReNo Mellow 3A (Solid-State Optical Audio Leveler)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Leveler optique transistoris\u233? inspir\u233? du LA-3A : cellule optique rapide, contour HF dans le side-chain, Vintage.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM3A.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM670.jsfx" type="effect" desc="RM670 - ReNo Mellow 670 (Variable-Mu Tube Stereo Limiter)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Limiteur st\u233?r\u233?o variable-mu \u224? lampes inspir\u233? du Fairchild 670 : 6 constantes de temps, modes Mid/Side, seuil AC/DC, Vintage.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM670.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM9000JDYN.jsfx" type="effect" desc="RM9000JDYN - ReNo Mellow 9000J Channel Dynamics">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Dynamiques de tranche inspir\u233?es de la SSL 9000J : compresseur RMS/peak, gate/expandeur avec hold, bypass s\u233?par\u233?s, vum\u232?tre d'entr\u233?e.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RM9000JDYN.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RMEL8.jsfx" type="effect" desc="RMEL8 - ReNo Mellow EL8 (Distressor-style compressor)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur de caract\u232?re inspir\u233? du Distressor : ratios de 1:1 \u224? Nuke, d\u233?tecteur HP/Band/Link, Dist2/Dist3, Mix, Smooth.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RMEL8.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RMGbuss.jsfx" type="effect" desc="RMGbuss - ReNo Mellow G Buss (VCA Bus Compressor)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur de bus VCA inspir\u233? du compresseur de bus SSL s\u233?rie G : d\u233?tection feedback, Auto release, filtre side-chain, Mix, Modern.}]]></description>
+        <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.0" author="ReNo Mellow" time="2026-11-08T06:40:03Z">
+        <changelog><![CDATA[Première version publique]]></changelog>
+        <source>https://raw.githubusercontent.com/PSEUDO/reno-mellow/main/Dynamics/RMGbuss.jsfx</source>
+      </version>
+    </reapack>
+  </category>
+  <metadata>
+    <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 ReNo Mellow : compresseurs et processeurs de dynamique gratuits pour REAPER (JSFX).\par
+Calibration commune : 0 VU = +4 dBu = -18 dBFS.}]]></description>
+    <link rel="website" href="https://github.com/PSEUDO/reno-mellow">GitHub</link>
+  </metadata>
+</index>

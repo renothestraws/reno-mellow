@@ -1,0 +1,681 @@
+desc:RM670 - ReNo Mellow 670 (Variable-Mu Tube Stereo Limiter)
+//tags: dynamics compressor limiter tube variable-mu fairchild 670
+//@author ReNo Mellow
+//@version 1.0
+//@changelog Première version publique
+//@about Limiteur stéréo variable-mu à lampes inspiré du Fairchild 670 : 6 constantes de temps, modes Mid/Side, seuil AC/DC, Vintage.
+//
+// ---------------------------------------------------------------------------
+// RM670 - émulation d'un limiteur stéréo à tubes variable-mu type Fairchild 670
+//
+// CALIBRATION
+//   0 VU = +4 dBu = 1.23 V RMS = -18 dBFS   =>   0 dBFS = +22 dBu
+//   Input Gain = atténuateur à crans de 1 dB gradué en dB d'atténuation
+//   (0 = gain max +10 dB, 20 = -10 dB) ; 10 = gain unité (manuel).
+//   Threshold (AC) à 10 + DC Threshold à 5 = courbe 3 "usine" du datasheet :
+//   début de limitation à +2 dBu (-20 dBFS RMS), sortie +4,6 / +5,5 / +6,0 /
+//   +6,3 dBu pour +10 / +15 / +20 / +25 dBu en entrée (datasheet : 4,6 /
+//   5,5 / 6,0 / 6,2). Chaque cran de Threshold relève le seuil de 2,5 dB ;
+//   0 = pas de limitation (ampli ligne).
+//
+// DÉTECTION (circuit du 670)
+//   - Feedback : l'ampli de side-chain (12AX7 -> 12BH7 -> 6973) est attaqué
+//     par la sortie de l'étage de gain ; la boucle est résolue sans retard.
+//   - Redresseur en pont (crête) qui charge le réseau RC du Time Constant.
+//   - AC Threshold = gain du side-chain ; DC Threshold = polarisation qui
+//     fixe le point à 3 dB de limitation et la dureté de la courbe
+//     (vers 0 : limiteur dur, courbe 5 ; vers 10 : compression douce, courbe 4).
+//   - Tubes 6386 variable-mu en push-pull : gain = (1 - V/Vc)^0,9, le ratio
+//     augmente avec la réduction de gain (environ 1:1 -> 1:20), queue
+//     "remote cut-off" (jamais coupé).
+//   - Time Constant : attaque 0,2 ms (1, 2, 6), 0,4 ms (3, 5), 0,8 ms (4).
+//     Release (depuis 10 dB) : 0,3 / 0,8 / 2 / 5 s ; pos 5 : échelle RC à
+//     2 condensateurs (2 s pics isolés, 10 s pics répétés) ; pos 6 : échelle
+//     à 3 condensateurs (0,3 s / 10 s / ~25 s pour un niveau soutenu).
+//   - Distorsion push-pull : surtout H3, qui croît avec la réduction de gain
+//     (< 1 % jusqu'à +18 dBu sans limitation et à +12 dBu avec 10 dB, spec).
+//
+// MODES : Left/Right (2 limiteurs) ou Mid/Side (matriçage M/S, le "Lat/Vert"
+//         du 670 : voie du haut = Mid (L+R)/2, voie du bas = Side (L-R)/2),
+//         Link S.Chain (commande commune), Link Controls (droite = gauche).
+// OPTIONS : Calib (trim compensé en sortie), Analog, Output, Size,
+//           Classic / Vintage (comme le RM2A : coupe-bas 100 Hz et coupe-haut
+//           10 kHz à 3 dB/oct en sortie), suivi de +2 dB de compensation
+//           de niveau (VIN_MK).
+// SORTIE  : hard-clip permanent à 0 dBFS, non visible et non réglable.
+//
+// INTERFACE : glisser verticalement sur les potards (Shift = fin, Ctrl+clic
+//             = défaut). Clic sur Metering / interrupteurs pour basculer.
+// ---------------------------------------------------------------------------
+
+slider1:10<0,20,1>-Left Input Gain (atten. dB)
+slider2:8<0,10,0.01>-Left Threshold
+slider3:3<1,6,1>-Left Time Constant
+slider4:1<0,2,1{IN,GR,OUT}>-Left Metering
+slider5:10<0,20,1>-Right Input Gain (atten. dB)
+slider6:8<0,10,0.01>-Right Threshold
+slider7:3<1,6,1>-Right Time Constant
+slider8:1<0,2,1{IN,GR,OUT}>-Right Metering
+slider9:0<0,1,1{Left-Right,Mid-Side}>-AGC Mode
+slider10:0<0,1,1{Unlink,Link}>-Link S.Chain
+slider11:0<0,1,1{Unlink,Link}>-Link Controls
+slider12:5<0,10,0.01>-DC Threshold
+slider13:0<-12,12,0.1>-Output (dB)
+slider14:1<0,3,1{75%,100%,125%,150%}>-Size
+slider15:0<0,1,1{Off,On}>-Analog
+slider16:0<-12,12,0.1>-Calib (dB)
+slider17:0<0,1,1{Classic,Vintage}>-Character
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+// ---- Calibration ---------------------------------------------------------
+DBU_AT_0DBFS = 22;          // -18 dBFS = +4 dBu
+THR_PK0 = 0.1414;           // +2 dBu RMS sinus en crête (seuil courbe 3)
+A_MAX   = 1/THR_PK0;        // gain de side-chain, Threshold à 10
+AC_DB   = 2.5;              // dB de seuil par cran de Threshold
+
+// ---- Tubes variable-mu (6386) ---------------------------------------------
+VCUT  = 0.7;                // tension de cutoff (unités de la polarisation usine)
+TGAM  = 0.9;                // exposant de la loi de gain
+TEPS  = 0.003;              // queue "remote cut-off" (~50 dB max)
+SOFTK = 0.08;               // genou du redresseur (diodes)
+
+// ---- Réseaux de temps (positions 1..6) ------------------------------------------
+REL_K = 1.41;               // cale la remontée de GR sur les valeurs du manuel
+TCA = 200; TCR = 210;
+TCA[1]=0.0002; TCA[2]=0.0002; TCA[3]=0.0004; TCA[4]=0.0008; TCA[5]=0.0004; TCA[6]=0.0002;
+TCR[1]=0.3;    TCR[2]=0.8;    TCR[3]=2.0;    TCR[4]=5.0;
+// pos 5 : C1 -R- C2 -masse (tau1, C1/C2, tau2)
+P5_T1 = 2.0;  P5_K1 = 0.6;  P5_T2 = 14;
+// pos 6 : C1 -R- C2 -R- C3 -masse
+P6_T1 = 0.375; P6_K1 = 0.25; P6_T2 = 14; P6_K2 = 0.4; P6_T3 = 25;
+
+// ---- Distorsion push-pull ---------------------------------------------------------
+H3_0 = 0.03;                // H3 de base
+H3_GR = 3;                  // H3 x (1 + GR/H3_GR)
+H2_BAL = 0.002;             // léger déséquilibre de balance (H2)
+
+// ---- Vintage : bande passante de sortie (identique au RM2A) --------------------
+VIN_HP = 100;               // coupe-bas 3 dB/oct (Hz)
+VIN_LP = 10000;             // coupe-haut 3 dB/oct (Hz)
+VIN_MK = 2;                 // compensation de niveau après filtrage (dB)
+HPG = 100; HPK = 110;       // coefficients coupe-bas (4 étages)
+LBG = 120; LBK = 130;       // coefficients coupe-haut bilinéaires
+HSL = 140; HSR = 150;       // états coupe-bas  L / R
+LSL = 160; LSR = 170;       // états coupe-haut L / R
+FSL = 180; FSR = 190;       // états étage ajusté L / R
+
+// ---- Analog : transfo d'entrée non linéaire -----------------------------------
+AN_K = 0.5;
+AN_B = 0.1;
+
+marks = 0;
+marks[0]=-20; marks[1]=-10; marks[2]=-7; marks[3]=-5; marks[4]=-3; marks[5]=-2;
+marks[6]=-1;  marks[7]=0;   marks[8]=1;  marks[9]=2;  marks[10]=3;
+
+// ---- Outils ----------------------------------------------------------------
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x,0.0000000001)); );
+function tanh_(x) local(e) ( x = min(max(x,-20),20); e = exp(2*x); (e-1)/(e+1); );
+function analog_in(x) ( (tanh_(AN_K*(x + AN_B)) - an_t0)*an_norm; );
+
+// réglages d'un canal : Threshold (AC), Input Gain, Time Constant
+function ch_set(ac, ig, tc) instance(A, igg, ca, aa, nn, c1, k1, c2, k2, c3) local(p)
+(
+  A   = ac <= 0.05 ? 0 : A_MAX*db2lin((ac - 10)*AC_DB)*min(ac/0.5, 1);
+  igg = db2lin(10 - ig);                       // atténuateur : 10 = unité
+  p   = min(max(floor(tc + 0.5), 1), 6);
+  ca  = exp(-1/(TCA[p]*srate));
+  aa  = 1 - ca;
+  p <= 4 ? (
+    nn = 1; c1 = exp(-1/(TCR[p]*REL_K*srate));
+  ) : p == 5 ? (
+    nn = 2; c1 = exp(-1/(P5_T1*srate)); k1 = P5_K1; c2 = exp(-1/(P5_T2*srate));
+  ) : (
+    nn = 3; c1 = exp(-1/(P6_T1*srate)); k1 = P6_K1; c2 = exp(-1/(P6_T2*srate));
+    k2 = P6_K2; c3 = exp(-1/(P6_T3*srate));
+  );
+);
+
+// un échantillon : ax = amplitude à l'entrée de l'étage de gain -> gain du tube
+// (boucle de feedback : le redresseur voit ax*G, résolue par Newton)
+function ch_proc(ax) instance(A, ca, aa, nn, c1, k1, c2, k2, c3, v1, v2, v3, gg)
+  local(v, b, gv, dg, z, e, t, dt, h, fl, fl2)
+(
+  b = max(1 - v1/VCUT, 0) + TEPS; gv = b^TGAM;
+  z = (A*ax*gv - dth)/SOFTK;
+  t = z > 30 ? SOFTK*z : SOFTK*log(1 + exp(z));
+  (A > 0 && t > v1) ? (
+    v = v1;
+    loop(5,
+      b  = max(1 - v/VCUT, 0) + TEPS; gv = b^TGAM;
+      dg = v < VCUT ? -TGAM/VCUT*b^(TGAM - 1) : 0;
+      z  = (A*ax*gv - dth)/SOFTK;
+      z > 30 ? ( t = SOFTK*z; dt = A; ) : ( e = exp(z); t = SOFTK*log(1 + e); dt = A*e/(1 + e); );
+      h  = v - ca*v1 - aa*t;
+      v -= h/(1 - aa*dt*ax*dg);
+      v  = min(max(v, 0), VCUT*0.9999);
+    );
+    v1 = max(v, v1);
+  ) : (
+    nn == 1 ? v1 *= c1;
+  );
+  // échelle RC (positions 5 et 6)
+  nn >= 2 ? (
+    fl = (v1 - v2)*(1 - c1); v1 -= fl; v2 += fl*k1;
+    nn == 2 ? ( v2 *= c2; ) : (
+      fl2 = (v2 - v3)*(1 - c2); v2 -= fl2; v3 += fl2*k2; v3 *= c3;
+    );
+  );
+  b  = max(1 - v1/VCUT, 0) + TEPS;
+  gg = b^TGAM;
+  gg;
+);
+
+// étage push-pull : H3 qui croît avec la GR + léger H2 de balance
+function tube_pp(y, grdb) local(c3)
+(
+  c3 = H3_0*(1 + min(grdb, 30)/H3_GR);
+  y = min(max(y, -2), 2);
+  y - c3*y*y*y + H2_BAL*y*y;
+);
+
+// ---- Filtres Vintage 3 dB/oct (identiques au RM2A) ------------------------------
+function an_lp(f) local(h, fp, fz)
+(
+  h = 1; fp = VIN_LP;
+  loop(8, fz = fp*2; h *= sqrt((1 + sqr(f/fz))/(1 + sqr(f/fp))); fp *= 4;);
+  h;
+);
+function vin_design() local(i, fp, gq, dn, w, target, q)
+(
+  fp = VIN_HP; i = 0;
+  loop(4,
+    gq = tan($pi*fp/srate);
+    HPG[i] = gq/(1 + gq);
+    HPK[i] = tan($pi*fp*0.5/srate)/gq;
+    fp *= 0.25; i += 1;
+  );
+  fp = VIN_LP; n_lb = 0; dn = 1;
+  loop(8,
+    fp*2 < 0.3*srate ? (
+      gq = tan($pi*fp/srate);
+      LBG[n_lb] = gq/(1 + gq);
+      LBK[n_lb] = gq/tan($pi*fp*2/srate);
+      dn *= LBK[n_lb];
+      n_lb += 1; fp *= 4;
+    );
+  );
+  target = an_lp(0.5*srate)/dn;
+  w   = tan($pi*min(fp, 0.45*srate)/srate);
+  vfa = (1 - w)/(1 + w);
+  q   = target*(1 + vfa)/(1 - vfa);
+  vfb = (q - 1)/(q + 1);
+  vfg = (1 - vfa)/(1 - vfb);
+  vin_sr = srate;
+);
+function vin(x, hs, ls, fs) local(i, v, l, y)
+(
+  i = 0;
+  loop(4,
+    v = (x - hs[i])*HPG[i]; l = v + hs[i]; hs[i] = l + v;
+    x = (x - l) + HPK[i]*l;
+    i += 1;
+  );
+  i = 0;
+  loop(n_lb,
+    v = (x - ls[i])*LBG[i]; l = v + ls[i]; ls[i] = l + v;
+    x = l + LBK[i]*(x - l);
+    i += 1;
+  );
+  y = vfg*(x - vfb*fs[0]) + vfa*fs[1];
+  fs[0] = x; fs[1] = y;
+  y;
+);
+
+function update_params()
+(
+  calib_g = db2lin(min(max(slider16, -12), 12));
+  calib_c = 1/calib_g;
+  out_g   = db2lin(min(max(slider13, -12), 12));
+  latvert = slider9 >= 0.5;
+  vintage = slider17 >= 0.5;
+  vin_g   = db2lin(VIN_MK);
+  srate != vin_sr ? vin_design();
+  lnk_sc  = slider10 >= 0.5;
+  lnk_ct  = slider11 >= 0.5;
+  analog  = slider15 >= 0.5;
+  dth     = 2^(-(slider12 - 5)/2.5);         // polarisation (DC Threshold)
+  chL.ch_set(slider2, slider1, slider3);
+  lnk_ct ? chR.ch_set(slider2, slider1, slider3) : chR.ch_set(slider6, slider5, slider7);
+  an_t0 = tanh_(AN_K*AN_B);  an_norm = 1/(AN_K*(1 - an_t0*an_t0));
+  hp_g  = tan($pi*20/srate); hp_g = hp_g/(1 + hp_g);   // transfo de sortie (20 Hz)
+  vu_c  = exp(-1/(0.045*srate));
+);
+
+// ---- Outils graphiques (coordonnées logiques 920 x 480) --------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,s) local(w,h) ( gfx_measurestr(s,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(s); );
+function text_l(x,y,s) local(w,h) ( gfx_measurestr(s,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(s); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function ring_label(cx,cy,rad,frac,s) ( knob_pt(cx,cy,rad,frac); text_c(kx,ky,s); );
+// gros potard bakélite noir avec repère crème
+function draw_knob(cx,cy,r,frac) local(x1, y1, t, i)
+(
+  col(0.03,0.03,0.03);
+  i = 0;
+  loop(12,
+    knob_pt(cx,cy,r*1.05,i/12); gfx_circle(PX(kx), PY(ky), r*0.16*S, 1, 1);
+    i += 1;
+  );
+  col(0.05,0.05,0.05); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.12,0.12,0.12); gfx_circle(PX(cx), PY(cy), r*0.78*S, 1, 1);
+  col(0.18,0.18,0.18); gfx_circle(PX(cx), PY(cy), r*0.78*S, 0, 1);
+  col(0.09,0.09,0.09); gfx_circle(PX(cx), PY(cy), r*0.55*S, 1, 1);
+  col(0.95,0.92,0.80);
+  knob_pt(cx,cy,r*0.86,frac); gfx_circle(PX(kx), PY(ky), max(2, r*0.07*S), 1, 1);
+  col(0.85,0.82,0.72);
+  knob_pt(cx,cy,r*0.35,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.78,frac);
+  t = 0;
+  loop(max(1, ceil(1.5*S)),
+    gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1);
+    t += 1;
+  );
+);
+// sélecteur à "bec" (Metering / Time Constant / AGC)
+function draw_pointer(cx,cy,r,frac) local(x1, y1, x2, y2)
+(
+  col(0.06,0.06,0.06); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.16,0.16,0.16); gfx_circle(PX(cx), PY(cy), r*S, 0, 1);
+  knob_pt(cx,cy,r*1.55,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.6,frac-0.09); x2 = kx; y2 = ky;
+  knob_pt(cx,cy,r*0.6,frac+0.09);
+  col(0.08,0.08,0.08);
+  gfx_triangle(PX(x1), PY(y1), PX(x2), PY(y2), PX(kx), PY(ky));
+  col(0.90,0.88,0.80);
+  knob_pt(cx,cy,r*1.15,frac); x2 = kx; y2 = ky;
+  knob_pt(cx,cy,r*1.5,frac); ln(x2, y2, kx, ky);
+  col(0.13,0.13,0.13); gfx_circle(PX(cx), PY(cy), r*0.7*S, 1, 1);
+);
+function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
+(
+  col(0.70,0.67,0.60);
+  knob_pt(cx,cy,r+2,0.5); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r+5,0.5);
+  ln(x1,y1,kx,ky);
+  col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
+  col(0.93,0.62,0.22);
+  knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.8,frac);
+  t = 0;
+  loop(max(1, ceil(1.5*S)),
+    gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1);
+    t += 1;
+  );
+);
+function draw_btn(x,y,w,h,on,s)
+(
+  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  rct(x,y,w,h,1);
+  col(0.04,0.04,0.04); rct(x,y,w,h,0);
+  on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
+  text_c(x + w*0.5, y + h*0.5, s);
+);
+function vu_ang(db) local(v)
+(
+  v = (db2lin(min(max(db,-20),3)) - 0.1)/(1.41254 - 0.1);
+  (-32 + 64*v)*$pi/180;
+);
+// VU-mètre crème (x, y = coin), nd = position en dB
+function draw_vu(vx, vy, nd) local(vw, vh, pvx, pvy, j, a1, a2, i, db, an)
+(
+  vw = 150; vh = 104;
+  col(0.03,0.03,0.03); rct(vx-12, vy-10, vw+24, vh+40, 1);
+  col(0.96,0.90,0.74); rct(vx, vy, vw, vh, 1);
+  pvx = vx + vw*0.5; pvy = vy + vh + 22;
+  col(0.12,0.10,0.08);
+  j = 0;
+  loop(40,
+    a1 = vu_ang(-20 + j*0.5); a2 = vu_ang(-20 + (j+1)*0.5);
+    ln(pvx+96*sin(a1), pvy-96*cos(a1), pvx+96*sin(a2), pvy-96*cos(a2));
+    j += 1;
+  );
+  col(0.80,0.12,0.08);
+  j = 0;
+  loop(20,
+    a1 = vu_ang(j*0.15); a2 = vu_ang((j+1)*0.15);
+    ln(pvx+97*sin(a1), pvy-97*cos(a1), pvx+97*sin(a2), pvy-97*cos(a2));
+    ln(pvx+98.5*sin(a1), pvy-98.5*cos(a1), pvx+98.5*sin(a2), pvy-98.5*cos(a2));
+    j += 1;
+  );
+  gfx_setfont(3);
+  i = 0;
+  loop(11,
+    db = marks[i];
+    an = vu_ang(db);
+    db > 0 ? col(0.80,0.12,0.08) : col(0.12,0.10,0.08);
+    ln(pvx+96*sin(an), pvy-96*cos(an), pvx+104*sin(an), pvy-104*cos(an));
+    sprintf(#s, "%d", abs(db));
+    text_c(pvx+113*sin(an), pvy-113*cos(an), #s);
+    i += 1;
+  );
+  col(0.20,0.16,0.12); gfx_setfont(4); text_c(pvx, vy + vh - 30, "RM 670");
+  an = vu_ang(nd);
+  col(0.06,0.05,0.04);
+  ln(pvx+30*sin(an), pvy-30*cos(an), pvx+108*sin(an), pvy-108*cos(an));
+  S >= 1.5 ? gfx_line(PX(pvx+30*sin(an))+1, PY(pvy-30*cos(an)), PX(pvx+108*sin(an))+1, PY(pvy-108*cos(an)), 1);
+  col(0.03,0.03,0.03); rct(vx-12, vy + vh - 6, vw+24, 36, 1);
+  col(0.10,0.10,0.10); rct(pvx-10, vy + vh - 2, 20, 26, 1);
+  col(0.25,0.25,0.25); rct(pvx-10, vy + vh - 2, 20, 26, 0);
+);
+// interrupteur à levier horizontal : right = 0 (gauche) / 1 (droite)
+function draw_toggle_h(cx,cy,right) local(tx, t)
+(
+  col(0.62,0.62,0.64); gfx_circle(PX(cx), PY(cy), 9*S, 1, 1);
+  col(0.30,0.30,0.31); gfx_circle(PX(cx), PY(cy), 9*S, 0, 1);
+  col(0.85,0.85,0.86); gfx_circle(PX(cx), PY(cy), 5*S, 1, 1);
+  tx = right ? cx + 16 : cx - 16;
+  col(0.75,0.75,0.77);
+  t = -2; loop(5, gfx_line(PX(cx), PY(cy+t), PX(tx), PY(cy+t*0.6), 1); t += 1;);
+  col(0.92,0.92,0.93); gfx_circle(PX(tx), PY(cy), 3.5*S, 1, 1);
+  col(0.30,0.30,0.30); gfx_circle(PX(tx), PY(cy), 3.5*S, 0, 1);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+
+vin_sr = 0;
+memset(HSL, 0, 60);
+update_params();
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+// ---- Calib : trim avant l'entrée (compensé en sortie) ----------------------
+xl = spl0*calib_g;
+xr = spl1*calib_g;
+
+// ---- Transfo d'entrée (+ Analog) ----------------------------------------------
+analog ? ( xl = analog_in(xl); xr = analog_in(xr); );
+
+// ---- Matriçage Mid/Side (le "Lat/Vert" du 670) -----------------------------------
+latvert ? (
+  ma = 0.5*(xl + xr);   // Mid  (voie du haut)
+  mb = 0.5*(xl - xr);   // Side (voie du bas)
+) : (
+  ma = xl; mb = xr;
+);
+
+// ---- Atténuateurs d'entrée -----------------------------------------------------
+ua = ma*chL.igg;
+ub = mb*(lnk_ct ? chL.igg : chR.igg);
+in_a = ua; in_b = ub;
+
+// ---- Étages variable-mu + side-chain en feedback ---------------------------------
+lnk_sc ? (
+  ga = chL.ch_proc(max(abs(ua), abs(ub)));
+  gb = ga;
+  chR.v1 = chL.v1; chR.v2 = chL.v2; chR.v3 = chL.v3; chR.gg = chL.gg;
+) : (
+  ga = chL.ch_proc(abs(ua));
+  gb = chR.ch_proc(abs(ub));
+);
+gra = -lin2db(ga);
+grb = -lin2db(gb);
+
+ya = tube_pp(ua*ga, gra);
+yb = tube_pp(ub*gb, grb);
+
+// ---- Transfo de sortie (passe-haut 20 Hz) -------------------------------------
+vt = (ya - hsa)*hp_g; lp = vt + hsa; hsa = lp + vt; ta = ya - lp;
+vt = (yb - hsb)*hp_g; lp = vt + hsb; hsb = lp + vt; tb = yb - lp;
+
+// ---- Dématriçage ----------------------------------------------------------------
+latvert ? (
+  zl = ta + tb;
+  zr = ta - tb;
+) : (
+  zl = ta; zr = tb;
+);
+
+// ---- Vintage : coupe-bas 100 Hz + coupe-haut 10 kHz (3 dB/oct) ------------
+// (filtres toujours actifs : pas de clic ; zl/zr ne sont pas des états)
+vl = vin(zl, HSL, LSL, FSL);
+vr = vin(zr, HSR, LSR, FSR);
+vintage ? ( zl = vl*vin_g; zr = vr*vin_g; );   // +2 dB après filtrage
+
+// ---- Output + compensation du Calib + hard-clip 0 dBFS -------------------------
+zl *= out_g*calib_c;
+zr *= out_g*calib_c;
+spl0 = min(max(zl, -1), 1);
+spl1 = min(max(zr, -1), 1);
+
+// ---- VU-mètres ------------------------------------------------------------------
+m = abs(in_a); via = m + vu_c*(via - m); vib = via + vu_c*(vib - via);
+m = abs(in_b); vja = m + vu_c*(vja - m); vjb = vja + vu_c*(vjb - vja);
+m = abs(ta);   voa = m + vu_c*(voa - m); vob = voa + vu_c*(vob - voa);
+m = abs(tb);   vpa = m + vu_c*(vpa - m); vpb = vpa + vu_c*(vpb - vpa);
+gma = gra + vu_c*(gma - gra); gmb = gma + vu_c*(gmb - gma);
+gna = grb + vu_c*(gna - grb); gnb = gna + vu_c*(gnb - gna);
+
+@gfx 920 480
+S  = 0.75 + 0.25*floor(slider14 + 0.5);
+ox = max(0, floor((gfx_w - 920*S)/2));
+oy = max(0, floor((gfx_h - 480*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+lv = slider9 >= 0.5;
+lc = slider11 >= 0.5;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(9, floor(20*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(11*S)), 'b');
+gfx_setfont(5, "Times New Roman", max(9, floor(26*S)), 'bi');
+
+// ---- Fond -----------------------------------------------------------------------
+col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.10,0.10,0.11);  rct(6,6,908,468,1);
+col(0.06,0.06,0.06);  rct(6,6,908,30,1);
+gfx_setfont(2); col(0.93,0.62,0.22); text_l(16, 21, "RM670");
+gfx_setfont(3); col(0.72,0.69,0.63); text_l(90, 22, "RENO MELLOW  -  VARIABLE-MU TUBE STEREO LIMITER");
+
+// ---- Deux canaux ---------------------------------------------------------------------
+ch = 0;
+loop(2,
+  y0 = 44 + ch*192;
+  ig = ch == 0 ? slider1 : (lc ? slider1 : slider5);
+  th = ch == 0 ? slider2 : (lc ? slider2 : slider6);
+  tc = ch == 0 ? slider3 : (lc ? slider3 : slider7);
+  ms = floor((ch == 0 ? slider4 : slider8) + 0.5);
+  dim = ch == 1 && lc;
+
+  // VU
+  nd = ms == 1 ? -(ch == 0 ? gmb : gnb) :
+       ms == 0 ? lin2db((ch == 0 ? vib : vjb)*1.1107) + 18 :
+                 lin2db((ch == 0 ? vob : vpb)*1.1107) + 18;
+  draw_vu(46, y0 + 14, nd);
+
+  // libellés de canal
+  gfx_setfont(4);
+  col(0.92,0.92,0.92);
+  lv ? ( ch == 0 ? strcpy(#nm, "MID")  : strcpy(#nm, "SIDE");  )
+     : ( ch == 0 ? strcpy(#nm, "LEFT") : strcpy(#nm, "RIGHT"); );
+
+  // Metering (IN / GR / OUT)
+  mkx = 290; mky = y0 + 92;
+  lv ? col(0.85,0.20,0.15) : col(0.92,0.92,0.92); text_c(mkx, y0 + 10, #nm);
+  col(0.92,0.92,0.92); text_c(mkx, y0 + 24, "METERING");
+  gfx_setfont(3);
+  ring_label(mkx, mky, 44, 0.32, "IN"); ring_label(mkx, mky, 44, 0.5, "GR"); ring_label(mkx, mky, 44, 0.68, "OUT");
+  draw_pointer(mkx, mky, 20, 0.32 + ms*0.18);
+
+  // Input Gain (0..20)
+  ikx = 440; iky = y0 + 100;
+  gfx_setfont(4); col(0.92,0.92,0.92);
+  lv ? col(0.85,0.20,0.15) : col(0.92,0.92,0.92);
+  sprintf(#s, "%s CHANNEL", #nm); text_c(ikx, y0 + 10, #s);
+  col(0.92,0.92,0.92);
+  text_c(ikx, y0 + 24, "INPUT GAIN");
+  gfx_setfont(3);
+  i = 0; loop(11, sprintf(#s, "%d", 20 - i*2); ring_label(ikx, iky, 66, i/10, #s); i += 1;);
+  dim ? col(0.4,0.4,0.4) : col(0.92,0.92,0.92);
+  draw_knob(ikx, iky, 46, 1 - ig/20);
+  gfx_setfont(3); col(0.70,0.70,0.70);
+  sprintf(#s, "%+d dB", 10 - ig); text_c(ikx, y0 + 186, #s);
+
+  // Threshold (0..10)
+  tkx = 610; tky = y0 + 100;
+  gfx_setfont(4); col(0.92,0.92,0.92);
+  lv ? col(0.85,0.20,0.15) : col(0.92,0.92,0.92); text_c(tkx, y0 + 10, #nm);
+  col(0.92,0.92,0.92); text_c(tkx, y0 + 24, "THRESHOLD");
+  gfx_setfont(3);
+  i = 0; loop(11, sprintf(#s, "%d", i); ring_label(tkx, tky, 64, i/10, #s); i += 1;);
+  draw_knob(tkx, tky, 44, th/10);
+  gfx_setfont(3); col(0.70,0.70,0.70);
+  th <= 0.05 ? strcpy(#s, "OFF") : sprintf(#s, "%.1f", th);
+  text_c(tkx, y0 + 186, #s);
+
+  // Time Constant (1..6)
+  ckx = 790; cky = y0 + 84;
+  gfx_setfont(4); col(0.92,0.92,0.92);
+  lv ? col(0.85,0.20,0.15) : col(0.92,0.92,0.92); text_c(ckx, y0 + 10, #nm);
+  col(0.92,0.92,0.92); text_c(ckx, y0 + 24, "TIME CONSTANT");
+  gfx_setfont(3);
+  i = 1; loop(6, sprintf(#s, "%d", i); ring_label(ckx, cky, 34, 0.2 + (i-1)*0.12, #s); i += 1;);
+  draw_pointer(ckx, cky, 15, 0.2 + (floor(tc + 0.5) - 1)*0.12);
+  ch += 1;
+);
+
+// ---- AGC (Left-Right / Mid-Side) ---------------------------------------------------
+akx = 790; aky = 222;
+gfx_setfont(4); col(0.92,0.92,0.92);
+text_c(akx, 180, "AGC");
+lv ? col(0.55,0.55,0.55) : col(0.92,0.92,0.92);
+text_c(akx - 50, 196, "LEFT"); text_c(akx - 50, 208, "RIGHT");
+lv ? col(0.85,0.20,0.15) : col(0.55,0.55,0.55);
+text_c(akx + 50, 196, "MID"); text_c(akx + 50, 208, "SIDE");
+draw_pointer(akx, aky, 13, lv ? 0.62 : 0.38);
+
+// ---- Logo -------------------------------------------------------------------------
+gfx_setfont(5); col(0.80,0.15,0.12); text_c(760, 384, "ReNo Mellow");
+gfx_setfont(4); col(0.85,0.85,0.85); text_c(760, 408, "MODEL 670");
+
+// ---- Bandeau d'options --------------------------------------------------------------
+oby = 438; cky2 = oby + 11;
+col(0.06,0.06,0.06); rct(6, 430, 908, 44, 1);
+gfx_setfont(1);
+draw_btn(14,  oby, 74, 22, slider10 >= 0.5, "LINK S.C.");
+draw_btn(92,  oby, 74, 22, slider11 >= 0.5, "LINK CTRL");
+draw_btn(170, oby, 64, 22, slider15 >= 0.5, "ANALOG");
+gfx_setfont(3); col(0.85,0.82,0.75);
+text_c(256, cky2, "CALIB");  draw_knob_s(286, cky2, 10, (slider16 + 12)/24);
+col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider16); text_c(286, cky2 + 18, #s);
+col(0.85,0.82,0.75);
+text_c(322, cky2, "DC");     draw_knob_s(346, cky2, 10, slider12/10);
+col(0.93,0.90,0.82); sprintf(#s, "%.1f", slider12); text_c(346, cky2 + 18, #s);
+col(0.85,0.82,0.75);
+text_c(384, cky2, "OUT");    draw_knob_s(410, cky2, 10, (slider13 + 12)/24);
+col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider13); text_c(410, cky2 + 18, #s);
+// Classic / Vintage (interrupteur à levier comme le RM2A)
+vint = slider17 >= 0.5;
+swx = 534;
+gfx_setfont(3);
+vint ? col(0.60,0.58,0.52) : col(0.95,0.45,0.35); text_c(swx - 48, cky2, "CLASSIC");
+vint ? col(0.95,0.45,0.35) : col(0.60,0.58,0.52); text_c(swx + 50, cky2, "VINTAGE");
+draw_toggle_h(swx, cky2, vint);
+// taille
+gfx_setfont(3); col(0.85,0.82,0.75); text_c(640, cky2, "SIZE");
+szx = 666; szy = oby + 1;
+gfx_setfont(1);
+sz = floor(slider14 + 0.5);
+draw_btn(szx,      szy, 50, 20, sz == 0, "75%");
+draw_btn(szx+54,   szy, 50, 20, sz == 1, "100%");
+draw_btn(szx+108,  szy, 50, 20, sz == 2, "125%");
+draw_btn(szx+162,  szy, 50, 20, sz == 3, "150%");
+
+// ---- Souris ---------------------------------------------------------------------
+md = mouse_cap & 1;
+(md && !last_md) ? (
+  drag = 0; acc = 0;
+  ch = 0;
+  loop(2,
+    y0 = 44 + ch*192;
+    in_circ(440, y0 + 100, 50) ? (drag = 1 + ch*10) :
+    in_circ(610, y0 + 100, 48) ? (drag = 2 + ch*10) :
+    in_circ(790, y0 + 84, 26)  ? (drag = 3 + ch*10);
+    // Metering : clic = position suivante
+    in_circ(290, y0 + 92, 30) ? (
+      ch == 0 ? (slider4 = (floor(slider4 + 0.5) + 1) % 3; slider_automate(slider4);)
+              : (slider8 = (floor(slider8 + 0.5) + 1) % 3; slider_automate(slider8););
+    );
+    ch += 1;
+  );
+  (lc && drag >= 11) ? drag = 0;   // canal droit verrouillé par Link Controls
+  in_circ(akx, aky, 26) ? (slider9 = slider9 >= 0.5 ? 0 : 1; slider_automate(slider9););
+  in_circ(286, cky2, 13) ? (drag = 20) :
+  in_circ(346, cky2, 13) ? (drag = 21) :
+  in_circ(410, cky2, 13) ? (drag = 22);
+  start = drag == 3 ? slider3 : drag == 13 ? slider7 : drag == 1 ? slider1 : drag == 11 ? slider5 : 0;
+
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1  ? (slider1 = 10; slider_automate(slider1);) :
+    drag == 2  ? (slider2 = 8;  slider_automate(slider2);) :
+    drag == 3  ? (slider3 = 3;  slider_automate(slider3);) :
+    drag == 11 ? (slider5 = 10; slider_automate(slider5);) :
+    drag == 12 ? (slider6 = 8;  slider_automate(slider6);) :
+    drag == 13 ? (slider7 = 3;  slider_automate(slider7);) :
+    drag == 20 ? (slider16 = 0; slider_automate(slider16);) :
+    drag == 21 ? (slider12 = 5; slider_automate(slider12);) :
+                 (slider13 = 0; slider_automate(slider13););
+    drag = 0;
+  );
+
+  in_rect(14,  oby, 74, 22) ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
+  in_rect(92,  oby, 74, 22) ? (slider11 = slider11 >= 0.5 ? 0 : 1; slider_automate(slider11););
+  in_rect(170, oby, 64, 22) ? (slider15 = slider15 >= 0.5 ? 0 : 1; slider_automate(slider15););
+  in_rect(swx - 80, oby - 2, 160, 26) ? (slider17 = slider17 >= 0.5 ? 0 : 1; slider_automate(slider17););
+  in_rect(szx,     szy, 50, 20) ? (slider14 = 0; sliderchange(slider14););
+  in_rect(szx+54,  szy, 50, 20) ? (slider14 = 1; sliderchange(slider14););
+  in_rect(szx+108, szy, 50, 20) ? (slider14 = 2; sliderchange(slider14););
+  in_rect(szx+162, szy, 50, 20) ? (slider14 = 3; sliderchange(slider14););
+);
+
+(md && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.1 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    acc += dy;
+    // Input Gain : atténuateur à crans (1 dB / 8 px)
+    drag == 1  ? ( v = min(max(floor(start - acc/8 + 0.5), 0), 20); v != slider1 ? (slider1 = v; slider_automate(slider1);); ) :
+    drag == 11 ? ( v = min(max(floor(start - acc/8 + 0.5), 0), 20); v != slider5 ? (slider5 = v; slider_automate(slider5);); ) :
+    drag == 2  ? ( slider2 = min(max(slider2 + dy*0.05, 0), 10); slider_automate(slider2); ) :
+    drag == 12 ? ( slider6 = min(max(slider6 + dy*0.05, 0), 10); slider_automate(slider6); ) :
+    drag == 3  ? ( v = min(max(floor(start + acc/22 + 0.5), 1), 6); v != slider3 ? (slider3 = v; slider_automate(slider3);); ) :
+    drag == 13 ? ( v = min(max(floor(start + acc/22 + 0.5), 1), 6); v != slider7 ? (slider7 = v; slider_automate(slider7);); ) :
+    drag == 20 ? ( slider16 = min(max(slider16 + dy*0.12, -12), 12); slider_automate(slider16); ) :
+    drag == 21 ? ( slider12 = min(max(slider12 + dy*0.05,   0), 10); slider_automate(slider12); ) :
+    drag == 22 ? ( slider13 = min(max(slider13 + dy*0.12, -12), 12); slider_automate(slider13); );
+  );
+);
+!md ? (drag = 0);
+last_md = md;
+last_my = (mouse_y - oy)/S;

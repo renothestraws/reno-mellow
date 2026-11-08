@@ -1,0 +1,504 @@
+desc:RM1176 - ReNo Mellow 1176 (FET Limiting Amplifier)
+//tags: dynamics compressor limiter FET 1176
+//@author ReNo Mellow
+//@version 1.0
+//@changelog Première version publique
+//@about Compresseur/limiteur FET inspiré du 1176 : ratios 4/8/12/20 et all-buttons, attaque et release ultra-rapides, Punch, Analog, Calib.
+//
+// ---------------------------------------------------------------------------
+// RM1176 - émulation d'un limiteur FET type 1176LN (rev. D/E, sortie classe A)
+//
+// CALIBRATION
+//   0 VU = +4 dBu = 1.23 V RMS = -18 dBFS   =>   0 dBFS = +22 dBu
+//   Input à 24 + ratio 4:1 : une sinusoïde à 0 VU (-18 dBFS RMS) est au seuil.
+//   Les ratios plus élevés relèvent le seuil (comme sur le hardware).
+//   Les seuils sont modifiables dans @init (THR_xx, en dBu RMS sinus).
+//
+// OPTIONS
+//   Calib  : trim -12 / +12 dB placé AVANT l'entrée (avant Input, Analog,
+//            transfo et détection), compensé à l'inverse en sortie
+//            (+5 dB en entrée -> -5 dB en sortie, avant le hard-clip).
+//            Change la quantité de compression sans changer le niveau.
+//   Size   : 75 / 100 / 125 / 150 % de l'interface
+//   Analog : gain d'entrée non linéaire (saturation très légère, H2 + H3)
+//   Punch  : +33 ms ajoutées au temps d'attaque
+//
+// SORTIE
+//   Hard-clip permanent à 0 dBFS, non visible et non réglable.
+//
+// INTERFACE
+//   Glisser verticalement sur les boutons. Shift = réglage fin.
+//   Ctrl + clic = valeur par défaut (12 h).
+// ---------------------------------------------------------------------------
+
+slider1:24<0,48,0.1>-Input
+slider2:24<0,48,0.1>-Output
+slider3:3.5<0,7,0.01>-Attack (0 = OFF)
+slider4:4<1,7,0.01>-Release
+slider5:0<0,4,1{4:1,8:1,12:1,20:1,All-Button}>-Ratio
+slider6:1<0,3,1{GR,Out,In,OFF}>-Meter
+slider7:1<0,1,1{Dual Mono,Stereo Link}>-Stereo
+slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+slider9:0<0,1,1{Off,On}>-Analog
+slider10:0<0,1,1{Off,On}>-Punch
+slider11:0<-12,12,0.1>-Calib (dB)
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+// ---- Calibration ---------------------------------------------------------
+DBU_AT_0DBFS = 22;          // -18 dBFS = +4 dBu
+// Seuils (dBu RMS d'une sinusoïde au point de détection, Input = 24)
+THR_4   = 4;                // 4:1  -> 0 VU
+THR_8   = 6;                // 8:1
+THR_12  = 8;                // 12:1
+THR_20  = 10;               // 20:1
+THR_ALL = 2;                // All-Button
+
+// ---- Analog : saturation d'entrée --------------------------------------------
+AN_K = 0.5;                 // pente (plus haut = plus de saturation)
+AN_B = 0.1;                 // asymétrie (plus haut = plus de H2)
+
+// ---- Punch ------------------------------------------------------------------
+PUNCH_ADD = 0.033;          // +33 ms sur l'attaque
+
+// Graduations du VU (mémoire 0..10)
+marks = 0;
+marks[0]=-20; marks[1]=-10; marks[2]=-7; marks[3]=-5; marks[4]=-3; marks[5]=-2;
+marks[6]=-1;  marks[7]=0;   marks[8]=1;  marks[9]=2;  marks[10]=3;
+
+// ---- Outils ----------------------------------------------------------------
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x,0.0000000001)); );
+function tanh_(x) local(e) ( x = min(max(x,-20),20); e = exp(2*x); (e-1)/(e+1); );
+
+// Courbe de gain (knee doux). Statique équivalente à la topologie feedback :
+// GR = (1 - 1/R) * dépassement.
+function gain_comp(e) local(over, g)
+(
+  over = lin2db(e) - thr_db;
+  g = over <= -0.5*knee ? 0 :
+      (over < 0.5*knee ? slope*sqr(over + 0.5*knee)/(2*knee) : slope*over);
+  // All-Button : sur-compression (la sortie redescend quand l'entrée monte)
+  (all_mode && over > 6) ? (g += 0.3*(over - 6));
+  min(g, 40);
+);
+
+// Saturation d'entrée "Analog" : tanh asymétrique, pente unitaire à 0,
+// 0 en entrée -> 0 en sortie (pas d'offset DC statique).
+function analog_in(x)
+(
+  (tanh_(AN_K*(x + AN_B)) - an_t0)*an_norm;
+);
+
+// Étage de sortie classe A : légère asymétrie (H2) + saturation douce vers +24 dBu
+function class_a(x) local(a)
+(
+  x += 0.008*x*x;
+  a = abs(x);
+  a > 0.6 ? (a = 0.6 + 0.7*tanh_((a - 0.6)/0.7));
+  sign(x)*a;
+);
+
+function update_params() local(ap, rp, t_att, t_rel, thr_dbu)
+(
+  calib_g = db2lin(min(max(slider11, -12), 12));   // trim d'entrée
+  calib_c = 1/calib_g;                             // compensation de sortie
+  in_g  = slider1 <= 0 ? 0 : db2lin(slider1 - 24)*min(slider1/4, 1);
+  out_g = slider2 <= 0 ? 0 : db2lin(slider2 - 24)*min(slider2/4, 1);
+
+  comp_on = slider3 >= 0.5;               // Attack sur OFF = couleur seule
+  ap = max(slider3, 1);
+  rp = slider4;
+  t_att = 0.000800*(20/800)^((ap - 1)/6);  // 800 µs -> 20 µs
+  t_rel = 1.100*(50/1100)^((rp - 1)/6);    // 1100 ms -> 50 ms
+
+  link = slider7 >= 0.5;
+  link ? (t_att += 0.000020);              // en stéréo, l'attaque la plus rapide double
+
+  mode = floor(slider5 + 0.5);
+  mode == 0 ? (ratio = 4;  thr_dbu = THR_4;  knee = 10;) :
+  mode == 1 ? (ratio = 8;  thr_dbu = THR_8;  knee = 8;) :
+  mode == 2 ? (ratio = 12; thr_dbu = THR_12; knee = 6;) :
+  mode == 3 ? (ratio = 20; thr_dbu = THR_20; knee = 4;) :
+              (ratio = 16; thr_dbu = THR_ALL; knee = 6; t_att *= 3; t_rel *= 0.7;);
+  all_mode = (mode == 4);
+  slope = 1 - 1/ratio;
+
+  punch = slider10 >= 0.5;
+  punch ? (t_att += PUNCH_ADD);
+
+  analog = slider9 >= 0.5;
+  an_t0   = tanh_(AN_K*AN_B);
+  an_norm = 1/(AN_K*(1 - an_t0*an_t0));
+
+  // seuil exprimé en crête dBFS (sinus : crête = RMS + 3.01 dB)
+  thr_db = thr_dbu - DBU_AT_0DBFS + 3.0103;
+
+  att_c = exp(-1/(t_att*srate));
+  rel_c = exp(-1/(t_rel*srate));
+
+  fet_k = all_mode ? 0.007 : 0.0017;       // distorsion du FET selon la GR
+
+  lf_c   = exp(-2*$pi*120/srate);          // grave du transfo d'entrée
+  hf_c   = exp(-2*$pi*6000/srate);         // léger tilt brillant
+  tilt_g = db2lin(0.6) - 1;
+  dc_c   = exp(-2*$pi*8/srate);            // passe-haut transfo / DC
+  vu_c   = exp(-1/(0.045*srate));          // balistique VU (~300 ms)
+);
+
+// ---- Outils graphiques (coordonnées logiques 640 x 310, mises à l'échelle) --
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,s) local(w,h) ( gfx_measurestr(s,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(s); );
+function text_l(x,y,s) ( gfx_x = PX(x); gfx_y = PY(y); gfx_drawstr(s); );
+function knob_pt(cx,cy,rad,frac) local(a)
+(
+  a = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(a);
+  ky = cy - rad*sin(a);
+);
+function ring_label(cx,cy,rad,frac,s) ( knob_pt(cx,cy,rad,frac); text_c(kx,ky,s); );
+function draw_knob(cx,cy,r,frac) local(i, x1, y1, t)
+(
+  col(0.70,0.67,0.60);
+  i = 0;
+  loop(13,
+    knob_pt(cx,cy,r+4,i/12); x1 = kx; y1 = ky;
+    knob_pt(cx,cy,r+9,i/12);
+    ln(x1,y1,kx,ky);
+    i += 1;
+  );
+  col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.17,0.17,0.19); gfx_circle(PX(cx), PY(cy), r*0.86*S, 1, 1);
+  col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
+  col(0.96,0.93,0.86);
+  knob_pt(cx,cy,r*0.2,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.8,frac);
+  t = 0;
+  loop(max(2, ceil(2*S)),
+    gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1);
+    gfx_line(PX(x1), PY(y1)+t, PX(kx), PY(ky)+t, 1);
+    t += 1;
+  );
+);
+// petit potard sans graduation (Calib), repère central à 12 h
+function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
+(
+  col(0.70,0.67,0.60);
+  knob_pt(cx,cy,r+2,0.5); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r+5,0.5);
+  ln(x1,y1,kx,ky);
+  col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
+  col(0.93,0.62,0.22);
+  knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.8,frac);
+  t = 0;
+  loop(max(1, ceil(1.5*S)),
+    gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1);
+    t += 1;
+  );
+);
+function draw_btn(x,y,w,h,on,s)
+(
+  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  rct(x,y,w,h,1);
+  col(0.04,0.04,0.04); rct(x,y,w,h,0);
+  on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
+  text_c(x + w*0.5, y + h*0.5, s);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function vu_ang(db) local(v)
+(
+  v = (db2lin(min(max(db,-20),3)) - 0.1)/(1.41254 - 0.1);
+  (-32 + 64*v)*$pi/180;
+);
+
+update_params();
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+// ---- Calib : trim transparent avant l'entrée --------------------------------
+xl = spl0*calib_g;
+xr = spl1*calib_g;
+
+// ---- VU d'entrée (après Calib, avant Input) : 0 VU = +4 dBu = -18 dBFS ------
+mi = max(abs(xl), abs(xr));
+vi_a = mi + vu_c*(vi_a - mi);  vi_b = vi_a + vu_c*(vi_b - vi_a);
+
+// ---- Entrée : atténuateur (+ saturation Analog) + transfo ------------------
+xl *= in_g;
+xr *= in_g;
+analog ? (
+  xl = analog_in(xl);
+  xr = analog_in(xr);
+);
+lfl = xl + lf_c*(lfl - xl);  xl -= 0.06*lfl*lfl*lfl;
+lfr = xr + lf_c*(lfr - xr);  xr -= 0.06*lfr*lfr*lfr;
+
+// ---- Détection : redressement double alternance + charge/décharge (C22) ---
+link ? (
+  d = max(abs(xl), abs(xr));
+  envl = d + (d > envl ? att_c : rel_c)*(envl - d);
+  envr = envl;
+) : (
+  d = abs(xl); envl = d + (d > envl ? att_c : rel_c)*(envl - d);
+  d = abs(xr); envr = d + (d > envr ? att_c : rel_c)*(envr - d);
+);
+
+comp_on ? (
+  grl = gain_comp(envl);
+  grr = link ? grl : gain_comp(envr);
+) : (
+  grl = 0; grr = 0;
+);
+
+// ---- Réduction de gain FET (+ harmoniques paires selon la GR) -------------
+yl = xl*db2lin(-grl);
+yr = xr*db2lin(-grr);
+yl += fet_k*min(grl,20)*yl*yl;
+yr += fet_k*min(grr,20)*yr*yr;
+
+// ---- Préampli : léger tilt brillant ----------------------------------------
+hfl = yl + hf_c*(hfl - yl);  yl += tilt_g*(yl - hfl);
+hfr = yr + hf_c*(hfr - yr);  yr += tilt_g*(yr - hfr);
+
+// ---- Output + étage classe A + transfo de sortie ---------------------------
+yl = class_a(yl*out_g);
+yr = class_a(yr*out_g);
+ol  = yl - dxl + dc_c*ol;   dxl = yl;
+orr = yr - dxr + dc_c*orr;  dxr = yr;
+
+// ---- Compensation du Calib (inverse du trim d'entrée) ----------------------
+// (variables séparées : ol/orr sont la mémoire du passe-haut DC)
+zl = ol*calib_c;
+zr = orr*calib_c;
+
+// ---- Hard-clip 0 dBFS (permanent, invisible) ------------------------------
+spl0 = min(max(zl, -1), 1);
+spl1 = min(max(zr, -1), 1);
+
+// ---- Mesures VU -------------------------------------------------------------
+m = max(abs(spl0), abs(spl1));
+vu_a = m + vu_c*(vu_a - m);    vu_b = vu_a + vu_c*(vu_b - vu_a);
+m = max(grl, grr);
+gr_a = m + vu_c*(gr_a - m);    gr_b = gr_a + vu_c*(gr_b - gr_a);
+
+@gfx 640 310
+S  = 0.75 + 0.25*floor(slider8 + 0.5);
+ox = max(0, floor((gfx_w - 640*S)/2));
+oy = max(0, floor((gfx_h - 310*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+gm = floor(slider5 + 0.5);
+sm = floor(slider6 + 0.5);
+
+gfx_setfont(1, "Arial", max(6, floor(13*S)));
+gfx_setfont(2, "Arial", max(9, floor(22*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)));
+
+// ---- Fond -------------------------------------------------------------------
+col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.24,0.23,0.215); rct(6,6,628,298,1);
+col(0.33,0.31,0.29);  rct(6,6,628,298,0);
+col(0.08,0.08,0.08);  rct(6,6,628,30,1);
+gfx_setfont(2); col(0.93,0.62,0.22); text_l(16, 10, "RM1176");
+gfx_setfont(3); col(0.72,0.69,0.63); text_l(118, 17, "RENO MELLOW  -  FET LIMITING AMPLIFIER");
+
+// ---- Boutons Input / Output -------------------------------------------------
+ikx = 90;  iky = 148;
+okx = 215; oky = 148;
+akx = 332; aky = 100;
+rkx = 332; rky = 200;
+
+gfx_setfont(3); col(0.85,0.82,0.75);
+i = 0;
+loop(9,
+  sprintf(#s, "%d", i*6);
+  ring_label(ikx,iky,64,i/8,#s);
+  ring_label(okx,oky,64,i/8,#s);
+  i += 1;
+);
+draw_knob(ikx,iky,44,slider1/48);
+draw_knob(okx,oky,44,slider2/48);
+gfx_setfont(1); col(0.93,0.90,0.82);
+text_c(ikx, 230, "INPUT");
+text_c(okx, 230, "OUTPUT");
+gfx_setfont(3); col(0.70,0.67,0.60);
+sprintf(#s, "%.1f", slider1); text_c(ikx, 246, #s);
+sprintf(#s, "%.1f", slider2); text_c(okx, 246, #s);
+
+// ---- Attack / Release -------------------------------------------------------
+gfx_setfont(3); col(0.85,0.82,0.75);
+ring_label(akx,aky,38,0,"OFF");
+i = 1;
+loop(7,
+  sprintf(#s, "%d", i);
+  ring_label(akx,aky,38,i/7,#s);
+  ring_label(rkx,rky,38,(i-1)/6,#s);
+  i += 1;
+);
+draw_knob(akx,aky,22,slider3/7);
+draw_knob(rkx,rky,22,(slider4-1)/6);
+gfx_setfont(1); col(0.93,0.90,0.82);
+text_c(akx, 46, "ATTACK");
+text_c(rkx, 254, "RELEASE");
+
+// ---- Ratio ------------------------------------------------------------------
+gfx_setfont(3); col(0.85,0.82,0.75);
+text_c(412, 48, "RATIO");
+by = 58;
+gfx_setfont(1);
+draw_btn(392, by,     40, 24, gm == 3 || gm == 4, "20");
+draw_btn(392, by+30,  40, 24, gm == 2 || gm == 4, "12");
+draw_btn(392, by+60,  40, 24, gm == 1 || gm == 4, "8");
+draw_btn(392, by+90,  40, 24, gm == 0 || gm == 4, "4");
+draw_btn(392, by+130, 40, 24, gm == 4, "ALL");
+
+// ---- VU-mètre ---------------------------------------------------------------
+vx = 452; vy = 48; vw = 172; vh = 128;
+col(0.05,0.05,0.05); rct(vx-3,vy-3,vw+6,vh+6,1);
+sm < 3 ? col(0.97,0.87,0.60) : col(0.40,0.37,0.31);
+rct(vx,vy,vw,vh,1);
+pvx = vx + vw*0.5;
+pvy = vy + vh + 36;
+
+j = 0;
+col(0.12,0.10,0.08);
+loop(40,
+  a1 = vu_ang(-20 + j*0.5); a2 = vu_ang(-20 + (j+1)*0.5);
+  ln(pvx+120*sin(a1), pvy-120*cos(a1), pvx+120*sin(a2), pvy-120*cos(a2));
+  j += 1;
+);
+col(0.78,0.12,0.08);
+j = 0;
+loop(20,
+  a1 = vu_ang(j*0.15); a2 = vu_ang((j+1)*0.15);
+  ln(pvx+122*sin(a1), pvy-122*cos(a1), pvx+122*sin(a2), pvy-122*cos(a2));
+  ln(pvx+123.5*sin(a1), pvy-123.5*cos(a1), pvx+123.5*sin(a2), pvy-123.5*cos(a2));
+  j += 1;
+);
+gfx_setfont(3);
+i = 0;
+loop(11,
+  db = marks[i];
+  a = vu_ang(db);
+  db > 0 ? col(0.78,0.12,0.08) : col(0.12,0.10,0.08);
+  ln(pvx+120*sin(a), pvy-120*cos(a), pvx+131*sin(a), pvy-131*cos(a));
+  sprintf(#s, "%d", abs(db));
+  text_c(pvx+142*sin(a), pvy-142*cos(a), #s);
+  i += 1;
+);
+gfx_setfont(1); col(0.15,0.12,0.09);
+text_c(pvx, vy+vh-44, "VU");
+gfx_setfont(3);
+sm == 0 ? text_c(pvx, vy+vh-28, "GAIN REDUCTION") :
+sm == 1 ? text_c(pvx, vy+vh-28, "OUTPUT  +4") :
+sm == 2 ? text_c(pvx, vy+vh-28, "INPUT  +4");
+
+nd = sm == 0 ? -gr_b :
+     sm == 1 ? lin2db(vu_b*1.1107) + 18 :
+     sm == 2 ? lin2db(vi_b*1.1107) + 18 : -20;
+a = vu_ang(nd);
+col(0.06,0.05,0.04);
+ln(pvx+46*sin(a), pvy-46*cos(a), pvx+138*sin(a), pvy-138*cos(a));
+S >= 1.5 ? gfx_line(PX(pvx+46*sin(a))+1, PY(pvy-46*cos(a)), PX(pvx+138*sin(a))+1, PY(pvy-138*cos(a)), 1);
+col(0.10,0.09,0.08); rct(vx, vy+vh-12, vw, 12, 1);
+
+// ---- Sélecteur du meter + link ---------------------------------------------
+mby = 188;
+gfx_setfont(1);
+draw_btn(vx,     mby, 40, 22, sm == 0, "GR");
+draw_btn(vx+44,  mby, 40, 22, sm == 1, "OUT");
+draw_btn(vx+88,  mby, 40, 22, sm == 2, "IN");
+draw_btn(vx+132, mby, 40, 22, sm == 3, "OFF");
+draw_btn(vx, 222, 172, 24, slider7 >= 0.5, "STEREO LINK");
+
+// ---- Bandeau d'options ------------------------------------------------------
+col(0.33,0.31,0.29); ln(14, 268, 626, 268);
+oby = 276;
+draw_btn(20,  oby, 84, 22, slider9  >= 0.5, "ANALOG");
+draw_btn(112, oby, 84, 22, slider10 >= 0.5, "PUNCH");
+ckx = 262; cky = oby + 11;
+gfx_setfont(3); col(0.85,0.82,0.75);
+text_c(226, cky, "CALIB");
+draw_knob_s(ckx, cky, 10, (slider11 + 12)/24);
+col(0.93,0.90,0.82);
+sprintf(#s, "%+.1f dB", slider11);
+text_l(278, cky - 6, #s);
+gfx_setfont(3); col(0.85,0.82,0.75);
+text_c(424, oby+11, "SIZE");
+gfx_setfont(1);
+sz = floor(slider8 + 0.5);
+draw_btn(vx,     oby, 40, 22, sz == 0, "75%");
+draw_btn(vx+44,  oby, 40, 22, sz == 1, "100%");
+draw_btn(vx+88,  oby, 40, 22, sz == 2, "125%");
+draw_btn(vx+132, oby, 40, 22, sz == 3, "150%");
+
+// ---- Souris -----------------------------------------------------------------
+md = mouse_cap & 1;
+(md && !last_md) ? (
+  drag = 0;
+  in_circ(ikx,iky,48) ? (drag = 1) :
+  in_circ(okx,oky,48) ? (drag = 2) :
+  in_circ(akx,aky,27) ? (drag = 3) :
+  in_circ(rkx,rky,27) ? (drag = 4) :
+  in_circ(ckx,cky,14) ? (drag = 5);
+
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? (slider1 = 24;  slider_automate(slider1);) :
+    drag == 2 ? (slider2 = 24;  slider_automate(slider2);) :
+    drag == 3 ? (slider3 = 3.5; slider_automate(slider3);) :
+    drag == 4 ? (slider4 = 4;   slider_automate(slider4);) :
+                (slider11 = 0;  slider_automate(slider11););
+    drag = 0;
+  );
+
+  in_rect(392, by,     40, 24) ? (slider5 = 3; slider_automate(slider5););
+  in_rect(392, by+30,  40, 24) ? (slider5 = 2; slider_automate(slider5););
+  in_rect(392, by+60,  40, 24) ? (slider5 = 1; slider_automate(slider5););
+  in_rect(392, by+90,  40, 24) ? (slider5 = 0; slider_automate(slider5););
+  in_rect(392, by+130, 40, 24) ? (slider5 = 4; slider_automate(slider5););
+
+  in_rect(vx,     mby, 40, 22) ? (slider6 = 0; slider_automate(slider6););
+  in_rect(vx+44,  mby, 40, 22) ? (slider6 = 1; slider_automate(slider6););
+  in_rect(vx+88,  mby, 40, 22) ? (slider6 = 2; slider_automate(slider6););
+  in_rect(vx+132, mby, 40, 22) ? (slider6 = 3; slider_automate(slider6););
+  in_rect(vx, 222, 172, 24) ? (slider7 = slider7 >= 0.5 ? 0 : 1; slider_automate(slider7););
+
+  in_rect(20,  oby, 84, 22) ? (slider9  = slider9  >= 0.5 ? 0 : 1; slider_automate(slider9););
+  in_rect(112, oby, 84, 22) ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
+
+  in_rect(vx,     oby, 40, 22) ? (slider8 = 0; sliderchange(slider8););
+  in_rect(vx+44,  oby, 40, 22) ? (slider8 = 1; sliderchange(slider8););
+  in_rect(vx+88,  oby, 40, 22) ? (slider8 = 2; sliderchange(slider8););
+  in_rect(vx+132, oby, 40, 22) ? (slider8 = 3; sliderchange(slider8););
+);
+
+(md && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.1 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? (slider1 = min(max(slider1 + dy*0.24, 0), 48); slider_automate(slider1);) :
+    drag == 2 ? (slider2 = min(max(slider2 + dy*0.24, 0), 48); slider_automate(slider2);) :
+    drag == 3 ? (slider3 = min(max(slider3 + dy*0.035, 0), 7); slider_automate(slider3);) :
+    drag == 4 ? (slider4 = min(max(slider4 + dy*0.03, 1), 7);  slider_automate(slider4);) :
+    drag == 5 ? (slider11 = min(max(slider11 + dy*0.12, -12), 12); slider_automate(slider11););
+  );
+);
+!md ? (drag = 0);
+last_md = md;
+last_my = (mouse_y - oy)/S;

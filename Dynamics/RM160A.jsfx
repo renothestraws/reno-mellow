@@ -1,0 +1,474 @@
+desc:RM160A - ReNo Mellow 160A (True RMS VCA Compressor/Limiter)
+//tags: dynamics compressor limiter VCA RMS dbx 160
+//@author ReNo Mellow
+//@version 1.0
+//@changelog Première version publique
+//@about Compresseur/limiteur VCA à RMS vrai inspiré du dbx 160A : OverEasy, ratios jusqu'à -1:1, vumètres LED.
+//
+// ---------------------------------------------------------------------------
+// RM160A - émulation d'un compresseur/limiteur VCA type dbx 160A
+//
+// CALIBRATION
+//   0 VU = +4 dBu = 1.23 V RMS = -18 dBFS   =>   0 dBFS = +22 dBu
+//   Le seuil est gradué en dBu RMS comme le hardware (-40 à +20 dBu), donc
+//   threshold +4 dBu = sinusoïde à -18 dBFS RMS. Afficheur de niveau :
+//   0 = +4 dBu = -18 dBFS (comme la calibration d'usine du 160A).
+//
+// DÉTECTION (dbx True RMS, feedforward)
+//   - Le détecteur est câblé en parallèle sur l'entrée : feedforward.
+//   - True RMS : moyenne de la puissance, constante unique de 34,7 ms.
+//     Les temps dépendent donc du programme, sans réglages attack/release :
+//       attaque 15,8 ms pour 10 dB, 6,7 ms pour 20 dB, 2,8 ms pour 30 dB
+//       (spec : 15 / 5 / 3 ms) ; release à vitesse constante 125 dB/s
+//       (1 dB en 8 ms, 10 dB en 80 ms, 50 dB en 400 ms - identique spec).
+//   - Calcul de gain dans le domaine log, appliqué directement à la VCA.
+//   - OverEasy : genou doux de OVEREASY_W dB centré sur le seuil (le seuil est le
+//     milieu de la zone, comme le manuel). Hard Knee : rotation au seuil.
+//   - Ratio continu 1:1 -> inf:1 -> Infinity+ jusqu'à -1:1 (la sortie baisse
+//     quand l'entrée monte). Jusqu'à 60 dB de réduction.
+//   - Link : sommation des puissances RMS (True RMS Power Summing).
+//   - THD 0,06 % à 1 kHz avec 30 dB de GR (spec < 0,2 %), plus dans le grave
+//     (ondulation du détecteur RMS, comme l'original).
+//
+// OPTIONS : Calib (trim compensé en sortie), Analog, Size.
+// SORTIE  : hard-clip permanent à 0 dBFS, non visible et non réglable.
+//
+// INTERFACE : glisser verticalement sur les potards (Shift = fin, Ctrl+clic
+//             = défaut). Clic sur les boutons pour les enclencher.
+// ---------------------------------------------------------------------------
+
+slider1:0<-40,20,0.1>-Threshold (dBu)
+slider2:0.45<0,1,0.001>-Compression Ratio (position)
+slider3:0<-20,20,0.1>-Output Gain (dB)
+slider4:1<0,1,1{Hard Knee,OverEasy}>-OverEasy
+slider5:0<0,1,1{Output,Input}>-Display
+slider6:1<0,1,1{Off,On}>-Link
+slider7:0<0,1,1{Off,On}>-Bypass
+slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+slider9:0<0,1,1{Off,On}>-Analog
+slider10:0<-12,12,0.1>-Calib (dB)
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+// ---- Calibration ---------------------------------------------------------
+DBU_AT_0DBFS = 22;          // -18 dBFS = +4 dBu
+
+// ---- Détecteur True RMS -----------------------------------------------------
+RMS_TAU = 4.343/125;        // 34,7 ms -> release 125 dB/s (spec)
+OVEREASY_W = 16;               // largeur de la zone OverEasy (dB)
+GR_MAX  = 60;               // > 60 dB de réduction (spec)
+
+// ---- Analog : étage d'entrée non linéaire -----------------------------------
+AN_K = 0.5;
+AN_B = 0.1;
+
+// ---- Courbe du potard de ratio (position -> pente 1 - 1/R) ------------------
+// positions des graduations : 1:1 2:1 3:1 4:1 6:1 10:1 inf -5:1 -2:1 -1:1
+RP = 200; RS = 220; NR = 10;
+RP[0]=0;    RS[0]=0;
+RP[1]=0.17; RS[1]=0.5;
+RP[2]=0.33; RS[2]=0.6667;
+RP[3]=0.45; RS[3]=0.75;
+RP[4]=0.58; RS[4]=0.8333;
+RP[5]=0.70; RS[5]=0.9;
+RP[6]=0.80; RS[6]=1.0;
+RP[7]=0.87; RS[7]=1.2;
+RP[8]=0.93; RS[8]=1.5;
+RP[9]=1.0;  RS[9]=2.0;
+
+// LEDs de niveau (19) et de réduction de gain (12, sous les 12 premières)
+LV = 300; GV = 330;
+LV[0]=-40; LV[1]=-30; LV[2]=-20; LV[3]=-15; LV[4]=-10; LV[5]=-8; LV[6]=-6; LV[7]=-5;
+LV[8]=-4;  LV[9]=-3;  LV[10]=-2; LV[11]=-1; LV[12]=0;  LV[13]=1; LV[14]=2; LV[15]=4;
+LV[16]=6;  LV[17]=10; LV[18]=20;
+GV[0]=40; GV[1]=30; GV[2]=20; GV[3]=15; GV[4]=10; GV[5]=8; GV[6]=6; GV[7]=5;
+GV[8]=4;  GV[9]=3;  GV[10]=2; GV[11]=1;
+
+// ---- Outils ----------------------------------------------------------------
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x,0.0000000001)); );
+function tanh_(x) local(e) ( x = min(max(x,-20),20); e = exp(2*x); (e-1)/(e+1); );
+function analog_in(x) ( (tanh_(AN_K*(x + AN_B)) - an_t0)*an_norm; );
+
+// position du potard -> pente
+function ratio_slope(p) local(i, f, sl)
+(
+  p = min(max(p, 0), 1);
+  sl = RS[NR-1];
+  i = 0;
+  loop(NR-1,
+    (p >= RP[i] && p <= RP[i+1]) ? (
+      f = (p - RP[i])/(RP[i+1] - RP[i]);
+      sl = RS[i] + f*(RS[i+1] - RS[i]);
+    );
+    i += 1;
+  );
+  sl;
+);
+
+// genou : OverEasy (quadratique, largeur oe_w) ou hard knee
+function knee(o) local(hw)
+(
+  oe_w > 0 ? (
+    hw = 0.5*oe_w;
+    o <= -hw ? 0 : o < hw ? sqr(o + hw)/(2*oe_w) : o;
+  ) : max(o, 0);
+);
+
+function update_params()
+(
+  calib_g = db2lin(min(max(slider10, -12), 12));
+  calib_c = 1/calib_g;
+  thr_fs  = slider1 - DBU_AT_0DBFS;           // seuil en dBFS RMS
+  slope   = ratio_slope(slider2);
+  out_g   = db2lin(min(max(slider3, -20), 20));
+  oe      = slider4 >= 0.5;
+  oe_w    = oe ? OVEREASY_W : 0;
+  disp_in = slider5 >= 0.5;
+  link    = slider6 >= 0.5;
+  bypass  = slider7 >= 0.5;
+  analog  = slider9 >= 0.5;
+  an_t0 = tanh_(AN_K*AN_B);  an_norm = 1/(AN_K*(1 - an_t0*an_t0));
+  c_rms = exp(-1/(RMS_TAU*srate));
+  c_met = exp(-1/(0.06*srate));
+  c_hld = exp(-1/(0.25*srate));
+);
+
+// ---- Outils graphiques (coordonnées logiques 1180 x 256) -------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,s) local(w,h) ( gfx_measurestr(s,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(s); );
+function text_l(x,y,s) local(w,h) ( gfx_measurestr(s,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(s); );
+function knob_pt(cx,cy,rad,frac) local(a)
+(
+  a = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(a);
+  ky = cy - rad*sin(a);
+);
+function ring_label(cx,cy,rad,frac,s) ( knob_pt(cx,cy,rad,frac); text_c(kx,ky,s); );
+// potard à capuchon coloré (rouge / bleu / vert)
+function draw_knob(cx,cy,r,frac,cr,cg,cb) local(x1, y1, t, i)
+(
+  col(0.85,0.85,0.85);
+  i = 0;
+  loop(7,
+    knob_pt(cx,cy,r+4,i/6); x1 = kx; y1 = ky;
+    knob_pt(cx,cy,r+9,i/6); ln(x1,y1,kx,ky);
+    i += 1;
+  );
+  col(0.02,0.02,0.02); gfx_circle(PX(cx), PY(cy), (r+2)*S, 1, 1);
+  col(cr*0.75,cg*0.75,cb*0.75); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(cr,cg,cb); gfx_circle(PX(cx), PY(cy), r*0.86*S, 1, 1);
+  col(min(cr+0.25,1),min(cg+0.25,1),min(cb+0.25,1));
+  gfx_circle(PX(cx-r*0.25), PY(cy-r*0.3), r*0.3*S, 1, 1);
+  col(0.98,0.98,0.98);
+  knob_pt(cx,cy,r*0.05,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.95,frac);
+  t = -max(1, ceil(1.2*S));
+  loop(2*max(1, ceil(1.2*S)) + 1,
+    gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1);
+    gfx_line(PX(x1), PY(y1)+t, PX(kx), PY(ky)+t, 1);
+    t += 1;
+  );
+);
+function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
+(
+  col(0.70,0.67,0.60);
+  knob_pt(cx,cy,r+2,0.5); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r+5,0.5);
+  ln(x1,y1,kx,ky);
+  col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
+  col(0.93,0.62,0.22);
+  knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.8,frac);
+  t = 0;
+  loop(max(1, ceil(1.5*S)),
+    gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1);
+    t += 1;
+  );
+);
+function draw_btn(x,y,w,h,on,s)
+(
+  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  rct(x,y,w,h,1);
+  col(0.04,0.04,0.04); rct(x,y,w,h,0);
+  on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
+  text_c(x + w*0.5, y + h*0.5, s);
+);
+// petit bouton poussoir noir (comme le hardware)
+function push(cx,cy,down)
+(
+  col(0.30,0.30,0.32); gfx_circle(PX(cx), PY(cy), 11*S, 1, 1);
+  down ? col(0.04,0.04,0.04) : col(0.10,0.10,0.11);
+  gfx_circle(PX(cx), PY(cy), 9*S, 1, 1);
+  down ? 0 : ( col(0.22,0.22,0.24); gfx_circle(PX(cx-2), PY(cy-2), 4*S, 1, 1); );
+);
+function led(x,y,on,r,g,b)
+(
+  on ? col(r,g,b) : col(r*0.20+0.04,g*0.20+0.04,b*0.20+0.04);
+  gfx_circle(PX(x), PY(y), 3.6*S, 1, 1);
+  on ? ( col(min(r+0.4,1),min(g+0.4,1),min(b+0.4,1)); gfx_circle(PX(x-1), PY(y-1), 1.2*S, 1, 1); );
+);
+function sep(x) ( col(0.10,0.35,0.85); rct(x, 60, 3, 120, 1); );
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+
+update_params();
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+// ---- Calib : trim avant l'entrée (compensé en sortie) ----------------------
+xl = spl0*calib_g;
+xr = spl1*calib_g;
+
+// ---- Afficheur d'entrée (RMS, après Calib) ---------------------------------
+q = 0.5*(xl*xl + xr*xr);
+in_p = q + c_met*(in_p - q);
+
+bypass ? (
+  zl = spl0; zr = spl1;
+  grl = grr = 0;
+) : (
+  // ---- Étage d'entrée (+ Analog) -------------------------------------------
+  analog ? ( xl = analog_in(xl); xr = analog_in(xr); );
+
+  // ---- Détecteur True RMS (feedforward) ------------------------------------
+  ql = xl*xl; qr = xr*xr;
+  pwl = ql + c_rms*(pwl - ql);
+  pwr = qr + c_rms*(pwr - qr);
+  link ? (
+    // True RMS Power Summing
+    lvl_l = lvl_r = 10*log10(max(0.5*(pwl + pwr), 0.00000000000000000001));
+  ) : (
+    lvl_l = 10*log10(max(pwl, 0.00000000000000000001));
+    lvl_r = 10*log10(max(pwr, 0.00000000000000000001));
+  );
+  ovl = lvl_l - thr_fs;
+  ovr = lvl_r - thr_fs;
+
+  // ---- Calcul de gain (log) -> VCA ------------------------------------------
+  grl = min(max(slope*knee(ovl), 0), GR_MAX);
+  grr = min(max(slope*knee(ovr), 0), GR_MAX);
+  zl = xl*db2lin(-grl)*out_g*calib_c;
+  zr = xr*db2lin(-grr)*out_g*calib_c;
+);
+
+// ---- Hard-clip 0 dBFS (permanent, invisible) ------------------------------
+spl0 = min(max(zl, -1), 1);
+spl1 = min(max(zr, -1), 1);
+
+// ---- Mesures ----------------------------------------------------------------
+q = 0.5*(spl0*spl0 + spl1*spl1);
+mout_p = q + c_met*(mout_p - q);
+m = max(grl, grr);
+gr_m = m > gr_m ? m : m + c_hld*(gr_m - m);
+m = max(ovl, ovr);
+ov_m = bypass ? -100 : m;
+
+@gfx 1180 256
+S  = 0.75 + 0.25*floor(slider8 + 0.5);
+ox = max(0, floor((gfx_w - 1180*S)/2));
+oy = max(0, floor((gfx_h - 256*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(9, floor(20*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(9*S)), 'b');
+gfx_setfont(4, "Arial", max(10, floor(34*S)), 'b');
+gfx_setfont(5, "Arial", max(8, floor(26*S)));
+gfx_setfont(6, "Arial", max(6, floor(14*S)));
+
+// ---- Fond -----------------------------------------------------------------------
+col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.07,0.07,0.08);  rct(6,6,1168,244,1);
+col(0.08,0.08,0.08);  rct(6,6,1168,30,1);
+gfx_setfont(2); col(0.93,0.62,0.22); text_l(16, 21, "RM160A");
+gfx_setfont(3); col(0.72,0.69,0.63); text_l(110, 22, "RENO MELLOW  -  TRUE RMS VCA COMPRESSOR / LIMITER");
+col(0.11,0.11,0.12); rct(10, 40, 1160, 172, 1);
+
+// ---- Logo -------------------------------------------------------------------------
+gfx_setfont(4); col(0.95,0.95,0.95); text_c(75, 98, "RM");
+gfx_setfont(5); text_c(75, 136, "160A");
+
+// ---- Bypass / Link ----------------------------------------------------------------
+gfx_setfont(3); col(0.92,0.92,0.92);
+led(165, 70, slider7 >= 0.5, 0.95, 0.10, 0.08); text_c(165, 104, "BYPASS"); push(165, 140, slider7 >= 0.5);
+led(225, 70, slider6 >= 0.5, 0.98, 0.65, 0.10); text_c(225, 104, "LINK");   push(225, 140, slider6 >= 0.5);
+sep(268);
+
+// ---- Threshold (rouge) ------------------------------------------------------------
+tkx = 340; tky = 124;
+gfx_setfont(3); col(0.92,0.92,0.92);
+ring_label(tkx,tky,48,0,  "-40dBu");
+ring_label(tkx,tky,46,1/6,"-30");
+ring_label(tkx,tky,46,2/6,"-20");
+ring_label(tkx,tky,46,3/6,"-10");
+ring_label(tkx,tky,46,4/6,"0");
+ring_label(tkx,tky,46,5/6,"+10");
+ring_label(tkx,tky,48,1,  "+20dBu");
+draw_knob(tkx, tky, 28, (slider1 + 40)/60, 0.92, 0.18, 0.12);
+gfx_setfont(3); col(0.92,0.92,0.92); text_c(tkx, 188, "THRESHOLD");
+col(0.65,0.65,0.65); sprintf(#s, "%+.1f dBu", slider1); text_c(tkx, 202, #s);
+
+// ---- Threshold LEDs + OverEasy -----------------------------------------------------
+oe_on = slider4 >= 0.5;
+hw = oe_on ? 0.5*OVEREASY_W : 0;
+st_below = ov_m < -hw;
+st_oe    = oe_on && ov_m >= -hw && ov_m < hw;
+st_above = ov_m >= hw;
+gfx_setfont(3); col(0.92,0.92,0.92);
+led(425, 70, st_below, 0.25, 0.95, 0.25); text_c(425, 84, "BELOW");
+led(460, 70, st_oe,    0.98, 0.65, 0.10);
+led(495, 70, st_above, 0.95, 0.12, 0.08); text_c(495, 84, "ABOVE");
+text_c(460, 104, "OVEREASY");
+ln(460, 110, 460, 128);
+push(460, 140, oe_on);
+sep(528);
+
+// ---- Compression Ratio (bleu) ------------------------------------------------------
+rkx = 600; rky = 124;
+gfx_setfont(3); col(0.92,0.92,0.92);
+ring_label(rkx,rky,46,RP[0],"1:1");
+ring_label(rkx,rky,46,RP[1],"2:1");
+ring_label(rkx,rky,46,RP[2],"3:1");
+ring_label(rkx,rky,46,RP[3],"4:1");
+ring_label(rkx,rky,46,RP[4],"6:1");
+ring_label(rkx,rky,48,RP[5],"10:1");
+ring_label(rkx,rky,46,RP[6],"inf");
+ring_label(rkx,rky,48,RP[7],"-5:1");
+ring_label(rkx,rky,48,RP[8],"-2:1");
+ring_label(rkx,rky,48,RP[9],"-1:1");
+draw_knob(rkx, rky, 28, slider2, 0.15, 0.40, 0.90);
+gfx_setfont(3); col(0.92,0.92,0.92); text_c(rkx, 188, "COMPRESSION RATIO");
+sl_ui = ratio_slope(slider2);
+col(0.65,0.65,0.65);
+sl_ui < 0.995 ? sprintf(#s, "%.1f:1", 1/(1 - sl_ui)) :
+sl_ui < 1.005 ? strcpy(#s, "inf:1") :
+                sprintf(#s, "-%.1f:1", 1/(sl_ui - 1));
+text_c(rkx, 202, #s);
+
+// ---- Output Gain (vert) -----------------------------------------------------------
+gkx = 730; gky = 124;
+gfx_setfont(3); col(0.92,0.92,0.92);
+ring_label(gkx,gky,48,0,   "-20dB");
+ring_label(gkx,gky,46,0.25,"-10");
+ring_label(gkx,gky,46,0.5, "0");
+ring_label(gkx,gky,46,0.75,"+10");
+ring_label(gkx,gky,48,1,   "+20dB");
+draw_knob(gkx, gky, 28, (slider3 + 20)/40, 0.12, 0.70, 0.30);
+gfx_setfont(3); col(0.92,0.92,0.92); text_c(gkx, 188, "OUTPUT GAIN");
+col(0.65,0.65,0.65); sprintf(#s, "%+.1f dB", slider3); text_c(gkx, 202, #s);
+sep(790);
+
+// ---- Display ---------------------------------------------------------------------
+din = slider5 >= 0.5;
+gfx_setfont(3); col(0.92,0.92,0.92);
+led(812, 66, din,  0.95, 0.12, 0.08); text_l(820, 66, "INPUT");
+led(812, 84, !din, 0.95, 0.12, 0.08); text_l(820, 84, "OUTPUT");
+text_c(825, 168, "DISPLAY");
+push(825, 140, din);
+
+// ---- Afficheurs LED (niveau 19 + réduction de gain 12) -----------------------------
+lvl_db = 10*log10(max(din ? in_p : mout_p, 0.00000000000000000001)) + 18;   // 0 = -18 dBFS RMS
+lx0 = 858; lstep = 14;
+gfx_setfont(3);
+i = 0;
+loop(19,
+  x = lx0 + i*lstep;
+  col(0.92,0.92,0.92);
+  i == 0 ? strcpy(#s, "-40") : i == 18 ? strcpy(#s, "20+") : sprintf(#s, "%d", abs(LV[i]));
+  text_c(x, 80, #s);
+  LV[i] < 0 ? led(x, 66, lvl_db >= LV[i], 0.98, 0.85, 0.15) :
+              led(x, 66, lvl_db >= LV[i], 0.95, 0.15, 0.10);
+  i += 1;
+);
+text_l(lx0 + 18*lstep + 10, 66, "LEVEL");
+i = 0;
+loop(12,
+  x = lx0 + i*lstep;
+  led(x, 96, gr_m >= GV[i] - 0.25, 0.95, 0.12, 0.08);
+  i += 1;
+);
+col(0.92,0.92,0.92); ln(lx0 + 11*lstep + 8, 96, lx0 + 18*lstep + 6, 96);
+text_l(lx0 + 18*lstep + 10, 96, "GAIN RED.");
+gfx_setfont(6); col(0.92,0.92,0.92);
+text_c(lx0 + 9*lstep, 150, "C O M P R E S S O R  /  L I M I T E R");
+
+// ---- Bandeau d'options --------------------------------------------------------------
+col(0.08,0.08,0.08); rct(6, 216, 1168, 34, 1);
+oby = 222; cky = oby + 11;
+gfx_setfont(1);
+draw_btn(20, oby, 84, 22, slider9 >= 0.5, "ANALOG");
+ckx = 176;
+gfx_setfont(3); col(0.85,0.82,0.75);
+text_c(140, cky, "CALIB");
+draw_knob_s(ckx, cky, 10, (slider10 + 12)/24);
+col(0.93,0.90,0.82);
+sprintf(#s, "%+.1f dB", slider10);
+text_l(192, cky, #s);
+col(0.85,0.82,0.75);
+text_c(950, cky, "SIZE");
+szx = 976;
+gfx_setfont(1);
+sz = floor(slider8 + 0.5);
+draw_btn(szx,     oby, 44, 22, sz == 0, "75%");
+draw_btn(szx+48,  oby, 44, 22, sz == 1, "100%");
+draw_btn(szx+96,  oby, 44, 22, sz == 2, "125%");
+draw_btn(szx+144, oby, 44, 22, sz == 3, "150%");
+
+// ---- Souris ---------------------------------------------------------------------
+md = mouse_cap & 1;
+(md && !last_md) ? (
+  drag = 0;
+  in_circ(tkx, tky, 34) ? (drag = 1) :
+  in_circ(rkx, rky, 34) ? (drag = 2) :
+  in_circ(gkx, gky, 34) ? (drag = 3) :
+  in_circ(ckx, cky, 14) ? (drag = 4);
+
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? (slider1 = 0;    slider_automate(slider1);) :
+    drag == 2 ? (slider2 = 0.45; slider_automate(slider2);) :
+    drag == 3 ? (slider3 = 0;    slider_automate(slider3);) :
+                (slider10 = 0;   slider_automate(slider10););
+    drag = 0;
+  );
+
+  in_circ(165, 140, 14) ? (slider7 = slider7 >= 0.5 ? 0 : 1; slider_automate(slider7););
+  in_circ(225, 140, 14) ? (slider6 = slider6 >= 0.5 ? 0 : 1; slider_automate(slider6););
+  in_circ(460, 140, 14) ? (slider4 = slider4 >= 0.5 ? 0 : 1; slider_automate(slider4););
+  in_circ(825, 140, 14) ? (slider5 = slider5 >= 0.5 ? 0 : 1; slider_automate(slider5););
+
+  in_rect(20, oby, 84, 22) ? (slider9 = slider9 >= 0.5 ? 0 : 1; slider_automate(slider9););
+  in_rect(szx,     oby, 44, 22) ? (slider8 = 0; sliderchange(slider8););
+  in_rect(szx+48,  oby, 44, 22) ? (slider8 = 1; sliderchange(slider8););
+  in_rect(szx+96,  oby, 44, 22) ? (slider8 = 2; sliderchange(slider8););
+  in_rect(szx+144, oby, 44, 22) ? (slider8 = 3; sliderchange(slider8););
+);
+
+(md && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.1 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? (slider1  = min(max(slider1  + dy*0.3,  -40), 20); slider_automate(slider1);) :
+    drag == 2 ? (slider2  = min(max(slider2  + dy*0.005,  0),  1); slider_automate(slider2);) :
+    drag == 3 ? (slider3  = min(max(slider3  + dy*0.2,  -20), 20); slider_automate(slider3);) :
+    drag == 4 ? (slider10 = min(max(slider10 + dy*0.12, -12), 12); slider_automate(slider10););
+  );
+);
+!md ? (drag = 0);
+last_md = md;
+last_my = (mouse_y - oy)/S;
