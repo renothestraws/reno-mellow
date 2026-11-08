@@ -6,7 +6,7 @@ Génère index.xml (dépôt ReaPack) pour les plugins ReNo Mellow.
 Usage :   python3 make_index.py PSEUDO_GITHUB [NOM_DU_DEPOT] [BRANCHE]
 Exemple : python3 make_index.py renomellow reno-mellow main
 
-Le script lit chaque fichier Dynamics/*.jsfx et récupère dans son en-tête :
+Le script lit chaque fichier Dynamics/*.jsfx et EQ/*.jsfx et récupère dans son en-tête :
   desc:        -> nom affiché dans ReaPack
   //@version   -> version (à augmenter à chaque mise à jour)
   //@author    -> auteur
@@ -18,7 +18,7 @@ import os, re, sys, glob, datetime
 from xml.sax.saxutils import escape, quoteattr
 
 REPO_NAME = "ReNo Mellow"
-CATEGORIES = ["Dynamics"]          # un dossier = une catégorie ReaPack
+CATEGORIES = ["Dynamics", "EQ"]          # un dossier = une catégorie ReaPack
 
 
 def rtf(text):
@@ -92,7 +92,7 @@ def main():
         x.append('  </category>')
     x.append('  <metadata>')
     x.append('    <description><![CDATA[%s]]></description>' % rtf(
-        "ReNo Mellow : compresseurs et processeurs de dynamique gratuits pour REAPER (JSFX).\n"
+        "ReNo Mellow : compresseurs, processeurs de dynamique et égaliseurs gratuits pour REAPER (JSFX).\n"
         "Calibration commune : 0 VU = +4 dBu = -18 dBFS."))
     x.append('    <link rel="website" href=%s>GitHub</link>' % quoteattr(site))
     x.append('  </metadata>')

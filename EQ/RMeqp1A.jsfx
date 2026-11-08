@@ -1,0 +1,673 @@
+desc:RMeqp1A - ReNo Mellow EQP-1A (Passive Tube Program Equalizer)
+//tags: equalizer EQ passive tube program pultec-style
+//@author ReNo Mellow
+//@version 1.4
+//@changelog Première version publique
+//@about Égaliseur passif à lampes inspiré du Pultec EQP-1A : courbes calculées par analyse nodale, boost et cut simultanés (truc Pultec), étage à lampes bypassable, HPF/LPF, vumètres LED.
+//
+// ---------------------------------------------------------------------------
+// RMeqp1A - émulation de l'égaliseur de programme passif à lampes EQP-1A
+//
+// CALIBRATION : 0 VU = +4 dBu = -18 dBFS (0 dBFS = +22 dBu)
+//
+// RÉSEAU PASSIF - simulé composant par composant (schéma "Passive Equalizer
+// Circuit Pultec EQP-1A") par analyse nodale à chaque échantillon :
+//   - Treble Boost : pot 10k linéaire + circuit LC série (150/82/68/47/33/33/
+//     27 mH ; 18/18/15/8.2/8.2/5.6/3.3 nF -> 3/4/5/8/10/12/16 kHz), largeur par
+//     rhéostat 2.5k (Sharp -> Broad), pertes d'inductance Q = 40.
+//   - Treble Cut : pot 1k linéaire + 75 ohms + 68/136/288 nF (20/10/5 kHz).
+//   - Bass Boost : pot 10k audio + 330 nF / 550 nF / 1.15 uF / 1.83 uF.
+//   - Bass Cut   : pot 100k audio + 12 / 20.2 / 39 / 68 nF.
+//   - 10k, 1k, source 300 ohms, charge 70k (calés sur les courbes du manuel).
+//   Les sections interagissent exactement comme sur l'original : boost et
+//   cut grave simultanés donnent la bosse grave + le creux au-dessus.
+//   Courbes vérifiées contre les relevés du manuel (boost grave max ~+16 dB,
+//   cut grave max ~-19 dB, boost aigu sharp ~+19 dB / broad ~+11 dB, cut aigu
+//   20 kHz ~-16 dB). Course des potards recalée sur un vrai EQP-1A (environ
+//   la moitié de l'effet maximal à la graduation 5).
+//   Discrétisation trapézoïdale, pré-déformation des éléments aigus,
+//   latence nulle ; bouton HQ = suréchantillonnage x2 (46 éch. de latence).
+//
+// COULEUR (toujours présente, comme l'original) :
+//   - transfo d'entrée HS-56 : saturation de flux dans le grave ;
+//   - ampli à lampes 12AX7 / 12AU7 push-pull : rattrape la perte d'insertion,
+//     H2 + H3 (~0,15 % à +10 dBu, comme la fiche technique), saturation douce
+//     au-delà de +21 dBu ;
+//   - transfo de sortie S-217-D : saturation de flux dans le grave (d'autant
+//     plus que le grave est boosté), coupe-bas vers 8 Hz.
+//
+// BYPASS (à droite, près du voyant) : comme la clé de l'original, ramène
+//             toutes les commandes à zéro ; lampes et transfos restent actifs.
+// TUBE (clé de gauche) : coupe uniquement la saturation (transfos + lampes) ;
+//             l'égalisation reste active. Fondu de 10 ms, sans clic.
+// HPF / LPF : filtres propres 6 dB/oct en sortie (HPF OFF..200 Hz,
+//             LPF OFF..5 kHz).
+// CALIB : trim d'entrée -12..+12 dB, compensé à l'inverse en sortie.
+// OUTPUT : volume de sortie propre (numérique), après tout le traitement.
+// SORTIE : hard-clip permanent à 0 dBFS, non visible et non réglable.
+// ---------------------------------------------------------------------------
+
+slider1:2<0,3,1{20 Hz,30 Hz,60 Hz,100 Hz}>-Low Frequency
+slider2:0<0,10,0.1>-Low Boost
+slider3:0<0,10,0.1>-Low Atten
+slider4:3<0,6,1{3 kHz,4 kHz,5 kHz,8 kHz,10 kHz,12 kHz,16 kHz}>-High Frequency
+slider5:0<0,10,0.1>-High Boost
+slider6:5<0,10,0.1>-Bandwidth (Sharp..Broad)
+slider7:0<0,10,0.1>-High Atten
+slider8:1<0,2,1{5 kHz,10 kHz,20 kHz}>-Atten Sel
+slider9:1<0,1,1{Bypass,In}>-EQ In
+slider10:0<-12,12,0.1>-Calib (dB)
+slider11:0<-12,12,0.1>-Output (dB)
+slider12:1<0,3,1{75%,100%,125%,150%}>-Size
+slider13:1<0,1,1{Off,On}>-Tube
+slider14:0<0,200,1>-HPF (Hz, 0 = Off)
+slider15:20000<5000,20000,1>-LPF (Hz, 20000 = Off)
+slider16:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+// ---- Composants du réseau --------------------------------------------------
+R_S   = 300;       // impédance de source (secondaire HS-56)
+R_LD  = 70000;     // charge (primaire HS-29)
+Q_IND = 40;        // facteur de qualité des inductances
+EPS   = 0.001;     // résistance minimale d'un pot en butée
+LBC = 100; LCC = 110; HFC = 120; HFL = 130; HCC = 140;
+LBC[0] = 0.00000183; LBC[1] = 0.00000115; LBC[2] = 0.00000055; LBC[3] = 0.00000033;   // bass boost
+LCC[0] = 0.000000068;   LCC[1] = 0.000000039;   LCC[2] = 0.0000000202; LCC[3] = 0.000000012;   // bass cut
+HFC[0] = 0.000000018;  HFC[1] = 0.000000018;  HFC[2] = 0.000000015;  HFC[3] = 0.0000000082;
+HFC[4] = 0.0000000082; HFC[5] = 0.0000000056; HFC[6] = 0.0000000033;
+HFL[0] = 0.150;  HFL[1] = 0.082;  HFL[2] = 0.068;  HFL[3] = 0.047;
+HFL[4] = 0.033;  HFL[5] = 0.033;  HFL[6] = 0.027;
+HCC[0] = 0.000000288; HCC[1] = 0.000000136; HCC[2] = 0.000000068;                       // 5/10/20 kHz
+// lois des potentiomètres : plus d'action à mi-course que les courbes
+// "dial number" du manuel de 1950 (comparaison avec un vrai EQP-1A)
+K_LB  = 2.5;       // bass boost : audio (course recalée sur un vrai)
+K_LC  = 2.5;       // bass cut   : audio (course recalée sur un vrai)
+P_HB  = 0.6;       // treble boost (course recalée sur un vrai)
+P_HC  = 0.6;       // treble cut   (course recalée sur un vrai)
+HC_W  = 0.5;       // pré-déformation du cut aigu (fraction de la fréquence)
+
+// ---- Couleur ------------------------------------------------------------------
+XI_FC = 40;   XI_A = 0.05;     // transfo d'entrée : coin du flux, saturation
+XO_FC = 30;   XO_A = 0.03;     // transfo de sortie
+TB_K2 = 0.0068;                // lampes : H2
+TB_K3 = 0.025;                 // lampes : H3
+TB_KN = 0.9;  TB_RG = 0.5;     // saturation douce (crête) : genou, plage
+HP_FC = 8;                     // coupe-bas des transfos (Hz)
+REF_DB = 18;                   // 0 VU = -18 dBFS
+MT_TAU = 0.05;                 // afficheurs LED (s)
+INV = 160;
+INV[0] = 6; INV[1] = 3; INV[2] = 0; INV[3] = -6; INV[4] = -12;
+
+// ---- Mémoire --------------------------------------------------------------------
+GM  = 1000;   // matrice nodale 10x10
+GI  = 1200;   // inverse
+HBF = 1400;   // demi-bande (96)
+// anneaux de suréchantillonnage : 4 x 96 par canal
+UXL = 1600; UXR = 1800; DOL = 2000; DOR = 2200; DEL = 2400; DER = 2600;
+NHB = 95; HC0 = 47; LX = 48;
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function tanh_(x) local(e) ( x = min(max(x,-20),20); e = exp(2*x); (e-1)/(e+1); );
+function logt(x, k) ( (exp(k*x) - 1)/(exp(k) - 1); );
+
+// ---- Filtre demi-bande (sinc x Kaiser) --------------------------------------
+function bessel_i0(x) local(s, t, k)
+(
+  s = 1; t = 1; k = 1;
+  loop(30, t *= sqr(x/(2*k)); s += t; k += 1;);
+  s;
+);
+function hb_design() local(n, m, w, beta)
+(
+  beta = 8; n = 0;
+  loop(NHB,
+    m = n - HC0;
+    w = bessel_i0(beta*sqrt(max(0, 1 - sqr(m/HC0))))/bessel_i0(beta);
+    HBF[n] = m == 0 ? 0.5 : ((abs(m) % 2) == 0 ? 0 : sin($pi*m*0.5)/($pi*m)*w);
+    n += 1;
+  );
+);
+hb_design();
+
+// ---- Analyse nodale ------------------------------------------------------------
+// noeuds : 0 IN, 1 W, 2 A, 3 X, 4 M, 5 E, 6 D, 7 O, 8 N, 9 K
+function nadd(a, b, g)
+(
+  a >= 0 ? GM[a*10 + a] += g;
+  b >= 0 ? GM[b*10 + b] += g;
+  (a >= 0 && b >= 0) ? ( GM[a*10 + b] -= g; GM[b*10 + a] -= g; );
+);
+function invert() local(i, j, k, p, mx, t, f)
+(
+  i = 0; loop(100, GI[i] = 0; i += 1;);
+  i = 0; loop(10, GI[i*10 + i] = 1; i += 1;);
+  k = 0;
+  loop(10,
+    p = k; mx = abs(GM[k*10 + k]);
+    i = k + 1; loop(9 - k, abs(GM[i*10 + k]) > mx ? ( mx = abs(GM[i*10 + k]); p = i; ); i += 1;);
+    p != k ? (
+      j = 0; loop(10,
+        t = GM[k*10 + j]; GM[k*10 + j] = GM[p*10 + j]; GM[p*10 + j] = t;
+        t = GI[k*10 + j]; GI[k*10 + j] = GI[p*10 + j]; GI[p*10 + j] = t;
+        j += 1;
+      );
+    );
+    f = 1/GM[k*10 + k];
+    j = 0; loop(10, GM[k*10 + j] *= f; GI[k*10 + j] *= f; j += 1;);
+    i = 0;
+    loop(10,
+      i != k ? (
+        f = GM[i*10 + k];
+        f != 0 ? ( j = 0; loop(10, GM[i*10 + j] -= f*GM[k*10 + j]; GI[i*10 + j] -= f*GI[k*10 + j]; j += 1;); );
+      );
+      i += 1;
+    );
+    k += 1;
+  );
+);
+// construit et inverse la matrice ; dc = 1 : régime continu (makeup)
+function build(lb, lc, hb, bw, hc, dc) local(i, ch, lh, w0, rlw, c0, clc, chc, wh)
+(
+  i = 0; loop(100, GM[i] = 0; i += 1;);
+  ch = HFC[hf_i]; lh = HFL[hf_i];
+  c0 = 2*fsn;
+  w0 = 1/sqrt(lh*ch); rlw = w0*lh/Q_IND;
+  clc = w0/(2*fsn) < 1.5 ? w0/tan(w0/(2*fsn)) : c0;
+  wh  = 2*$pi*min(HC_W*HCF_HZ, 0.42*fsn);
+  chc = wh/tan(wh/(2*fsn));
+  dc ? ( g_ch = 0; g_l = 100; g_chc = 0; g_cb = 0; g_cc = 0; ) : (
+    g_ch = clc*ch; g_l = 1/(clc*lh); g_chc = chc*HCC[hc_i];
+    g_cb = c0*LBC[lf_i]; g_cc = c0*LCC[lf_i];
+  );
+  nadd(0, -1, 1/R_S);
+  nadd(0, 1, 1/((1 - hb)*10000 + EPS));
+  nadd(1, 2, 1/(hb*10000 + EPS));
+  nadd(1, 8, g_ch);
+  nadd(8, 9, g_l);
+  nadd(9, 2, 1/(rlw + bw*2500 + EPS));
+  nadd(2, 3, 1/((1 - hc)*1000 + EPS));
+  nadd(3, 5, 1/(hc*1000 + EPS));
+  nadd(3, 4, 1/75);
+  nadd(4, 5, g_chc);
+  nadd(5, -1, 1/(lb*10000 + EPS) + g_cb);
+  nadd(5, 7, 1/10000);
+  nadd(2, 6, 1/(lc*100000 + EPS));
+  nadd(6, 7, 1/1000);
+  nadd(2, 7, g_cc);
+  nadd(7, -1, 1/R_LD);
+  invert();
+);
+function vrow(r) local(o)
+(
+  o = GI + r*10;
+  o[0]*nb0 + o[1]*nb1 + o[2]*nb2 + o[4]*nb4 + o[5]*nb5 + o[7]*nb7 + o[8]*nb8 + o[9]*nb9;
+);
+// un pas du réseau (états trapézoïdaux propres au canal)
+function net_tick(x) instance(ich, ichc, icb, icc, il) local(v1, v2, v4, v5, v7, v8, v9, v)
+(
+  nb0 = x/R_S;
+  nb1 = ich;
+  nb8 = -ich - il;
+  nb9 = il;
+  nb4 = ichc;
+  nb5 = -ichc + icb;
+  nb2 = icc;
+  nb7 = -icc;
+  v1 = vrow(1); v2 = vrow(2); v4 = vrow(4); v5 = vrow(5);
+  v7 = vrow(7); v8 = vrow(8); v9 = vrow(9);
+  ich  = 2*g_ch*(v1 - v8) - ich;
+  ichc = 2*g_chc*(v4 - v5) - ichc;
+  icb  = 2*g_cb*v5 - icb;
+  icc  = 2*g_cc*(v2 - v7) - icc;
+  il   = 2*g_l*(v8 - v9) + il;
+  v7;
+);
+
+// ---- Chaîne analogique complète d'un canal (à la cadence interne) -------------
+// tbm = dosage du circuit "lampes" (0 = coupé, 1 = actif, fondu)
+function chain(x) instance(pi, po, nw, h1, h2, y1, y2) local(y, c, a)
+(
+  // transfo d'entrée : saturation de flux (grave)
+  pi += k_xi*(x - pi);
+  y = x - tbm*XI_A*x*pi*pi;
+  // réseau passif + rattrapage de la perte d'insertion (toujours actif)
+  y = nw.net_tick(y)*mk;
+  // ampli à lampes
+  c = y + TB_K2*y*y - TB_K3*y*y*y;
+  a = abs(c);
+  a > TB_KN ? c = sign(c)*(TB_KN + TB_RG*tanh_((a - TB_KN)/TB_RG));
+  // transfo de sortie : saturation de flux + coupe-bas 2e ordre
+  po += k_xo*(c - po);
+  c = c - XO_A*c*po*po;
+  a = hb0*c + hb1*h1 + hb2*h2 - ha1*y1 - ha2*y2;
+  h2 = h1; h1 = c; y2 = y1; y1 = a;
+  y + tbm*(a - y);
+);
+// filtre 6 dB/oct (TPT) : renvoie le passe-bas, hp = x - lp
+function op_lp(x, g) instance(s) local(v, l) ( v = (x - s)*g; l = v + s; s = l + v; l; );
+
+// ---- Suréchantillonnage x2 (demi-bande à phase linéaire) ----------------------
+// sur-échantillonne x, produit up_a (pair) et up_b (impair)
+function up2(x, buf) instance(p) local(j, s, o)
+(
+  p = (p + 1) % LX;
+  buf[p] = x; buf[p + LX] = x;
+  o = buf + p + LX;
+  s = 0; j = 0;
+  loop(LX, s += HBF[2*j]*o[-j]; j += 1;);
+  up_a = 2*s;
+  up_b = o[-23];
+);
+// décime (va = échantillon pair, vb = impair)
+function down2(va, vb, be, bo) instance(p) local(j, s, o)
+(
+  p = (p + 1) % LX;
+  be[p] = va; be[p + LX] = va;
+  bo[p] = vb; bo[p + LX] = vb;
+  o = bo + p + LX;
+  s = 0; j = 0;
+  loop(LX, s += HBF[2*j]*o[-j]; j += 1;);
+  s + 0.5*be[p + LX - 23];
+);
+
+function update_params() local(w, cw, al)
+(
+  calib_g = db2lin(min(max(slider10, -12), 12));
+  calib_c = 1/calib_g;
+  out_g   = db2lin(min(max(slider11, -12), 12));
+  eq_in   = slider9 >= 0.5;
+  tube_on = slider13 >= 0.5;
+  hp_on   = slider14 >= 20;
+  lp_on   = slider15 < 19999;
+  w = tan($pi*min(max(slider14, 20), 200)/srate); g_hp = w/(1 + w);
+  w = tan($pi*min(max(slider15, 5000), min(20000, 0.45*srate))/srate); g_lp = w/(1 + w);
+  t_lb = eq_in ? logt(min(max(slider2, 0), 10)/10, K_LB) : 0;
+  t_lc = eq_in ? logt(min(max(slider3, 0), 10)/10, K_LC) : 0;
+  t_hb = eq_in ? pow(min(max(slider5, 0), 10)/10, P_HB) : 0;
+  t_bw = min(max(slider6, 0), 10)/10;
+  t_hc = eq_in ? pow(min(max(slider7, 0), 10)/10, P_HC) : 0;
+  n_lf = min(max(floor(slider1 + 0.5), 0), 3);
+  n_hf = min(max(floor(slider4 + 0.5), 0), 6);
+  n_hc = min(max(floor(slider8 + 0.5), 0), 2);
+);
+
+function setup_rate() local(w, cw, al)
+(
+  // HQ : suréchantillonnage x2 (sous 70 kHz) avec latence ; sinon aucune latence
+  os  = (slider16 >= 0.5 && srate < 70000) ? 2 : 1;
+  fsn = srate*os;
+  pdc_delay = os == 2 ? 46 : 0; pdc_bot_ch = 0; pdc_top_ch = 2;
+  k_xi = 1 - exp(-2*$pi*XI_FC/fsn);
+  k_xo = 1 - exp(-2*$pi*XO_FC/fsn);
+  w = 2*$pi*HP_FC/fsn; cw = cos(w); al = sin(w)/(2*0.7071);
+  hb0 = (1 + cw)/2/(1 + al); hb1 = -(1 + cw)/(1 + al); hb2 = hb0;
+  ha1 = -2*cw/(1 + al);      ha2 = (1 - al)/(1 + al);
+  k_mt = 1 - exp(-1/(MT_TAU*srate));
+  k_tb = 1 - exp(-1/(0.01*srate));
+  // gain de rattrapage : inverse de la perte du réseau à plat (régime continu)
+  lf_i = 2; hf_i = 3; hc_i = 1; HCF_HZ = 10000;
+  build(0, 0, 0, 0.5, 0, 1);
+  mk = R_S/GI[70];
+  rate_ok = srate; hq_ok = slider16 >= 0.5;
+  dirty = 1;
+);
+
+// ---- Outils graphiques (coordonnées logiques 1200 x 400) ---------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+// point à un angle (degrés, 0 = haut, sens horaire)
+function ang_pt(cx,cy,rad,deg) ( kx = cx + rad*sin(deg*$pi/180); ky = cy - rad*cos(deg*$pi/180); );
+// gros bouton noir cannelé avec index blanc
+function fluted(cx,cy,r,frac) local(i, x1, y1, t)
+(
+  col(0.06,0.06,0.07); gfx_circle(PX(cx+2), PY(cy+4), (r+3)*S, 1, 1);
+  col(0.09,0.09,0.10);
+  i = 0; loop(14, ang_pt(cx,cy,r*0.93,i*360/14); gfx_circle(PX(kx), PY(ky), r*0.17*S, 1, 1); i += 1;);
+  col(0.10,0.10,0.11); gfx_circle(PX(cx), PY(cy), r*0.93*S, 1, 1);
+  col(0.20,0.20,0.22); gfx_circle(PX(cx), PY(cy), r*0.64*S, 1, 1);
+  col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*0.56*S, 1, 1);
+  col(0.15,0.15,0.17); gfx_circle(PX(cx - r*0.15), PY(cy - r*0.18), r*0.3*S, 1, 1);
+  col(0.96,0.96,0.94);
+  knob_pt(cx,cy,r*0.66,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.98,frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function scale10(cx,cy,r) local(i)
+(
+  i = 0;
+  loop(11, sprintf(#s, "%d", i); knob_pt(cx,cy,r,i/10); text_c(kx,ky,#s); i += 1;);
+);
+// sélecteur "chicken-head" ; deg = angle du pointeur
+function chicken(cx,cy,deg) local(i, a, x1, y1, x2, y2)
+(
+  col(0.06,0.06,0.07); gfx_circle(PX(cx+2), PY(cy+3), 22*S, 1, 1);
+  col(0.12,0.12,0.13); gfx_circle(PX(cx), PY(cy), 20*S, 1, 1);
+  // pointeur épais
+  col(0.16,0.16,0.18);
+  i = -7;
+  loop(15,
+    ang_pt(cx + i*cos(deg*$pi/180), cy + i*sin(deg*$pi/180), 36, deg); x1 = kx; y1 = ky;
+    ang_pt(cx + i*cos(deg*$pi/180)*0.6, cy + i*sin(deg*$pi/180)*0.6, -18, deg);
+    ln(x1, y1, kx, ky);
+    i += 1;
+  );
+  col(0.30,0.30,0.33);
+  ang_pt(cx - 6*cos(deg*$pi/180), cy - 6*sin(deg*$pi/180), 34, deg); x1 = kx; y1 = ky;
+  ang_pt(cx - 6*cos(deg*$pi/180), cy - 6*sin(deg*$pi/180), -14, deg); ln(x1, y1, kx, ky);
+  col(0.92,0.92,0.92);
+  ang_pt(cx, cy, 33, deg); x1 = kx; y1 = ky;
+  ang_pt(cx, cy, 8, deg); ln(x1, y1, kx, ky);
+  ln(x1 + 1/S, y1, kx + 1/S, ky);
+);
+function led(x,y,on,r,g,b)
+(
+  on ? col(r,g,b) : col(r*0.18+0.03,g*0.18+0.03,b*0.18+0.03);
+  gfx_circle(PX(x), PY(y), 6*S, 1, 1);
+  on ? ( col(min(r+0.35,1),min(g+0.35,1),min(b+0.35,1)); gfx_circle(PX(x-2), PY(y-2), 2*S, 1, 1); );
+  col(0.02,0.02,0.02); gfx_circle(PX(x), PY(y), 6*S, 0, 1);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  rct(x,y,w,h,1);
+  col(0.04,0.04,0.04); rct(x,y,w,h,0);
+  on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
+(
+  col(0.70,0.67,0.60);
+  knob_pt(cx,cy,r+2,0.5); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r+5,0.5);
+  ln(x1,y1,kx,ky);
+  col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
+  col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
+  col(0.93,0.62,0.22);
+  knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
+  knob_pt(cx,cy,r*0.8,frac);
+  t = 0;
+  loop(max(1, ceil(1.5*S)), gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1); t += 1;);
+);
+function screw(x,y) local(t)
+(
+  col(0.55,0.56,0.58); gfx_circle(PX(x), PY(y), 9*S, 1, 1);
+  col(0.35,0.36,0.38); gfx_circle(PX(x), PY(y), 9*S, 0, 1);
+  col(0.25,0.25,0.27); ln(x - 6, y - 3, x + 6, y + 3); ln(x - 6, y - 2, x + 6, y + 4);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+// clé à levier (up = levier en haut)
+function key(cx, cy, up, len)
+(
+  col(0.16,0.16,0.17); gfx_circle(PX(cx), PY(cy), 16*S, 1, 1);
+  col(0.60,0.60,0.62); gfx_circle(PX(cx), PY(cy), 12*S, 1, 1);
+  col(0.08,0.08,0.09);
+  up ? ( rct(cx-6, cy-len-4, 12, len, 1); col(0.22,0.22,0.24); gfx_circle(PX(cx), PY(cy-len-4), 7*S, 1, 1); ) :
+       ( rct(cx-6, cy+4, 12, len, 1);     col(0.22,0.22,0.24); gfx_circle(PX(cx), PY(cy+len+4), 7*S, 1, 1); );
+);
+function hp_pos(f) ( f < 20 ? 0 : 0.06 + 0.94*log(f/20)/log(10); );
+function hp_hz(p)  ( p < 0.03 ? 0 : 20*exp(log(10)*(max(p, 0.06) - 0.06)/0.94); );
+function lp_pos(f) ( f >= 19999 ? 0 : 0.06 + 0.94*log(16000/min(f, 16000))/log(3.2); );
+function lp_hz(p)  ( p < 0.03 ? 20000 : 16000*exp(-log(3.2)*(max(p, 0.06) - 0.06)/0.94); );
+
+update_params();
+tbm = tube_on;
+s_lb = t_lb; s_lc = t_lc; s_hb = t_hb; s_bw = t_bw; s_hc = t_hc;
+setup_rate();
+
+@slider
+update_params();
+
+@block
+(srate != rate_ok || (slider16 >= 0.5) != hq_ok) ? setup_rate();
+update_params();
+// lissage des commandes (sans clics) puis reconstruction du réseau
+s_lb += 0.35*(t_lb - s_lb); s_lc += 0.35*(t_lc - s_lc); s_hb += 0.35*(t_hb - s_hb);
+s_bw += 0.35*(t_bw - s_bw); s_hc += 0.35*(t_hc - s_hc);
+chg = abs(s_lb - b_lb) + abs(s_lc - b_lc) + abs(s_hb - b_hb) + abs(s_bw - b_bw) + abs(s_hc - b_hc);
+(dirty || chg > 0.00001 || n_lf != lf_i || n_hf != hf_i || n_hc != hc_i) ? (
+  lf_i = n_lf; hf_i = n_hf; hc_i = n_hc;
+  HCF_HZ = hc_i == 0 ? 5000 : hc_i == 1 ? 10000 : 20000;
+  build(s_lb, s_lc, s_hb, s_bw, s_hc, 0);
+  b_lb = s_lb; b_lc = s_lc; b_hb = s_hb; b_bw = s_bw; b_hc = s_hc;
+  dirty = 0;
+);
+
+@sample
+// ---- Calib : trim avant l'entrée -----------------------------------------------
+xl = spl0*calib_g;
+xr = spl1*calib_g;
+mi += k_mt*(max(xl*xl, xr*xr) - mi);
+
+tbm += k_tb*(tube_on - tbm);
+
+// ---- Traitement analogique (x2 sous 70 kHz) ------------------------------------
+os == 2 ? (
+  uL.up2(xl, UXL); a1 = cL.chain(up_a); a2 = cL.chain(up_b); yl = dL.down2(a1, a2, DEL, DOL);
+  uR.up2(xr, UXR); a1 = cR.chain(up_a); a2 = cR.chain(up_b); yr = dR.down2(a1, a2, DER, DOR);
+) : (
+  yl = cL.chain(xl);
+  yr = cR.chain(xr);
+);
+
+// ---- HPF / LPF 6 dB/oct --------------------------------------------------------
+hp_on ? ( yl -= hL.op_lp(yl, g_hp); yr -= hR.op_lp(yr, g_hp); );
+lp_on ? ( yl = lL.op_lp(yl, g_lp);  yr = lR.op_lp(yr, g_lp); );
+
+// ---- Compensation du Calib + volume de sortie propre ---------------------------
+zl = yl*calib_c*out_g;
+zr = yr*calib_c*out_g;
+mo += k_mt*(max(zl*zl, zr*zr) - mo);
+
+// ---- Hard-clip 0 dBFS (permanent, invisible) --------------------------------
+spl0 = min(max(zl, -1), 1);
+spl1 = min(max(zr, -1), 1);
+
+@gfx 1200 400
+S  = 0.75 + 0.25*floor(slider12 + 0.5);
+ox = max(0, floor((gfx_w - 1200*S)/2));
+oy = max(0, floor((gfx_h - 400*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(6, floor(15*S)));
+gfx_setfont(3, "Arial", max(5, floor(11*S)));
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(8, floor(20*S)));
+
+PCR = 0.31; PCG = 0.34; PCB = 0.39;              // bleu-gris de façade
+// ---- Façade -----------------------------------------------------------------------
+col(0.10,0.10,0.11); gfx_rect(0,0,gfx_w,gfx_h);
+col(PCR,PCG,PCB); rct(6,6,1188,324,1);
+col(PCR+0.04,PCG+0.04,PCB+0.04); rct(6,6,1188,2,1);
+col(PCR-0.08,PCG-0.08,PCB-0.08); rct(6,328,1188,2,1);
+col(0.08,0.08,0.09); rct(6,60,14,22,1); rct(6,250,14,22,1); rct(1180,60,14,22,1); rct(1180,250,14,22,1);
+screw(58,62); screw(58,272); screw(1142,62); screw(1142,272);
+
+// ---- Bloc texte --------------------------------------------------------------------
+col(0.92,0.92,0.92);
+gfx_setfont(5); text_c(150, 120, "RENO MELLOW");
+gfx_setfont(2); text_c(150, 150, "PROGRAM  EQUALIZER");
+text_c(150, 174, "RMeqp1A");
+col(0.92,0.92,0.92); rct(102,190,96,22,0);
+gfx_setfont(3); text_c(150, 201, "TUBE");
+
+// ---- Clé TUBE (circuit de lampes) -----------------------------------------------------
+kx0 = 150; ky0 = 262;
+key(kx0, ky0, slider13 >= 0.5, 36);
+gfx_setfont(3); col(0.92,0.92,0.92);
+text_l(kx0 + 24, ky0 - 30, "ON"); text_l(kx0 + 24, ky0 + 30, "OFF");
+
+// ---- Rangée du haut : BOOST / ATTEN grave et aigu ----------------------------------------
+KRAD = 34; ROWY = 108;
+gfx_setfont(2); col(0.94,0.94,0.94);
+text_c(330, 34, "BOOST"); text_c(470, 34, "ATTEN"); text_c(700, 34, "BOOST"); text_c(840, 34, "ATTEN");
+gfx_setfont(3);
+col(0.94,0.94,0.94); scale10(330, ROWY, KRAD + 18); scale10(470, ROWY, KRAD + 18);
+scale10(700, ROWY, KRAD + 18); scale10(840, ROWY, KRAD + 18);
+fluted(330, ROWY, KRAD, slider2/10);
+fluted(470, ROWY, KRAD, slider3/10);
+fluted(700, ROWY, KRAD, slider5/10);
+fluted(840, ROWY, KRAD, slider7/10);
+
+// ---- ATTEN SEL ----------------------------------------------------------------------------
+gfx_setfont(2); col(0.94,0.94,0.94); text_c(1000, 34, "ATTEN SEL");
+gfx_setfont(3);
+ang_pt(1000, 104, 48, -40); text_c(kx, ky, "5");
+ang_pt(1000, 104, 48, 0);   text_c(kx, ky, "10");
+ang_pt(1000, 104, 48, 40);  text_c(kx, ky, "20");
+chicken(1000, 104, -40 + 40*floor(slider8 + 0.5));
+
+// ---- Rangée du bas : CPS / BANDWIDTH / KCS --------------------------------------------
+gfx_setfont(2); col(0.94,0.94,0.94);
+text_c(400, 190, "CPS");
+gfx_setfont(3);
+ang_pt(400, 252, 50, -66); text_c(kx, ky, "20");
+ang_pt(400, 252, 50, -22); text_c(kx, ky, "30");
+ang_pt(400, 252, 50, 22);  text_c(kx, ky, "60");
+ang_pt(400, 252, 50, 66);  text_c(kx, ky, "100");
+chicken(400, 252, -66 + 44*floor(slider1 + 0.5));
+gfx_setfont(2); col(0.94,0.94,0.94); text_c(400, 318, "LOW FREQUENCY");
+
+gfx_setfont(3); col(0.94,0.94,0.94);
+scale10(585, 250, KRAD + 18);
+text_c(548, 304, "SHARP"); text_c(622, 304, "BROAD");
+fluted(585, 250, KRAD, slider6/10);
+gfx_setfont(2); col(0.94,0.94,0.94); text_c(585, 318, "BANDWIDTH");
+
+gfx_setfont(2); text_c(770, 190, "KCS");
+gfx_setfont(3);
+i = 0;
+loop(7,
+  i == 0 ? strcpy(#s, "3") : i == 1 ? strcpy(#s, "4") : i == 2 ? strcpy(#s, "5") : i == 3 ? strcpy(#s, "8") :
+  i == 4 ? strcpy(#s, "10") : i == 5 ? strcpy(#s, "12") : strcpy(#s, "16");
+  ang_pt(770, 252, 50, -90 + i*30); text_c(kx, ky, #s);
+  i += 1;
+);
+chicken(770, 252, -90 + 30*floor(slider4 + 0.5));
+gfx_setfont(2); col(0.94,0.94,0.94); text_c(770, 318, "HIGH FREQUENCY");
+
+// ---- Voyant rouge + BYPASS de l'égaliseur ----------------------------------------------
+col(0.20,0.20,0.22); gfx_circle(PX(970), PY(200), 22*S, 1, 1);
+col(0.55,0.56,0.58); gfx_circle(PX(970), PY(200), 18*S, 1, 1);
+slider9 >= 0.5 ? col(0.85,0.08,0.06) : col(0.40,0.05,0.04);
+gfx_circle(PX(970), PY(200), 14*S, 1, 1);
+slider9 >= 0.5 ? ( col(1.0,0.55,0.45); gfx_circle(PX(965), PY(194), 4*S, 1, 1); );
+key(970, 282, slider9 >= 0.5, 24);
+gfx_setfont(3); col(0.94,0.94,0.94);
+text_c(926, 258, "EQ IN"); text_c(926, 306, "BYPASS");
+
+// ---- Afficheurs LED : entrée / sortie ---------------------------------------------------
+in_m = 10*log10(max(mi, 0.00000000000000000001)) + REF_DB;
+out_m = 10*log10(max(mo, 0.00000000000000000001)) + REF_DB;
+col(0.20,0.22,0.25); rct(1024,178,96,138,1);
+col(0.12,0.13,0.15); rct(1024,178,96,138,0);
+gfx_setfont(3); col(0.94,0.94,0.94);
+text_c(1046, 190, "IN"); text_c(1098, 190, "OUT");
+i = 0;
+loop(5,
+  w = INV[i]; y = 210 + i*22;
+  w > 0 ? sprintf(#s, "+%d", w) : sprintf(#s, "%d", w);
+  col(0.94,0.94,0.94); text_c(1072, y, #s);
+  w >= 6 ? ( led(1046, y, in_m >= w, 0.95, 0.15, 0.10); led(1098, y, out_m >= w, 0.95, 0.15, 0.10); ) :
+  w >= 0 ? ( led(1046, y, in_m >= w, 0.98, 0.88, 0.15); led(1098, y, out_m >= w, 0.98, 0.88, 0.15); ) :
+           ( led(1046, y, in_m >= w, 0.20, 0.95, 0.25); led(1098, y, out_m >= w, 0.20, 0.95, 0.25); );
+  i += 1;
+);
+
+// ---- Bandeau ------------------------------------------------------------------------------
+col(0.06,0.06,0.065); rct(6, 338, 1188, 56, 1);
+oby = 354; cky = oby + 11;
+gfx_setfont(4); col(0.93,0.62,0.22); text_l(22, cky, "RMeqp1A");
+gfx_setfont(3); col(0.85,0.82,0.75);
+text_c(160, cky, "CALIB");
+draw_knob_s(196, cky, 10, (slider10 + 12)/24);
+col(0.93,0.90,0.82); sprintf(#s, "%+.1f dB", slider10); text_l(212, cky, #s);
+col(0.85,0.82,0.75); text_c(300, cky, "OUTPUT");
+draw_knob_s(342, cky, 10, (slider11 + 12)/24);
+col(0.93,0.90,0.82); sprintf(#s, "%+.1f dB", slider11); text_l(358, cky, #s);
+col(0.85,0.82,0.75); text_c(470, cky, "HPF");
+draw_knob_s(500, cky, 10, hp_pos(slider14));
+col(0.93,0.90,0.82); slider14 < 20 ? strcpy(#s, "OFF") : sprintf(#s, "%d Hz", slider14); text_l(516, cky, #s);
+col(0.85,0.82,0.75); text_c(630, cky, "LPF");
+draw_knob_s(660, cky, 10, lp_pos(slider15));
+col(0.93,0.90,0.82); slider15 >= 19999 ? strcpy(#s, "OFF") : sprintf(#s, "%d Hz", slider15); text_l(676, cky, #s);
+col(0.85,0.82,0.75); text_c(924, cky, "SIZE");
+szx = 950;
+gfx_setfont(1);
+sz = floor(slider12 + 0.5);
+draw_btn(780, oby, 50, 22, slider16 >= 0.5, "HQ");
+draw_btn(szx,     oby, 54, 22, sz == 0, "75%");
+draw_btn(szx+58,  oby, 54, 22, sz == 1, "100%");
+draw_btn(szx+116, oby, 54, 22, sz == 2, "125%");
+draw_btn(szx+174, oby, 54, 22, sz == 3, "150%");
+
+// ---- Souris -----------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = 0; acc = 0;
+  in_circ(330, ROWY, 44) ? drag = 2;
+  in_circ(470, ROWY, 44) ? drag = 3;
+  in_circ(700, ROWY, 44) ? drag = 5;
+  in_circ(840, ROWY, 44) ? drag = 7;
+  in_circ(585, 250, 44) ? drag = 6;
+  in_circ(1000, 104, 40) ? drag = 8;
+  in_circ(400, 252, 40) ? drag = 1;
+  in_circ(770, 252, 40) ? drag = 4;
+  in_circ(196, cky, 13) ? drag = 10;
+  in_circ(342, cky, 13) ? drag = 11;
+  // clic direct sur une étiquette de sélecteur
+  i = 0; loop(4, ang_pt(400, 252, 50, -66 + i*44); in_circ(kx, ky, 12) ? ( set_sl(1, i); drag = 0; ); i += 1;);
+  i = 0; loop(7, ang_pt(770, 252, 50, -90 + i*30); in_circ(kx, ky, 11) ? ( set_sl(4, i); drag = 0; ); i += 1;);
+  i = 0; loop(3, ang_pt(1000, 104, 48, -40 + i*40); in_circ(kx, ky, 12) ? ( set_sl(8, i); drag = 0; ); i += 1;);
+  in_rect(kx0 - 20, ky0 - 50, 60, 100) ? set_sl(13, slider13 >= 0.5 ? 0 : 1);
+  in_rect(950, 250, 40, 64) ? set_sl(9, slider9 >= 0.5 ? 0 : 1);
+  in_circ(500, cky, 13) ? ( drag = 14; scp = hp_pos(slider14); );
+  in_circ(660, cky, 13) ? ( drag = 15; scp = lp_pos(slider15); );
+  in_rect(780, oby, 50, 22) ? set_sl(16, slider16 >= 0.5 ? 0 : 1);
+  in_rect(szx,     oby, 54, 22) ? (slider12 = 0; sliderchange(slider12););
+  in_rect(szx+58,  oby, 54, 22) ? (slider12 = 1; sliderchange(slider12););
+  in_rect(szx+116, oby, 54, 22) ? (slider12 = 2; sliderchange(slider12););
+  in_rect(szx+174, oby, 54, 22) ? (slider12 = 3; sliderchange(slider12););
+  start = drag > 0 ? slider(drag) : 0;
+  // Ctrl+clic : valeur par défaut
+  (drag > 0 && (mouse_cap & 4)) ? (
+    set_sl(drag, drag == 6 ? 5 : drag == 1 ? 2 : drag == 4 ? 3 : drag == 8 ? 1 : drag == 15 ? 20000 : 0);
+    drag = 0;
+  );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.1 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    acc += dy;
+    drag == 1 ? set_sl(1, min(max(floor(start + acc/24 + 0.5), 0), 3)) :
+    drag == 4 ? set_sl(4, min(max(floor(start + acc/18 + 0.5), 0), 6)) :
+    drag == 8 ? set_sl(8, min(max(floor(start + acc/24 + 0.5), 0), 2)) :
+    drag == 14 ? ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(14, floor(hp_hz(scp) + 0.5)); ) :
+    drag == 15 ? ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(15, floor(lp_hz(scp) + 0.5)); ) :
+    (drag == 10 || drag == 11) ? set_sl(drag, floor(min(max(slider(drag) + dy*0.12, -12), 12)*10 + 0.5)/10) :
+    set_sl(drag, floor(min(max(slider(drag) + dy*0.05, 0), 10)*100 + 0.5)/100);
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;
