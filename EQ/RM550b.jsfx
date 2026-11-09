@@ -1,8 +1,8 @@
 desc:RM550b - ReNo Mellow 550b (Discrete 4-Band EQ)
 //tags: equalizer EQ proportional-q 500-series api-style 550b
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
 //@about Égaliseur 4 bandes inspiré de l'API 550b : Q proportionnel réciproque calé sur les courbes d'usine, crans de gain, shelf/cloche en HF et LF, couleur ampli discret + transfo.
 //
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ slider12:0<-12,12,0.1>-Calib (dB)
 slider13:0<-12,12,0.1>-Output (dB)
 slider14:1<0,3,1{75%,100%,125%,150%}>-Size
 slider15:1<0,1,1{Off,On}>-Color
-slider16:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+slider16:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
 in_pin:Left In
 in_pin:Right In

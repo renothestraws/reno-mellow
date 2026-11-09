@@ -1,0 +1,467 @@
+desc:RM1982TG - ReNo Mellow 1982TG (Trigger to MIDI)
+//tags: trigger midi drum replacement transient detection sidechain reject
+//@author ReNo Mellow
+//@version 1.2
+//@changelog Première version publique
+//@about Trigger to MIDI : transforme les transitoires audio en notes MIDI (seuil, sensibilité, masque, vélocité crête/RMS avec 5 courbes, note, canal, durée), 6 entrées de rejet, volume audio.
+//
+// ---------------------------------------------------------------------------
+// RM1982TG - convertit les transitoires audio (entrées 1/2) en notes MIDI
+//
+// THRESHOLD (-60..0 dBFS) : niveau minimal d'un coup.
+// SENS (0..100 %)         : sensibilité aux transitoires (montée rapide
+//                           demandée : 18 dB à 0 %, 2 dB à 100 %).
+// MASK (5..500 ms)        : temps mort après un coup (anti "double trig").
+// WINDOW (0,5..10 ms)     : fenêtre d'analyse du coup (mesure de vélocité et
+//                           comparaison avec les entrées de rejet). Ajoute
+//                           exactement cette latence, compensée par REAPER
+//                           (audio ET MIDI).
+// REJECT (-24..+24 dB)    : un transitoire arrivant en même temps sur une des
+//                           entrées de rejet (3 à 8, activables une à une)
+//                           annule la note s'il est plus fort que le coup
+//                           principal + REJECT dB. Un rejet faible (bleed) ne
+//                           bloque rien.
+// NOTE / CHANNEL          : note (0..127) et canal MIDI (1..16).
+// LENGTH (5..1000 ms)     : durée fixe des notes.
+// DYN RANGE (6..60 dB)    : plage de niveau couverte par la vélocité, à partir
+//                           du seuil (seuil -> vélocité 1, seuil + plage -> 127).
+// PEAK / RMS              : mesure de niveau pour la vélocité.
+// COURBE : LINEAR, LOG, EXP, LOUD, S-CURVE.
+// AUDIO OUT (-60..+6 dB, -60 = coupé) + MUTE : volume du son original en
+// sortie (retardé de WINDOW). Le MIDI entrant est transmis.
+// ---------------------------------------------------------------------------
+
+slider1:-24<-60,0,0.1>-Threshold (dBFS)
+slider2:50<0,100,0.5>-Sensitivity (%)
+slider3:50<5,500,1>-Mask (ms)
+slider4:2<0.5,10,0.1>-Window (ms)
+slider5:0<-24,24,0.1>-Reject (dB)
+slider6:36<0,127,1>-Note
+slider7:10<1,16,1>-MIDI Channel
+slider8:50<5,1000,1>-Length (ms)
+slider9:24<6,60,0.1>-Dyn Range (dB)
+slider10:0<0,1,1{Peak,RMS}>-Velocity Detection
+slider11:0<0,4,1{Linear,Log,Exp,Loud,S-Curve}>-Velocity Curve
+slider12:1<0,1,1{Off,On}>-Reject In 3
+slider13:1<0,1,1{Off,On}>-Reject In 4
+slider14:1<0,1,1{Off,On}>-Reject In 5
+slider15:1<0,1,1{Off,On}>-Reject In 6
+slider16:1<0,1,1{Off,On}>-Reject In 7
+slider17:1<0,1,1{Off,On}>-Reject In 8
+slider18:1<0,3,1{75%,100%,125%,150%}>-Size
+slider19:0<-60,6,0.1>-Audio Out (dB, -60 = Off)
+slider20:0<0,1,1{Off,On}>-Audio Mute
+
+in_pin:Main Left
+in_pin:Main Right
+in_pin:Reject 3
+in_pin:Reject 4
+in_pin:Reject 5
+in_pin:Reject 6
+in_pin:Reject 7
+in_pin:Reject 8
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+EPS = 0.00000001;
+ABL = 1000; ABR = 2000; ABN = 960;     // retard audio (WINDOW)
+SFE = 3000; SSE = 3010; SCP = 3020; SCC = 3030; SAC = 3040; SEN = 3050; SLED = 3060;
+HIST = 4000; NH = 400;                 // historique : niveau / évènements
+memset(HIST, 0, 3*NH);
+// évènements à afficher : HIST[NH+i] = vélocité (>0) ou -1 (rejet)
+ext_noinit = 1;
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function tcoef(ms) ( 1 - exp(-1/(0.001*ms*srate)); );
+function vcurve(v, m)
+(
+  v = min(max(v, 0), 1);
+  m == 1 ? log(1 + 9*v)/log(10) :
+  m == 2 ? (pow(10, v) - 1)/9 :
+  m == 3 ? pow(v, 0.35) :
+  m == 4 ? v*v*(3 - 2*v) : v;
+);
+
+function update_params() local(i)
+(
+  thr   = min(max(slider1, -60), 0);
+  rise  = 18 - 0.16*min(max(slider2, 0), 100);
+  mask_n = floor(min(max(slider3, 5), 500)*0.001*srate);
+  win_n = max(1, floor(min(max(slider4, 0.5), 10)*0.001*srate + 0.5));
+  rej   = min(max(slider5, -24), 24);
+  note  = min(max(floor(slider6 + 0.5), 0), 127);
+  chan  = min(max(floor(slider7 + 0.5), 1), 16) - 1;
+  len_n = max(1, floor(min(max(slider8, 5), 1000)*0.001*srate));
+  drng  = min(max(slider9, 6), 60);
+  v_rms = slider10 >= 0.5;
+  v_crv = min(max(floor(slider11 + 0.5), 0), 4);
+  i = 0; loop(6, SEN[i] = slider(12 + i) >= 0.5; i += 1;);
+  a_ff = tcoef(0.1); r_ff = tcoef(5);
+  a_sl = tcoef(10);  r_sl = tcoef(60);
+  pdc_delay = win_n; pdc_bot_ch = 0; pdc_top_ch = 2; pdc_midi = 1;
+  h_n = max(1, floor(srate*0.01));
+  aud_t = (slider20 >= 0.5 || slider19 <= -59.95) ? 0 : db2lin(min(slider19, 6));
+  k_ag = tcoef(10);
+);
+
+// ---- Outils graphiques (coordonnées logiques 1060 x 412) -----------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 8, 0, 1, 3.5);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 8, fz, frac, 3.5);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(2.5*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function led(x,y,on,r,g,b)
+(
+  col(0.03,0.03,0.035); gfx_circle(PX(x), PY(y), 7*S, 1, 1);
+  on ? col(r,g,b) : col(r*0.15+0.04, g*0.15+0.04, b*0.15+0.04);
+  gfx_circle(PX(x), PY(y), 5*S, 1, 1);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+function lpos(v, a, b) ( log(v/a)/log(b/a); );
+function lval(p, a, b) ( a*pow(b/a, p); );
+// nom de note (C-1 = 0) dans #nn
+function note_name(n) local(o, k)
+(
+  o = floor(n/12) - 1; k = n % 12;
+  k == 0 ? strcpy(#nb, "C") : k == 1 ? strcpy(#nb, "C#") : k == 2 ? strcpy(#nb, "D") :
+  k == 3 ? strcpy(#nb, "D#") : k == 4 ? strcpy(#nb, "E") : k == 5 ? strcpy(#nb, "F") :
+  k == 6 ? strcpy(#nb, "F#") : k == 7 ? strcpy(#nb, "G") : k == 8 ? strcpy(#nb, "G#") :
+  k == 9 ? strcpy(#nb, "A") : k == 10 ? strcpy(#nb, "A#") : strcpy(#nb, "B");
+  sprintf(#nn, "%s%d  (%d)", #nb, o, n);
+);
+function dby(d) ( sy + sh*min(max(-d, 0), 66)/66; );
+
+update_params();
+st = 0; armed = 1; aud_g = aud_t;
+
+@slider
+update_params();
+
+@block
+update_params();
+// MIDI entrant transmis
+while (midirecv(ofs, m1, m2, m3) ? ( midisend(ofs, m1, m2, m3); 1; ) : 0);
+bpos = 0;
+
+@sample
+// ---- audio : passage retardé de WINDOW ---------------------------------------------
+awp = (awp + 1) % ABN;
+ABL[awp] = spl0; ABR[awp] = spl1;
+x0 = spl0; x1 = spl1;
+arp = (awp - win_n + ABN) % ABN;
+aud_g += k_ag*(aud_t - aud_g);
+spl0 = ABL[arp]*aud_g; spl1 = ABR[arp]*aud_g;
+
+// ---- détection principale ------------------------------------------------------------
+xd = max(abs(x0), abs(x1));
+ef += (xd > ef ? a_ff : r_ff)*(xd - ef);
+es += (xd > es ? a_sl : r_sl)*(xd - es);
+lf = lin2db(ef); ls = lin2db(es);
+dr = lf - ls;
+// ré-armement : la montée doit retomber sous la moitié du critère
+dr < 0.5*rise ? ( armed = 1; );
+
+// ---- entrées de rejet 3..8 (transitoires mémorisés pendant 2 x WINDOW) --------------
+k = 0;
+loop(6,
+  v = abs(spl(2 + k));
+  SFE[k] += (v > SFE[k] ? a_ff : r_ff)*(v - SFE[k]);
+  SSE[k] += (v > SSE[k] ? a_sl : r_sl)*(v - SSE[k]);
+  (lin2db(SFE[k]) - lin2db(SSE[k]) > rise && lin2db(SFE[k]) > -60) ? (
+    SCP[k] = max(SCP[k], SFE[k]); SCC[k] = 2*win_n; SLED[k] = 1;
+  );
+  SCC[k] > 0 ? ( SCC[k] -= 1; ) : ( SCP[k] = 0; );
+  k += 1;
+);
+
+// ---- machine à états : 0 attente, 1 fenêtre d'analyse ---------------------------
+mcnt > 0 ? ( mcnt -= 1; );
+st == 0 ? (
+  (armed && mcnt == 0 && lf > thr && dr > rise) ? (
+    st = 1; wcnt = win_n; pk = 0; ss = 0; nss = 0;
+    armed = 0; mcnt = mask_n;
+  );
+);
+st == 1 ? (
+  pk = max(pk, xd); ss += 0.5*(x0*x0 + x1*x1); nss += 1;
+  wcnt -= 1;
+  wcnt <= 0 ? (
+    st = 0;
+    lvp = lin2db(pk);
+    lvv = v_rms ? lin2db(sqrt(ss/max(nss, 1))*1.41421356) : lvp;
+    // rejet : un transitoire concurrent assez fort sur une entrée active
+    sc = 0; k = 0; loop(6, SEN[k] ? ( sc = max(sc, SCP[k]); ); k += 1;);
+    rejected = sc > EPS && lin2db(sc) >= lvp + rej;
+    rejected ? ( ev_rej = 1; ) : (
+      vel = 1 + floor(126*vcurve((lvv - thr)/drng, v_crv) + 0.5);
+      vel = min(max(vel, 1), 127);
+      noff > 0 ? midisend(bpos, 0x80 + n_ch, n_nt, 0);
+      n_ch = chan; n_nt = note;
+      midisend(bpos, 0x90 + n_ch, n_nt, vel);
+      noff = len_n; last_vel = vel; ev_vel = vel; trig_led = 1;
+    );
+  );
+);
+// fin de note
+noff > 0 ? ( noff -= 1; noff == 0 ? midisend(bpos, 0x80 + n_ch, n_nt, 0); );
+
+// ---- historique pour l'écran -------------------------------------------------------
+hc == 0 ? ( h1 = xd; ) : ( h1 = max(h1, xd); );
+hc += 1;
+hc >= h_n ? (
+  hp = (hp + 1) % NH;
+  HIST[hp] = h1;
+  HIST[NH + hp] = ev_rej ? -1 : ev_vel;
+  ev_rej = 0; ev_vel = 0;
+  hc = 0;
+);
+bpos += 1;
+
+@gfx 1060 412
+S  = 0.75 + 0.25*floor(slider18 + 0.5);
+ox = max(0, floor((gfx_w - 1060*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(11*S)), 'b');
+gfx_setfont(7, "Arial", max(8, floor(22*S)), 'b');
+
+// voyants (lus puis effacés par l'interface)
+t_led = trig_led; trig_led = 0;
+t_led ? ( tl_hold = 6; ) : ( tl_hold = max(tl_hold - 1, 0); );
+ui = 0; loop(6, SLED[ui] ? ( SLED[20 + ui] = 6; SLED[ui] = 0; ) : ( SLED[20 + ui] = max(SLED[20 + ui] - 1, 0); ); ui += 1;);
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1048,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1048, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1048,2,1);
+col(0.04,0.04,0.045); rct(6,364,1048,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
+
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982TG");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(204, 38, "TRIGGER  TO  MIDI");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+
+// ---- THRESHOLD + voyant + vélocité ---------------------------------------------------
+draw_knob(96, 160, 44, (slider1 + 60)/60, 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(96, 160, 68, 0, "-60"); klab(96, 160, 68, 0.5, "-30"); klab(96, 160, 68, 1, "0");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(96, 76, "THRESHOLD");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%.1f dBFS", slider1); text_c(96, 236, #s);
+led(46, 268, tl_hold > 0, 0.25, 0.95, 0.40);
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(58, 268, "TRIG");
+gfx_setfont(7); col(0.92,0.93,0.95); sprintf(#s, "%d", last_vel); text_r(170, 268, #s);
+gfx_setfont(3); col(0.62,0.63,0.66); text_r(170, 286, "LAST VELOCITY");
+gfx_setfont(1);
+draw_btn(34, 312, 64, 24, slider10 < 0.5, "PEAK");
+draw_btn(102, 312, 64, 24, slider10 >= 0.5, "RMS");
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(100, 346, "VELOCITY DETECTION");
+
+// ---- rangée 1 : SENS / MASK / WINDOW / REJECT ----------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95);
+text_c(232, 76, "SENS"); text_c(332, 76, "MASK"); text_c(432, 76, "WINDOW"); text_c(532, 76, "REJECT");
+draw_knob(232, 128, 26, slider2/100, 0);
+draw_knob(332, 128, 26, lpos(slider3, 5, 500), 0);
+draw_knob(432, 128, 26, lpos(slider4, 0.5, 10), 0);
+draw_knob(532, 128, 26, (slider5 + 24)/48, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(232, 128, 44, 0, "0"); klab(232, 128, 44, 1, "100");
+klab(332, 128, 44, 0, "5"); klab(332, 128, 44, 1, "500");
+klab(432, 128, 44, 0, "0.5"); klab(432, 128, 44, 1, "10");
+klab(532, 128, 44, 0, "-24"); klab(532, 128, 44, 1, "+24");
+gfx_setfont(6); col(1.00,0.70,0.35);
+sprintf(#s, "%.0f %%", slider2); text_c(232, 176, #s);
+sprintf(#s, "%.0f ms", slider3); text_c(332, 176, #s);
+sprintf(#s, "%.1f ms", slider4); text_c(432, 176, #s);
+sprintf(#s, "%+.1f dB", slider5); text_c(532, 176, #s);
+
+// ---- rangée 2 : NOTE / CHANNEL / LENGTH / DYN RANGE ----------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95);
+text_c(232, 210, "NOTE"); text_c(332, 210, "CHANNEL"); text_c(432, 210, "LENGTH"); text_c(532, 210, "DYN RANGE");
+draw_knob(232, 262, 26, slider6/127, 0);
+draw_knob(332, 262, 26, (slider7 - 1)/15, 0);
+draw_knob(432, 262, 26, lpos(slider8, 5, 1000), 0);
+draw_knob(532, 262, 26, (slider9 - 6)/54, 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(232, 262, 44, 0, "0"); klab(232, 262, 44, 1, "127");
+klab(332, 262, 44, 0, "1"); klab(332, 262, 44, 1, "16");
+klab(432, 262, 44, 0, "5"); klab(432, 262, 44, 1, "1 s");
+klab(532, 262, 44, 0, "6"); klab(532, 262, 44, 1, "60");
+gfx_setfont(6); col(1.00,0.70,0.35);
+note_name(floor(slider6 + 0.5)); text_c(232, 310, #nn);
+sprintf(#s, "%d", slider7); text_c(332, 310, #s);
+sprintf(#s, "%.0f ms", slider8); text_c(432, 310, #s);
+sprintf(#s, "%.1f dB", slider9); text_c(532, 310, #s);
+
+// ---- Écran ---------------------------------------------------------------------------
+sx = 616; sy = 72; sw = 410; sh = 160;
+col(0.03,0.03,0.035); rct(sx-4, sy-4, sw+8, sh+8, 1);
+col(0.04,0.06,0.08); rct(sx, sy, sw, sh, 1);
+col(0.09,0.13,0.17);
+dd = -12; loop(5, ln(sx, dby(dd), sx + sw, dby(dd)); dd -= 12;);
+hp_now = hp; ui = 0;
+loop(NH - 4,
+  hi = (hp_now + 1 + ui + 4) % NH;
+  xa = sx + 2 + ui;
+  ya = dby(lin2db(HIST[hi]));
+  col(0.24,0.27,0.31); ln(xa, sy + sh, xa, ya);
+  ev = HIST[NH + hi];
+  ev > 0 ? ( col(0.25,0.95,0.40); ln(xa, sy + sh, xa, sy + sh - ev/127*sh); ln(xa + 1, sy + sh, xa + 1, sy + sh - ev/127*sh); );
+  ev < 0 ? ( col(1.00,0.25,0.20); ln(xa - 3, sy + 4, xa + 3, sy + 10); ln(xa - 3, sy + 10, xa + 3, sy + 4); );
+  ui += 1;
+);
+ty = dby(slider1);
+col(0.95,0.95,0.97); ui = 0; loop(41, ln(sx + ui*10, ty, sx + ui*10 + 5, ty); ui += 1;);
+gfx_setfont(3); col(0.40,0.55,0.65);
+text_r(sx + sw - 4, dby(-12) - 7, "-12"); text_r(sx + sw - 4, dby(-36) - 7, "-36"); text_r(sx + sw - 4, dby(-60) - 7, "-60");
+col(0.25,0.95,0.40); text_l(sx + 6, sy + sh - 9, "NOTES");
+col(1.00,0.25,0.20); text_l(sx + 54, sy + sh - 9, "X = REJECT");
+
+// ---- Entrées de rejet ------------------------------------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(616, 252, "REJECT INPUTS");
+gfx_setfont(1);
+ui = 0;
+loop(6,
+  bx = 616 + ui*69;
+  sprintf(#s, "IN %d", ui + 3);
+  draw_btn(bx, 266, 64, 24, slider(12 + ui) >= 0.5, #s);
+  led(bx + 54, 278, SLED[20 + ui] > 0, 1.00, 0.25, 0.20);
+  ui += 1;
+);
+// ---- Courbe de vélocité ---------------------------------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(616, 306, "VELOCITY CURVE");
+gfx_setfont(1);
+cv = floor(slider11 + 0.5);
+draw_btn(616, 320, 76, 24, cv == 0, "LINEAR");
+draw_btn(698, 320, 76, 24, cv == 1, "LOG");
+draw_btn(780, 320, 76, 24, cv == 2, "EXP");
+draw_btn(862, 320, 76, 24, cv == 3, "LOUD");
+draw_btn(944, 320, 82, 24, cv == 4, "S-CURVE");
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider18 + 0.5);
+draw_btn(842, 377, 46, 24, sz == 0, "75%");
+draw_btn(892, 377, 46, 24, sz == 1, "100%");
+draw_btn(942, 377, 46, 24, sz == 2, "125%");
+draw_btn(992, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default  -  Shift: fine");
+// AUDIO OUT
+gfx_setfont(3); col(0.62,0.63,0.66); text_r(452, 389, "AUDIO OUT");
+draw_knob(476, 389, 9, (slider19 + 60)/66, 60/66);
+gfx_setfont(6); col(1.00,0.70,0.35);
+(slider20 >= 0.5 || slider19 <= -59.95) ? strcpy(#s, "OFF") : sprintf(#s, "%+.1f dB", slider19); text_l(504, 389, #s);
+gfx_setfont(1); draw_btn(566, 377, 64, 24, slider20 >= 0.5, "MUTE");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = 0;
+  in_circ(96, 160, 56) ? drag = 1;
+  in_circ(232, 128, 36) ? drag = 2;
+  in_circ(332, 128, 36) ? ( drag = 3; scp_ = lpos(slider3, 5, 500); );
+  in_circ(432, 128, 36) ? ( drag = 4; scp_ = lpos(slider4, 0.5, 10); );
+  in_circ(532, 128, 36) ? drag = 5;
+  in_circ(232, 262, 36) ? ( drag = 6; acc = 0; st_v = slider6; );
+  in_circ(332, 262, 36) ? ( drag = 7; acc = 0; st_v = slider7; );
+  in_circ(432, 262, 36) ? ( drag = 8; scp_ = lpos(slider8, 5, 1000); );
+  in_circ(532, 262, 36) ? drag = 9;
+  in_circ(476, 389, 16) ? drag = 19;
+  in_rect(566, 377, 64, 24) ? set_sl(20, slider20 >= 0.5 ? 0 : 1);
+  in_rect(34, 312, 64, 24) ? set_sl(10, 0);
+  in_rect(102, 312, 64, 24) ? set_sl(10, 1);
+  ui = 0; loop(6, in_rect(616 + ui*69, 266, 64, 24) ? set_sl(12 + ui, slider(12 + ui) >= 0.5 ? 0 : 1); ui += 1;);
+  in_rect(616, 320, 76, 24) ? set_sl(11, 0);
+  in_rect(698, 320, 76, 24) ? set_sl(11, 1);
+  in_rect(780, 320, 76, 24) ? set_sl(11, 2);
+  in_rect(862, 320, 76, 24) ? set_sl(11, 3);
+  in_rect(944, 320, 82, 24) ? set_sl(11, 4);
+  in_rect(842, 377, 46, 24) ? (slider18 = 0; sliderchange(slider18););
+  in_rect(892, 377, 46, 24) ? (slider18 = 1; sliderchange(slider18););
+  in_rect(942, 377, 46, 24) ? (slider18 = 2; sliderchange(slider18););
+  in_rect(992, 377, 46, 24) ? (slider18 = 3; sliderchange(slider18););
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? set_sl(1, -24) : drag == 2 ? set_sl(2, 50) : drag == 3 ? set_sl(3, 50) :
+    drag == 4 ? set_sl(4, 2) : drag == 5 ? set_sl(5, 0) : drag == 6 ? set_sl(6, 36) :
+    drag == 7 ? set_sl(7, 10) : drag == 8 ? set_sl(8, 50) : drag == 19 ? set_sl(19, 0) : set_sl(9, 24);
+    drag = 0;
+  );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? set_sl(1, floor(min(max(slider1 + dy*0.25, -60), 0)*10 + 0.5)/10) :
+    drag == 2 ? set_sl(2, floor(min(max(slider2 + dy*0.5, 0), 100)*2 + 0.5)/2) :
+    drag == 3 ? ( scp_ = min(max(scp_ + dy*0.005, 0), 1); set_sl(3, floor(lval(scp_, 5, 500) + 0.5)); ) :
+    drag == 4 ? ( scp_ = min(max(scp_ + dy*0.005, 0), 1); set_sl(4, floor(lval(scp_, 0.5, 10)*10 + 0.5)/10); ) :
+    drag == 5 ? set_sl(5, floor(min(max(slider5 + dy*0.25, -24), 24)*10 + 0.5)/10) :
+    drag == 6 ? ( acc += dy; set_sl(6, min(max(floor(st_v + acc/4 + 0.5), 0), 127)); ) :
+    drag == 7 ? ( acc += dy; set_sl(7, min(max(floor(st_v + acc/10 + 0.5), 1), 16)); ) :
+    drag == 8 ? ( scp_ = min(max(scp_ + dy*0.005, 0), 1); set_sl(8, floor(lval(scp_, 5, 1000) + 0.5)); ) :
+    drag == 19 ? set_sl(19, floor(min(max(slider19 + dy*0.3, -60), 6)*10 + 0.5)/10) :
+                set_sl(9, floor(min(max(slider9 + dy*0.25, 6), 60)*10 + 0.5)/10);
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;

@@ -1,8 +1,8 @@
 desc:RMvioletQ - ReNo Mellow violet Q (Passive Stereo Mastering EQ)
 //tags: equalizer EQ passive tube mastering stereo manley-style
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
 //@about Égaliseur passif stéréo à lampes inspiré du Manley Massive Passive (version Mastering) : 2 x 4 bandes à crans, BANDWIDTH qui sculpte les shelfs (courbes Pultec), combinaison parallèle, LP/HP, Link.
 //
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ slider50:0<-12,12,0.1>-Calib (dB)
 slider51:0<-12,12,0.1>-Output (dB)
 slider52:1<0,3,1{75%,100%,125%,150%}>-Size
 slider53:1<0,1,1{Off,On}>-Color
-slider54:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+slider54:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
 in_pin:Left In
 in_pin:Right In

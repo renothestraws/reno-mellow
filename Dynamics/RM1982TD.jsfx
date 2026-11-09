@@ -1,0 +1,433 @@
+desc:RM1982TD - ReNo Mellow 1982TD (Transient Designer)
+//tags: dynamics transient shaper designer attack sustain pump
+//@author ReNo Mellow
+//@version 1.3
+//@changelog Première version publique
+//@about Transient designer : attaque, sustain et pump, speed (fenêtre d'attaque), side-chain, Vintage, clip optionnel.
+//
+// ---------------------------------------------------------------------------
+// RM1982TD - transient designer simple, de la famille du RM1982
+//
+// ATTACK  (-100..+100 %) : amplifie ou atténue l'attaque (le transitoire).
+// PUMP    (0..100 %)     : creuse le son juste après le transitoire ; l'attaque
+//                          ressort sans que le niveau crête monte.
+// SUSTAIN (-100..+100 %) : amplifie ou atténue la queue (le son entretenu).
+// SPEED   (0..100 %)     : durée accordée à la partie "attaque" : 1 à 50 ms
+//                          (15 ms par défaut ; 85 % de la course entre 1 et 30 ms).
+//                          À gauche, l'attaque est courte et le sustain commence
+//                          tôt (il est donc plus long) ; à droite, l'attaque dure
+//                          plus longtemps. Le PUMP suit : il commence juste après
+//                          l'attaque et sa durée s'adapte.
+// SIDECHAIN : détection sur l'entrée 3/4, effet appliqué sur l'entrée 1/2.
+// VINTAGE : filtres doux 3 dB/oct (passe-haut 50 Hz, passe-bas 10 kHz),
+//           comme sur le RM1982.
+// CLIP    : écrêtage de sortie à 0 dBFS (désactivable).
+// OUTPUT  : volume de sortie propre -20..+20 dB.
+// Détection stéréo liée, aucune latence (pas d'anticipation).
+// Gain de traitement limité à +18 / -24 dB.
+// ---------------------------------------------------------------------------
+
+slider1:0<-100,100,0.5>-Attack (%)
+slider2:0<0,100,0.5>-Pump (%)
+slider3:0<-100,100,0.5>-Sustain (%)
+slider4:15<1,50,0.1>-Speed (ms, attack window)
+slider5:0<0,1,1{Off,On}>-Sidechain (in 3/4)
+slider6:0<0,1,1{Off,On}>-Vintage
+slider7:1<0,1,1{Off,On}>-Clip 0 dBFS
+slider8:0<-20,20,0.1>-Output (dB)
+slider9:1<0,3,1{75%,100%,125%,150%}>-Size
+
+in_pin:Left In
+in_pin:Right In
+in_pin:Sidechain Left
+in_pin:Sidechain Right
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+// ---- Constantes ------------------------------------------------------------------------
+K_ATT = 0.6; K_SUS = 0.6; K_PMP = 0.8;   // sensibilité à 100 %
+G_MAX = 18; G_MIN = -24;
+VIN_HP = 50; VIN_LP = 10000; VIN_MK = 2;
+EPS = 0.00000001;
+// mémoire
+HPG = 100; HPK = 110; LBG = 120; LBK = 130;
+HSL = 140; HSR = 150; LSL = 160; LSR = 170; FSL = 180; FSR = 190;
+memset(HSL, 0, 60);
+HIST = 1000; NH = 260;            // historique du gain (min/max par colonne)
+memset(HIST, 0, 2*NH);
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function tc(ms) ( 1 - exp(-1/(0.001*ms*srate)); );
+function lerp_log(a, b, t) ( a*pow(b/a, t); );
+// course du potard SPEED : 1..30 ms sur 85 %, 30..50 ms sur le reste
+function sp_pos(ms) ( ms <= 30 ? 0.85*(ms - 1)/29 : 0.85 + 0.15*(ms - 30)/20; );
+function sp_ms(p)   ( p <= 0.85 ? 1 + 29*p/0.85 : 30 + 20*(p - 0.85)/0.15; );
+
+// ---- Vintage : passe-haut / passe-bas 3 dB/oct (comme le RM1982) --------------------
+function an_lp(f) local(h, fp, fz)
+(
+  h = 1; fp = VIN_LP;
+  loop(8, fz = fp*2; h *= sqrt((1 + sqr(f/fz))/(1 + sqr(f/fp))); fp *= 4;);
+  h;
+);
+function vin_design() local(i, fp, gq, dn, w, target, q)
+(
+  fp = VIN_HP; i = 0;
+  loop(4,
+    gq = tan($pi*fp/srate);
+    HPG[i] = gq/(1 + gq);
+    HPK[i] = tan($pi*fp*0.5/srate)/gq;
+    fp *= 0.25; i += 1;
+  );
+  fp = VIN_LP; n_lb = 0; dn = 1;
+  loop(8,
+    fp*2 < 0.3*srate ? (
+      gq = tan($pi*fp/srate);
+      LBG[n_lb] = gq/(1 + gq);
+      LBK[n_lb] = gq/tan($pi*fp*2/srate);
+      dn *= LBK[n_lb];
+      n_lb += 1; fp *= 4;
+    );
+  );
+  target = an_lp(0.5*srate)/dn;
+  w   = tan($pi*min(fp, 0.45*srate)/srate);
+  vfa = (1 - w)/(1 + w);
+  q   = target*(1 + vfa)/(1 - vfa);
+  vfb = (q - 1)/(q + 1);
+  vfg = (1 - vfa)/(1 - vfb);
+  vin_sr = srate;
+);
+function vin(x, hs, ls, fs) local(i, v, l, y)
+(
+  i = 0;
+  loop(4,
+    v = (x - hs[i])*HPG[i]; l = v + hs[i]; hs[i] = l + v;
+    x = (x - l) + HPK[i]*l;
+    i += 1;
+  );
+  i = 0;
+  loop(n_lb,
+    v = (x - ls[i])*LBG[i]; l = v + ls[i]; ls[i] = l + v;
+    x = l + LBK[i]*(x - l);
+    i += 1;
+  );
+  y = vfg*(x - vfb*fs[0]) + vfa*fs[1];
+  fs[0] = x; fs[1] = y;
+  y;
+);
+
+function update_params()
+(
+  att = min(max(slider1, -100), 100)/100*K_ATT;
+  pmp = min(max(slider2, 0), 100)/100*K_PMP;
+  sus = min(max(slider3, -100), 100)/100*K_SUS;
+  sc_on  = slider5 >= 0.5;
+  vin_on = slider6 >= 0.5;
+  clip_on = slider7 >= 0.5;
+  out_g  = db2lin(min(max(slider8, -20), 20));
+  vin_g  = db2lin(VIN_MK);
+  srate != vin_sr ? vin_design();
+  // SPEED = durée de la partie attaque (1..50 ms, 15 ms par défaut)
+  w_att = min(max(slider4, 1), 50);
+  att *= min(max(pow(10/w_att, 0.25), 0.8), 1.8);   // fenêtre courte : même impact
+  a_f  = tc(0.2);                          // enveloppe rapide : attaque
+  a_s  = tc(w_att);                        // enveloppe lente : fixe la durée de l'attaque
+  r_t  = tc(max(15, 3*w_att));             // release commun (détection d'attaque)
+  a_e  = tc(1);
+  r_sh = tc(max(8, 1.5*w_att));            // sustain : commence après l'attaque
+  r_lg = tc(max(250, 8*w_att));            // sustain : release long
+  k_pd = exp(-1/(0.001*max(15, 2.5*w_att)*srate));   // pump : durée liée à l'attaque
+  k_gs = tc(min(max(w_att/10, 0.2), 3));   // lissage du gain
+  k_fd = tc(10);
+  h_n  = max(1, floor(srate*0.012));       // échantillons par colonne d'historique
+);
+
+// ---- Outils graphiques (coordonnées logiques 1060 x 412) -----------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+// potard alu moderne avec anneau de valeur ambre
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
+function lbtn(x,y,w,h,on,str,r,g,b)
+(
+  col(0.03,0.03,0.035); rct(x-2, y-2, w+4, h+4, 1);
+  col(0.16,0.165,0.18); rct(x, y, w, h, 1);
+  on ? col(r,g,b) : col(r*0.18+0.05, g*0.18+0.05, b*0.18+0.05);
+  rct(x + 8, y + h*0.5 - 2, 14, 4, 1);
+  on ? col(0.95,0.95,0.95) : col(0.62,0.63,0.66);
+  text_l(x + 30, y + h*0.5, str);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+// forme théorique (écran) : gain en dB au temps t (0..1) d'un coup typique
+function shape_g(t) local(sp, w, ta, tp, ts, g, ka)
+(
+  // t : 0..1 = 0..250 ms
+  w  = min(max(slider4, 1), 50);
+  ka = min(max(pow(10/w, 0.25), 0.8), 1.8);
+  ta = max(w, 2)/250; tp = max(15, 2.5*w)/250; ts = max(8, 1.5*w)*4/250;
+  g  = slider1/100*K_ATT*ka*16*exp(-t/ta)
+     - slider2/100*K_PMP*10*((t + ta)/tp)*exp(1 - (t + ta)/tp)*(1 - exp(-t/ta))
+     + slider3/100*K_SUS*16*(1 - exp(-t/ts));
+  min(max(g, G_MIN), G_MAX);
+);
+
+update_params();
+vin_design();
+gs = 0; vm = vin_on;
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+xl = spl0; xr = spl1;
+// ---- détection (stéréo liée, ou side-chain 3/4) ------------------------------------
+xd = sc_on ? max(abs(spl2), abs(spl3)) : max(abs(xl), abs(xr));
+// attaque : enveloppe rapide vs lente
+ef += (xd > ef ? a_f : r_t)*(xd - ef);
+es += (xd > es ? a_s : r_t)*(xd - es);
+d_att = max(0, lin2db(ef + EPS) - lin2db(es + EPS));
+// sustain : release long vs court
+e1 += (xd > e1 ? a_e : r_sh)*(xd - e1);
+e2 += (xd > e2 ? a_e : r_lg)*(xd - e2);
+d_sus = max(0, lin2db(e2 + EPS) - lin2db(e1 + EPS));
+// porte douce : rien sous -70 dBFS (évite de remonter le bruit de fond)
+lv = lin2db(e2 + EPS);
+gate = min(max((lv + 70)/12, 0), 1);
+// pump : creux juste après le transitoire
+pk = max(d_att, pk*k_pd);
+pv = pk - d_att;
+// gain
+gt = (att*d_att + sus*d_sus*gate - pmp*pv);
+gt = min(max(gt, G_MIN), G_MAX);
+gs += k_gs*(gt - gs);
+g = db2lin(gs);
+yl = xl*g; yr = xr*g;
+// ---- vintage (fondu) ----------------------------------------------------------------
+vm += k_fd*(vin_on - vm);
+vm > 0.0001 ? (
+  vl = vin(yl, HSL, LSL, FSL)*vin_g; vr = vin(yr, HSR, LSR, FSR)*vin_g;
+  yl += vm*(vl - yl); yr += vm*(vr - yr);
+);
+yl *= out_g; yr *= out_g;
+clip_on ? ( yl = min(max(yl, -1), 1); yr = min(max(yr, -1), 1); );
+spl0 = yl; spl1 = yr;
+// ---- historique pour l'écran -------------------------------------------------------
+hc == 0 ? ( hmin = gs; hmax = gs; ) : ( hmin = min(hmin, gs); hmax = max(hmax, gs); );
+hc += 1;
+hc >= h_n ? (
+  hp = (hp + 1) % NH;
+  HIST[hp] = hmin; HIST[NH + hp] = hmax;
+  hc = 0;
+);
+
+@gfx 1060 412
+S  = 0.75 + 0.25*floor(slider9 + 0.5);
+ox = max(0, floor((gfx_w - 1060*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1048,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1048, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1048,2,1);
+col(0.04,0.04,0.045); rct(6,364,1048,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
+
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982TD");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(204, 38, "TRANSIENT  DESIGNER");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+
+// ---- ATTACK -----------------------------------------------------------------------
+draw_knob(110, 168, 44, (slider1 + 100)/200, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(110, 168, 70, 0, "-100"); klab(110, 168, 70, 0.25, "-50"); klab(110, 168, 70, 0.5, "0");
+klab(110, 168, 70, 0.75, "+50"); klab(110, 168, 70, 1, "+100");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(110, 82, "ATTACK");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%+.0f %%", slider1); text_c(110, 248, #s);
+
+// ---- PUMP -------------------------------------------------------------------------
+draw_knob(250, 150, 30, slider2/100, 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(250, 150, 52, 0, "0"); klab(250, 150, 52, 0.5, "50"); klab(250, 150, 52, 1, "100");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(250, 82, "PUMP");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%.0f %%", slider2); text_c(250, 206, #s);
+
+// ---- SUSTAIN ----------------------------------------------------------------------
+draw_knob(390, 168, 44, (slider3 + 100)/200, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(390, 168, 70, 0, "-100"); klab(390, 168, 70, 0.25, "-50"); klab(390, 168, 70, 0.5, "0");
+klab(390, 168, 70, 0.75, "+50"); klab(390, 168, 70, 1, "+100");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(390, 82, "SUSTAIN");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%+.0f %%", slider3); text_c(390, 248, #s);
+
+// ---- SPEED ------------------------------------------------------------------------
+draw_knob(530, 150, 30, sp_pos(slider4), 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(530, 150, 52, 0, "1"); klab(530, 150, 52, sp_pos(15), "15"); klab(530, 150, 52, sp_pos(30), "30"); klab(530, 150, 52, 1, "50");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(530, 82, "SPEED");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%.1f ms", slider4); text_c(530, 206, #s);
+
+// ---- OUTPUT -----------------------------------------------------------------------
+draw_knob(670, 168, 44, (slider8 + 20)/40, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(670, 168, 70, 0, "-20"); klab(670, 168, 70, 0.25, "-10"); klab(670, 168, 70, 0.5, "0");
+klab(670, 168, 70, 0.75, "+10"); klab(670, 168, 70, 1, "+20");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(670, 82, "OUTPUT");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%+.1f dB", slider8); text_c(670, 248, #s);
+
+// ---- Boutons ------------------------------------------------------------------------
+gfx_setfont(1);
+lbtn(196, 286, 116, 26, slider5 >= 0.5, "SIDECHAIN", 0.20, 0.75, 1.00);
+lbtn(332, 286, 116, 26, slider6 >= 0.5, "VINTAGE", 1.00, 0.58, 0.12);
+lbtn(468, 286, 116, 26, slider7 >= 0.5, "CLIP 0 dB", 1.00, 0.25, 0.20);
+
+// ---- Écran --------------------------------------------------------------------------
+sx = 760; sy = 72; sw = 266; sh = 270;
+col(0.03,0.03,0.035); rct(sx-4, sy-4, sw+8, sh+8, 1);
+col(0.04,0.06,0.08); rct(sx, sy, sw, sh, 1);
+// -- haut : forme théorique d'un coup (gris = original, cyan = traité)
+fy0 = sy + 8; fh = 118;
+col(0.09,0.13,0.17);
+ui = 1; loop(3, ln(sx, fy0 + ui*fh/4, sx + sw, fy0 + ui*fh/4); ui += 1;);
+gfx_setfont(3); col(0.40,0.55,0.65); text_l(sx + 6, fy0 + 6, "SHAPE");
+// enveloppe d'origine : attaque brève puis déclin
+ui = 0; px_ = 0; py_ = 0; qy_ = 0;
+loop(133,
+  tt = ui/132;
+  e0 = tt < 0.02 ? tt/0.02 : exp(-(tt - 0.02)/0.28);
+  d0 = lin2db(max(e0, 0.0001));
+  cx_ = sx + 4 + tt*(sw - 8);
+  cy_ = fy0 + fh - (max(d0, -36) + 36)/48*fh;
+  cz_ = fy0 + fh - (min(max(d0 + (tt < 0.02 ? shape_g(0)*tt/0.02 : shape_g(tt - 0.02)), -36), 12) + 36)/48*fh;
+  ui > 0 ? (
+    col(0.30,0.34,0.38); ln(px_, py_, cx_, cy_);
+    col(0.25,0.85,1.00); ln(px_, qy_, cx_, cz_); ln(px_, qy_ + 1/S, cx_, cz_ + 1/S);
+  );
+  px_ = cx_; py_ = cy_; qy_ = cz_;
+  ui += 1;
+);
+// -- bas : gain appliqué en temps réel (+18 .. -24 dB)
+gy0 = sy + 140; gh = 122;
+col(0.09,0.13,0.17);
+z0 = gy0 + gh*18/42;
+ln(sx, gy0, sx + sw, gy0); ln(sx, gy0 + gh, sx + sw, gy0 + gh);
+col(0.18,0.24,0.30); ln(sx, z0, sx + sw, z0);
+gfx_setfont(3); col(0.40,0.55,0.65);
+text_l(sx + 6, gy0 + 8, "GAIN"); text_r(sx + sw - 4, gy0 + 8, "+18"); text_r(sx + sw - 4, z0 - 7, "0"); text_r(sx + sw - 4, gy0 + gh - 8, "-24");
+hp_now = hp;
+ui = 0;
+loop(NH - 4,
+  hi = (hp_now + 1 + ui + 4) % NH;
+  v1 = HIST[hi]; v2 = HIST[NH + hi];
+  y1 = z0 - max(v2, 0)*gh/42 + max(-v2, 0)*0;
+  ya = z0 - v2*gh/42; yb = z0 - v1*gh/42;
+  // barre depuis 0 jusqu'aux extrêmes
+  v2 > 0.05 ? ( col(1.00,0.58,0.12); ln(sx + 3 + ui, z0, sx + 3 + ui, ya); );
+  v1 < -0.05 ? ( col(0.25,0.85,1.00); ln(sx + 3 + ui, z0, sx + 3 + ui, yb); );
+  ui += 1;
+);
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(780, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider9 + 0.5);
+draw_btn(806, 377, 54, 24, sz == 0, "75%");
+draw_btn(864, 377, 54, 24, sz == 1, "100%");
+draw_btn(922, 377, 54, 24, sz == 2, "125%");
+draw_btn(980, 377, 54, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = 0; acc = 0;
+  in_circ(110, 168, 56) ? drag = 1;
+  in_circ(250, 150, 40) ? drag = 2;
+  in_circ(390, 168, 56) ? drag = 3;
+  in_circ(530, 150, 40) ? ( drag = 4; scp = sp_pos(slider4); );
+  in_circ(670, 168, 56) ? drag = 8;
+  in_rect(196, 286, 116, 26) ? set_sl(5, slider5 >= 0.5 ? 0 : 1);
+  in_rect(332, 286, 116, 26) ? set_sl(6, slider6 >= 0.5 ? 0 : 1);
+  in_rect(468, 286, 116, 26) ? set_sl(7, slider7 >= 0.5 ? 0 : 1);
+  in_rect(806, 377, 54, 24) ? (slider9 = 0; sliderchange(slider9););
+  in_rect(864, 377, 54, 24) ? (slider9 = 1; sliderchange(slider9););
+  in_rect(922, 377, 54, 24) ? (slider9 = 2; sliderchange(slider9););
+  in_rect(980, 377, 54, 24) ? (slider9 = 3; sliderchange(slider9););
+  (drag > 0 && (mouse_cap & 4)) ? ( set_sl(drag, drag == 4 ? 15 : 0); drag = 0; );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 8 ? set_sl(8, floor(min(max(slider8 + dy*0.2, -20), 20)*10 + 0.5)/10) :
+    drag == 4 ? ( scp = min(max(scp + dy*0.004, 0), 1); set_sl(4, floor(sp_ms(scp)*10 + 0.5)/10); ) :
+    drag == 2 ? set_sl(drag, floor(min(max(slider(drag) + dy*0.5, 0), 100)*2 + 0.5)/2) :
+                             set_sl(drag, floor(min(max(slider(drag) + dy*1.0, -100), 100)*2 + 0.5)/2);
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;

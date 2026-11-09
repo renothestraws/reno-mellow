@@ -1,0 +1,448 @@
+desc:RM1982G - ReNo Mellow 1982G (Gate / Expander)
+//tags: dynamics gate expander noise-gate downward-expander lookahead
+//@author ReNo Mellow
+//@version 1.3
+//@changelog Première version publique
+//@about Gate/expandeur inspiré du FabFilter Pro-G : ratio jusqu'à l'infini, range, knee, attack/hold/release, hystérésis (close), lookahead, side-chain filtré ou externe, audition, mix.
+//
+// ---------------------------------------------------------------------------
+// RM1982G - gate / expandeur vers le bas, de la famille du RM1982
+//
+// THRESHOLD (-80..0 dBFS) : niveau d'ouverture.
+// CLOSE  (0..24 dB)       : hystérésis = écart entre le seuil d'ouverture et le
+//                           seuil de fermeture (ex. -40 dBFS et 6 dB -> la porte
+//                           se ferme à -46 dBFS). Évite le "flutter".
+// RATIO  (1:1 .. inf:1)   : quantité d'expansion sous le seuil (4:1 = chaque dB
+//                           sous le seuil devient -4 dB). Au-delà de ~5:1 on
+//                           se rapproche d'une porte ; inf:1 = gate pure.
+// RANGE  (0..100 dB)      : réduction maximale (plancher).
+// KNEE   (0..30 dB)       : coude doux sous le seuil.
+// ATTACK (0,01..250 ms)   : vitesse d'ouverture.
+// HOLD   (0..250 ms)      : durée minimale d'ouverture complète.
+// RELEASE (5..5000 ms)    : vitesse de fermeture.
+// LOOKAHEAD (0..10 ms)    : pré-ouverture ; ajoute exactement cette latence
+//                           (compensée par REAPER). 0 = aucune latence.
+// MIX (0..100 %)          : mélange sec / traité. OUTPUT : -20..+20 dB.
+// SIDE CHAIN : interne ou externe (entrée 3/4), filtres HPF (OFF..2 kHz) et
+//              LPF (OFF..500 Hz) sur la détection, AUDITION pour écouter
+//              le signal de détection filtré.
+// Écran : niveau d'entrée (gris), sortie (cyan), réduction (ambre), seuil,
+//         et courbe de transfert.
+// SORTIE : hard-clip invisible à 0 dBFS.
+// ---------------------------------------------------------------------------
+
+slider1:-40<-80,0,0.1>-Threshold (dBFS)
+slider2:10<1,100,0.01>-Ratio (100 = inf:1)
+slider3:40<0,100,0.1>-Range (dB)
+slider4:6<0,30,0.1>-Knee (dB)
+slider5:0.5<0.01,250,0.01>-Attack (ms)
+slider6:20<0,250,0.1>-Hold (ms)
+slider7:120<5,5000,0.1>-Release (ms)
+slider8:0<0,10,0.1>-Lookahead (ms)
+slider9:100<0,100,0.5>-Mix (%)
+slider10:0<-20,20,0.1>-Output (dB)
+slider11:0<0,1,1{Internal,External (3/4)}>-Side Chain
+slider12:0<0,2000,1>-SC HPF (Hz, 0 = Off)
+slider13:20000<500,20000,1>-SC LPF (Hz, 20000 = Off)
+slider14:0<0,1,1{Off,On}>-Audition SC
+slider15:1<0,3,1{75%,100%,125%,150%}>-Size
+slider16:3<0,24,0.1>-Close / Hysteresis (dB)
+
+in_pin:Left In
+in_pin:Right In
+in_pin:Sidechain Left
+in_pin:Sidechain Right
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+EPS = 0.00000001;
+CHP = 100; CLP = 110;
+LAL = 1000; LAR = 4000; LAN = 2900;      // tampons de lookahead
+HIST = 8000; NH = 400;                   // historique : entrée, sortie, réduction
+memset(HIST, 0, 3*NH);
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function tcoef(ms) ( ms <= 0.001 ? 1 : 1 - exp(-1/(0.001*ms*srate)); );
+
+function bq(x, c) instance(z1, z2) local(y)
+(
+  y  = c[0]*x + z1;
+  z1 = c[1]*x - c[3]*y + z2;
+  z2 = c[2]*x - c[4]*y;
+  y;
+);
+function setc(c, b0, b1, b2, a0, a1, a2) ( c[0] = b0/a0; c[1] = b1/a0; c[2] = b2/a0; c[3] = a1/a0; c[4] = a2/a0; );
+function c_hp(c, f) local(w, al)
+(
+  w = 2*$pi*min(f, 0.45*srate)/srate; al = sin(w)/(2*0.7071);
+  setc(c, (1 + cos(w))/2, -(1 + cos(w)), (1 + cos(w))/2, 1 + al, -2*cos(w), 1 - al);
+);
+function c_lp(c, f) local(w, al)
+(
+  w = 2*$pi*min(f, 0.45*srate)/srate; al = sin(w)/(2*0.7071);
+  setc(c, (1 - cos(w))/2, 1 - cos(w), (1 - cos(w))/2, 1 + al, -2*cos(w), 1 - al);
+);
+
+// réduction statique (dB, positive) pour un niveau l et un seuil t
+function red_static(l, t) local(u, r)
+(
+  u = t - l;
+  r = kw <= 0.01 ? ( u > 0 ? u : 0 ) :
+      u <= -0.5*kw ? 0 : u >= 0.5*kw ? u : sqr(u + 0.5*kw)/(2*kw);
+  min(r*(rat - 1), rng);
+);
+
+function update_params() local(r)
+(
+  thr = min(max(slider1, -80), 0);
+  r   = min(max(slider2, 1), 100);
+  rat = r >= 99.5 ? 1000 : r;
+  rng = min(max(slider3, 0), 100);
+  hyst = min(max(slider16, 0), 24);
+  kw  = min(max(slider4, 0), 30);
+  a_at = tcoef(min(max(slider5, 0.01), 250));
+  hold_n = floor(min(max(slider6, 0), 250)*0.001*srate);
+  a_rl = tcoef(min(max(slider7, 5), 5000));
+  la_n = floor(min(max(slider8, 0), 10)*0.001*srate + 0.5);
+  pdc_delay = la_n; pdc_bot_ch = 0; pdc_top_ch = 2;
+  mix = min(max(slider9, 0), 100)/100;
+  out_g = db2lin(min(max(slider10, -20), 20));
+  sc_ext = slider11 >= 0.5;
+  hp_on = slider12 >= 20; lp_on = slider13 < 19999;
+  hp_on ? c_hp(CHP, slider12);
+  lp_on ? c_lp(CLP, slider13);
+  aud = slider14 >= 0.5;
+  k_det = exp(-1/(0.008*srate));          // détecteur crête : retour 8 ms
+  h_n = max(1, floor(srate*0.01));
+);
+
+// ---- Outils graphiques (coordonnées logiques 1060 x 412) -----------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 8, 0, 1, 3.5);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 8, fz, frac, 3.5);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(2.5*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
+function lbtn(x,y,w,h,on,str,r,g,b)
+(
+  col(0.03,0.03,0.035); rct(x-2, y-2, w+4, h+4, 1);
+  col(0.16,0.165,0.18); rct(x, y, w, h, 1);
+  on ? col(r,g,b) : col(r*0.18+0.05, g*0.18+0.05, b*0.18+0.05);
+  rct(x + 8, y + h*0.5 - 2, 14, 4, 1);
+  on ? col(0.95,0.95,0.95) : col(0.62,0.63,0.66);
+  text_l(x + 30, y + h*0.5, str);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+// courses de potards (log)
+function lpos(v, a, b) ( log(v/a)/log(b/a); );
+function lval(p, a, b) ( a*pow(b/a, p); );
+function hp_pos(f) ( f < 20 ? 0 : 0.06 + 0.94*log(f/20)/log(100); );
+function hp_hz(p)  ( p < 0.03 ? 0 : 20*exp(log(100)*(max(p, 0.06) - 0.06)/0.94); );
+function lp_pos(f) ( f >= 19999 ? 0 : 0.06 + 0.94*log(16000/min(f, 16000))/log(32); );
+function lp_hz(p)  ( p < 0.03 ? 20000 : 16000*exp(-log(32)*(max(p, 0.06) - 0.06)/0.94); );
+// courbe de transfert pour l'écran (indépendante de l'audio)
+function g_red(l) local(t, r, k, u, v)
+(
+  t = slider1; r = slider2 >= 99.5 ? 1000 : max(slider2, 1); k = slider4;
+  u = t - l;
+  v = k <= 0.01 ? ( u > 0 ? u : 0 ) : u <= -0.5*k ? 0 : u >= 0.5*k ? u : sqr(u + 0.5*k)/(2*k);
+  min(v*(r - 1), slider3);
+);
+// écran : échelle -84..0 dB
+function dby(d) ( sy + sh*min(max(-d, 0), 84)/84; );
+
+update_params();
+gr = 0;
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+// ---- side chain ------------------------------------------------------------------------
+sl = sc_ext ? spl2 : spl0; sr = sc_ext ? spl3 : spl1;
+hp_on ? ( sl = fhl.bq(sl, CHP); sr = fhr.bq(sr, CHP); );
+lp_on ? ( sl = fll.bq(sl, CLP); sr = flr.bq(sr, CLP); );
+xd = max(abs(sl), abs(sr));
+env = max(xd, env*k_det);
+lv = lin2db(env);
+// ---- porte : hystérésis + hold ------------------------------------------------------
+t_eff = is_open ? thr - hyst : thr;
+is_open = lv >= t_eff;
+is_open ? ( hcnt = hold_n; );
+tgt = hcnt > 0 ? 0 : red_static(lv, t_eff);
+hcnt > 0 ? ( hcnt -= 1; );
+gr += (tgt < gr ? a_at : a_rl)*(tgt - gr);
+g = db2lin(-gr);
+// ---- lookahead (le signal est retardé, pas la détection) -----------------------------
+la_n > 0 ? (
+  lwp = (lwp + 1) % LAN;
+  LAL[lwp] = spl0; LAR[lwp] = spl1;
+  rp = (lwp - la_n + LAN) % LAN;
+  xl = LAL[rp]; xr = LAR[rp];
+) : ( xl = spl0; xr = spl1; );
+yl = xl*(1 - mix + mix*g); yr = xr*(1 - mix + mix*g);
+aud ? ( yl = sl; yr = sr; );
+// ---- historique pour l'écran -------------------------------------------------------
+pa = max(abs(xl), abs(xr)); pb = max(abs(yl), abs(yr));
+hc == 0 ? ( h1 = pa; h2 = pb; h3 = gr; ) : ( h1 = max(h1, pa); h2 = max(h2, pb); h3 = max(h3, gr); );
+hc += 1;
+hc >= h_n ? (
+  hp = (hp + 1) % NH;
+  HIST[hp] = h1; HIST[NH + hp] = h2; HIST[2*NH + hp] = h3;
+  hc = 0;
+);
+o_open = is_open || hcnt > 0;
+spl0 = min(max(yl*out_g, -1), 1);
+spl1 = min(max(yr*out_g, -1), 1);
+
+@gfx 1060 412
+S  = 0.75 + 0.25*floor(slider15 + 0.5);
+ox = max(0, floor((gfx_w - 1060*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(11*S)), 'b');
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1048,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1048, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1048,2,1);
+col(0.04,0.04,0.045); rct(6,364,1048,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
+
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982G");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(184, 38, "GATE  /  EXPANDER");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+
+// ---- THRESHOLD + voyant --------------------------------------------------------------
+draw_knob(96, 160, 44, (slider1 + 80)/80, 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(96, 160, 68, 0, "-80"); klab(96, 160, 68, 0.25, "-60"); klab(96, 160, 68, 0.5, "-40");
+klab(96, 160, 68, 0.75, "-20"); klab(96, 160, 68, 1, "0");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(96, 76, "THRESHOLD");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%.1f dBFS", slider1); text_c(96, 236, #s);
+col(0.03,0.03,0.035); gfx_circle(PX(76), PY(262), 7*S, 1, 1);
+o_open ? col(0.25,0.95,0.40) : col(0.08,0.20,0.10); gfx_circle(PX(76), PY(262), 5*S, 1, 1);
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(88, 262, "OPEN");
+// OUTPUT
+draw_knob(52, 320, 17, (slider10 + 20)/40, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(52, 281, "OUTPUT");
+gfx_setfont(6); col(1.00,0.70,0.35); sprintf(#s, "%+.1f dB", slider10); text_c(52, 357, #s);
+// CLOSE (hystérésis)
+draw_knob(140, 320, 17, slider16/24, 0);
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(140, 281, "CLOSE");
+gfx_setfont(6); col(1.00,0.70,0.35); sprintf(#s, "-%.1f dB", slider16); text_c(140, 357, #s);
+
+// ---- rangée 1 : RATIO / RANGE / KNEE / LOOKAHEAD -------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95);
+text_c(232, 76, "RATIO"); text_c(332, 76, "RANGE"); text_c(432, 76, "KNEE"); text_c(532, 76, "LOOKAHEAD");
+draw_knob(232, 128, 26, lpos(slider2, 1, 100), 0);
+draw_knob(332, 128, 26, slider3/100, 0);
+draw_knob(432, 128, 26, slider4/30, 0);
+draw_knob(532, 128, 26, slider8/10, 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(232, 128, 44, 0, "1:1"); klab(232, 128, 44, 1, "inf");
+klab(332, 128, 44, 0, "0"); klab(332, 128, 44, 1, "100");
+klab(432, 128, 44, 0, "0"); klab(432, 128, 44, 1, "30");
+klab(532, 128, 44, 0, "0"); klab(532, 128, 44, 1, "10");
+gfx_setfont(6); col(1.00,0.70,0.35);
+slider2 >= 99.5 ? strcpy(#s, "inf : 1") : sprintf(#s, "%.1f : 1", slider2); text_c(232, 176, #s);
+sprintf(#s, "%.1f dB", slider3); text_c(332, 176, #s);
+sprintf(#s, "%.1f dB", slider4); text_c(432, 176, #s);
+slider8 < 0.05 ? strcpy(#s, "OFF") : sprintf(#s, "%.1f ms", slider8); text_c(532, 176, #s);
+
+// ---- rangée 2 : ATTACK / HOLD / RELEASE / MIX ----------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95);
+text_c(232, 210, "ATTACK"); text_c(332, 210, "HOLD"); text_c(432, 210, "RELEASE"); text_c(532, 210, "MIX");
+draw_knob(232, 262, 26, lpos(slider5, 0.01, 250), 0);
+draw_knob(332, 262, 26, slider6/250, 0);
+draw_knob(432, 262, 26, lpos(slider7, 5, 5000), 0);
+draw_knob(532, 262, 26, slider9/100, 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(232, 262, 44, 0, "0.01"); klab(232, 262, 44, 1, "250");
+klab(332, 262, 44, 0, "0"); klab(332, 262, 44, 1, "250");
+klab(432, 262, 44, 0, "5"); klab(432, 262, 44, 1, "5 s");
+klab(532, 262, 44, 0, "DRY"); klab(532, 262, 44, 1, "WET");
+gfx_setfont(6); col(1.00,0.70,0.35);
+slider5 < 1 ? sprintf(#s, "%.2f ms", slider5) : sprintf(#s, "%.1f ms", slider5); text_c(232, 310, #s);
+sprintf(#s, "%.0f ms", slider6); text_c(332, 310, #s);
+slider7 >= 1000 ? sprintf(#s, "%.2f s", slider7/1000) : sprintf(#s, "%.0f ms", slider7); text_c(432, 310, #s);
+sprintf(#s, "%.0f %%", slider9); text_c(532, 310, #s);
+
+// ---- Écran ---------------------------------------------------------------------------
+sx = 616; sy = 72; sw = 410; sh = 196;
+col(0.03,0.03,0.035); rct(sx-4, sy-4, sw+8, sh+8, 1);
+col(0.04,0.06,0.08); rct(sx, sy, sw, sh, 1);
+col(0.09,0.13,0.17);
+dd = -12; loop(6, ln(sx, dby(dd), sx + sw, dby(dd)); dd -= 12;);
+hp_now = hp; ui = 0;
+loop(NH - 4,
+  hi = (hp_now + 1 + ui + 4) % NH;
+  xa = sx + 2 + ui;
+  ya = dby(lin2db(HIST[hi])); yb = dby(lin2db(HIST[NH + hi])); yc = sy + HIST[2*NH + hi]/84*sh;
+  col(0.24,0.27,0.31); ln(xa, sy + sh, xa, ya);
+  col(0.25,0.85,1.00); ln(xa, yb, xa, yb + 1/S);
+  HIST[2*NH + hi] > 0.1 ? ( col(1.00,0.58,0.12); ln(xa, yc, xa, yc + 1/S); );
+  ui += 1;
+);
+// seuils d'ouverture (blanc) et de fermeture (ambre)
+ty = dby(slider1);
+col(0.95,0.95,0.97); ui = 0; loop(41, ln(sx + ui*10, ty, sx + ui*10 + 5, ty); ui += 1;);
+slider16 > 0.05 ? (
+  tz = dby(slider1 - slider16);
+  col(1.00,0.58,0.12); ui = 0; loop(41, ln(sx + ui*10 + 5, tz, sx + ui*10 + 9, tz); ui += 1;);
+  gfx_setfont(3); text_l(sx + 26, tz + 8, "CLOSE");
+);
+gfx_setfont(3); col(0.95,0.95,0.97); text_l(sx + 26, ty - 8, "OPEN");
+gfx_setfont(3); col(0.40,0.55,0.65);
+text_r(sx + sw - 4, dby(-12) - 7, "-12"); text_r(sx + sw - 4, dby(-36) - 7, "-36"); text_r(sx + sw - 4, dby(-60) - 7, "-60");
+col(1.00,0.58,0.12); text_l(sx + 6, sy + 9, "GR");
+// courbe de transfert (coin)
+cs = 84; cx0 = sx + sw - cs - 40; cy0 = sy + 8;
+col(0.03,0.04,0.05); rct(cx0, cy0, cs, cs, 1);
+col(0.15,0.22,0.28); ln(cx0, cy0 + cs, cx0 + cs, cy0);
+col(0.95,0.95,0.97);
+ui = 0;
+loop(43,
+  li = -84 + ui*2; lo = li - g_red(li);
+  qx = cx0 + (li + 84)/84*cs; qy = cy0 + cs - (max(lo, -84) + 84)/84*cs;
+  ui > 0 ? ln(px_, py_, qx, qy);
+  px_ = qx; py_ = qy; ui += 1;
+);
+
+// ---- Side chain ------------------------------------------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(616, 296, "SIDE CHAIN");
+gfx_setfont(1);
+lbtn(616, 314, 104, 26, slider11 >= 0.5, "EXT 3/4", 0.20, 0.75, 1.00);
+lbtn(916, 314, 110, 26, slider14 >= 0.5, "AUDITION", 1.00, 0.25, 0.20);
+draw_knob(770, 318, 16, hp_pos(slider12), 0);
+draw_knob(860, 318, 16, lp_pos(slider13), 0);
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(770, 290, "SC HPF"); text_c(860, 290, "SC LPF");
+gfx_setfont(6); col(1.00,0.70,0.35);
+slider12 < 20 ? strcpy(#s, "OFF") : sprintf(#s, "%d Hz", slider12); text_c(770, 350, #s);
+slider13 >= 19999 ? strcpy(#s, "OFF") : slider13 >= 1000 ? sprintf(#s, "%.1f k", slider13/1000) : sprintf(#s, "%d Hz", slider13);
+text_c(860, 350, #s);
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider15 + 0.5);
+draw_btn(842, 377, 46, 24, sz == 0, "75%");
+draw_btn(892, 377, 46, 24, sz == 1, "100%");
+draw_btn(942, 377, 46, 24, sz == 2, "125%");
+draw_btn(992, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = 0;
+  in_circ(96, 160, 56) ? drag = 1;
+  in_circ(232, 128, 36) ? ( drag = 2; scp = lpos(slider2, 1, 100); );
+  in_circ(332, 128, 36) ? drag = 3;
+  in_circ(432, 128, 36) ? drag = 4;
+  in_circ(532, 128, 36) ? drag = 8;
+  in_circ(232, 262, 36) ? ( drag = 5; scp = lpos(slider5, 0.01, 250); );
+  in_circ(332, 262, 36) ? drag = 6;
+  in_circ(432, 262, 36) ? ( drag = 7; scp = lpos(slider7, 5, 5000); );
+  in_circ(532, 262, 36) ? drag = 9;
+  in_circ(52, 320, 26) ? drag = 10;
+  in_circ(140, 320, 26) ? drag = 16;
+  in_circ(770, 318, 24) ? ( drag = 12; scp = hp_pos(slider12); );
+  in_circ(860, 318, 24) ? ( drag = 13; scp = lp_pos(slider13); );
+  in_rect(616, 314, 104, 26) ? set_sl(11, slider11 >= 0.5 ? 0 : 1);
+  in_rect(916, 314, 110, 26) ? set_sl(14, slider14 >= 0.5 ? 0 : 1);
+  in_rect(842, 377, 46, 24) ? (slider15 = 0; sliderchange(slider15););
+  in_rect(892, 377, 46, 24) ? (slider15 = 1; sliderchange(slider15););
+  in_rect(942, 377, 46, 24) ? (slider15 = 2; sliderchange(slider15););
+  in_rect(992, 377, 46, 24) ? (slider15 = 3; sliderchange(slider15););
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? set_sl(1, -40) : drag == 2 ? set_sl(2, 10) : drag == 3 ? set_sl(3, 40) :
+    drag == 4 ? set_sl(4, 6) : drag == 5 ? set_sl(5, 0.5) : drag == 6 ? set_sl(6, 20) :
+    drag == 7 ? set_sl(7, 120) : drag == 8 ? set_sl(8, 0) : drag == 9 ? set_sl(9, 100) :
+    drag == 10 ? set_sl(10, 0) : drag == 16 ? set_sl(16, 3) : drag == 12 ? set_sl(12, 0) : set_sl(13, 20000);
+    drag = 0;
+  );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? set_sl(1, floor(min(max(slider1 + dy*0.3, -80), 0)*10 + 0.5)/10) :
+    drag == 2 ? ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(2, floor(lval(scp, 1, 100)*100 + 0.5)/100); ) :
+    drag == 3 ? set_sl(3, floor(min(max(slider3 + dy*0.4, 0), 100)*10 + 0.5)/10) :
+    drag == 4 ? set_sl(4, floor(min(max(slider4 + dy*0.12, 0), 30)*10 + 0.5)/10) :
+    drag == 5 ? ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(5, floor(lval(scp, 0.01, 250)*100 + 0.5)/100); ) :
+    drag == 6 ? set_sl(6, floor(min(max(slider6 + dy*1, 0), 250)*10 + 0.5)/10) :
+    drag == 7 ? ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(7, floor(lval(scp, 5, 5000)*10 + 0.5)/10); ) :
+    drag == 8 ? set_sl(8, floor(min(max(slider8 + dy*0.04, 0), 10)*10 + 0.5)/10) :
+    drag == 9 ? set_sl(9, floor(min(max(slider9 + dy*0.5, 0), 100)*2 + 0.5)/2) :
+    drag == 10 ? set_sl(10, floor(min(max(slider10 + dy*0.2, -20), 20)*10 + 0.5)/10) :
+    drag == 16 ? set_sl(16, floor(min(max(slider16 + dy*0.1, 0), 24)*10 + 0.5)/10) :
+    drag == 12 ? ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(12, floor(hp_hz(scp) + 0.5)); ) :
+                 ( scp = min(max(scp + dy*0.005, 0), 1); set_sl(13, floor(lp_hz(scp) + 0.5)); );
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;

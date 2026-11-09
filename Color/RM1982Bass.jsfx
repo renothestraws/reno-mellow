@@ -1,0 +1,325 @@
+desc:RM1982Bass - ReNo Mellow 1982Bass (Psychoacoustic Bass)
+//tags: bass enhancer psychoacoustic harmonics missing-fundamental subharmonic maxxbass
+//@author ReNo Mellow
+//@version 1.1
+//@changelog Première version publique
+//@about Basse psycho-acoustique : complète ou remplace le grave sous FREQ par des harmoniques qui recréent la fondamentale sur les petites enceintes ; intensité, grave d'origine In/Out, vumètres.
+//
+// ---------------------------------------------------------------------------
+// RM1982Bass - basse psycho-acoustique : le cerveau reconstitue une
+//              fondamentale à partir de ses harmoniques.
+//
+// FREQ (32..256 Hz)        : sous cette fréquence, le grave d'origine est
+//                            séparé et sert à fabriquer des harmoniques
+//                            (2f, 3f, 4f, 5f) qui restent audibles sur de
+//                            petites enceintes.
+// INTENSITY (-24..+24 dB)  : niveau des harmoniques créées (0 dB ~ niveau proche
+//                            du grave d'origine ; un peu suffit souvent).
+// ORIGINAL BASS IN / OUT   : garder ou retirer le grave d'origine (sous FREQ).
+// OUTPUT (-24..+12 dB)     : volume de sortie (le traitement peut faire monter
+//                            le niveau : voyant CLIP au-dessus des vumètres).
+// Les harmoniques suivent fidèlement l'enveloppe du grave (générateur
+// normalisé) : pas de distorsion qui dépend du niveau.
+// Latence nulle. ORIGINAL BASS IN + INTENSITY à -24 dB (OFF) = signal
+// d'origine intact ; OUT = passe-haut 24 dB/oct à FREQ.
+// SORTIE : hard-clip invisible à 0 dBFS.
+// ---------------------------------------------------------------------------
+
+slider1:100<32,256,0.1>-Freq (Hz)
+slider2:-6<-24,24,0.1>-Intensity (dB)
+slider3:1<0,1,1{Out,In}>-Original Bass
+slider4:0<-24,12,0.1>-Output (dB)
+slider5:1<0,3,1{75%,100%,125%,150%}>-Size
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+EPS = 0.000000001;
+CL1 = 100; CL2 = 110; CX1 = 170; CB1 = 120; CB2 = 130; CH1 = 140; CH2 = 150; CT1 = 160;
+W2 = 1.0; W3 = 0.62; W4 = 0.38; W5 = 0.22;     // poids des harmoniques
+H_NORM = 1.0;                                   // 0 dB ~ -5 dB sous l'énergie du grave
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function tcoef(ms) ( 1 - exp(-1/(0.001*ms*srate)); );
+function bq(x, c) instance(z1, z2) local(y)
+(
+  y  = c[0]*x + z1;
+  z1 = c[1]*x - c[3]*y + z2;
+  z2 = c[2]*x - c[4]*y;
+  y;
+);
+function setc(c, b0, b1, b2, a0, a1, a2) ( c[0] = b0/a0; c[1] = b1/a0; c[2] = b2/a0; c[3] = a1/a0; c[4] = a2/a0; );
+function c_lp(c, f, q) local(w, al)
+(
+  w = 2*$pi*min(f, 0.45*srate)/srate; al = sin(w)/(2*q);
+  setc(c, (1 - cos(w))/2, 1 - cos(w), (1 - cos(w))/2, 1 + al, -2*cos(w), 1 - al);
+);
+function c_hp(c, f, q) local(w, al)
+(
+  w = 2*$pi*min(f, 0.45*srate)/srate; al = sin(w)/(2*q);
+  setc(c, (1 + cos(w))/2, -(1 + cos(w)), (1 + cos(w))/2, 1 + al, -2*cos(w), 1 - al);
+);
+
+function update_params() local(f)
+(
+  f = min(max(slider1, 32), 256);
+  // grave d'origine : passe-bas Butterworth 4e ordre (générateur + vumètre)
+  c_lp(CL1, f, 0.5412); c_lp(CL2, f, 1.3066);
+  // ORIGINAL BASS OUT : passe-haut Linkwitz-Riley 24 dB/oct à FREQ
+  c_hp(CX1, f, 0.7071);
+  // grave envoyé au générateur : borné entre f/3 et f
+  c_hp(CB1, f/3, 0.7071); c_lp(CB2, f*1.15, 0.7071);
+  // harmoniques : on garde au-dessus de ~1,4 f et sous ~7 f
+  c_hp(CH1, f*1.4, 0.5412); c_hp(CH2, f*1.4, 1.3066);
+  c_lp(CT1, min(f*7, 3000), 0.7071);
+  h_g  = db2lin(min(max(slider2, -24), 24))*H_NORM;
+  h_on = slider2 > -23.95;
+  orig = slider3 >= 0.5;
+  out_g = db2lin(min(max(slider4, -24), 12));
+  a_env = tcoef(1); r_env = tcoef(1000/f*2.5);
+  k_fd = tcoef(10);
+  k_mt = exp(-1/(0.3*srate));
+);
+
+// générateur : polynômes de Tchebychev sur le signal normalisé par son
+// enveloppe -> harmoniques pures dont le niveau suit le grave
+function harm(x) instance(env, ld, hd) local(u, u2, t2, t3, t4, t5)
+(
+  env += (abs(x) > env ? a_env : r_env)*(abs(x) - env);
+  u = min(max(x/(env + EPS), -1), 1);
+  u2 = u*u;
+  t2 = 2*u2 - 1;
+  t3 = u*(4*u2 - 3);
+  t4 = 8*u2*u2 - 8*u2 + 1;
+  t5 = u*(16*u2*u2 - 20*u2 + 5);
+  (W2*t2 + W3*t3 + W4*t4 + W5*t5)*env;
+);
+
+// ---- Outils graphiques (coordonnées logiques 840 x 412) ------------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+function lpos(v, a, b) ( log(v/a)/log(b/a); );
+function lval(p, a, b) ( a*pow(b/a, p); );
+// vumètre vertical -48..0 dB (segments)
+function vbar(x, y, w, h, d, r, g, b) local(i, n, lit)
+(
+  col(0.03,0.03,0.035); rct(x - 2, y - 2, w + 4, h + 4, 1);
+  n = 24; i = 0;
+  loop(n,
+    lit = d > -48 + 2*(i + 1) - 2;
+    lit ? ( i >= 22 ? col(1.00,0.25,0.20) : i >= 18 ? col(1.00,0.70,0.20) : col(r, g, b); )
+        : col(0.10,0.11,0.12);
+    rct(x, y + h - (i + 1)*h/n + 1, w, h/n - 2, 1);
+    i += 1;
+  );
+);
+
+update_params();
+om = orig;
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+x0 = spl0; x1 = spl1;
+// grave d'origine (sous FREQ)
+l0 = sl0b.bq(sl0a.bq(x0, CL1), CL2);
+l1 = sl1b.bq(sl1a.bq(x1, CL1), CL2);
+// version sans grave (LR4) : toujours calculée -> bascule IN/OUT sans clic
+hi0 = sh0b.bq(sh0a.bq(x0, CX1), CX1);
+hi1 = sh1b.bq(sh1a.bq(x1, CX1), CX1);
+// générateur (mono) : grave borné -> harmoniques -> filtrage
+lm = 0.5*(l0 + l1);
+lb = gb2.bq(gb1.bq(lm, CB1), CB2);
+hh = 0;
+h_on ? (
+  hh = gen.harm(lb);
+  hh = gt.bq(gh2.bq(gh1.bq(hh, CH1), CH2), CT1)*h_g;
+);
+om += k_fd*(orig - om);
+// IN : signal intact (+ harmoniques) ; OUT : grave retiré
+y0 = om*x0 + (1 - om)*hi0 + hh;
+y1 = om*x1 + (1 - om)*hi1 + hh;
+y0 *= out_g; y1 *= out_g;
+// mesures
+mo_b = max(mo_b*k_mt, abs(lm));
+mo_h = max(mo_h*k_mt, abs(hh));
+mo_l = max(mo_l*k_mt, abs(y0));
+mo_r = max(mo_r*k_mt, abs(y1));
+(abs(y0) > 1 || abs(y1) > 1) ? clip_f = 1;
+spl0 = min(max(y0, -1), 1);
+spl1 = min(max(y1, -1), 1);
+
+@gfx 840 412
+S  = 0.75 + 0.25*floor(slider5 + 0.5);
+ox = max(0, floor((gfx_w - 840*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+clip_f ? ( clip_hold = 40; clip_f = 0; ) : ( clip_hold = max(clip_hold - 1, 0); );
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(11*S)), 'b');
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,828,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 828, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,828,2,1);
+col(0.04,0.04,0.045); rct(6,364,828,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(822), PY(20), 4*S, 1, 1); gfx_circle(PX(822), PY(352), 4*S, 1, 1);
+
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982Bass");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(224, 38, "PSYCHOACOUSTIC  BASS");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(806, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 772, 2, 1);
+
+// ---- FREQ -----------------------------------------------------------------------------
+draw_knob(130, 176, 48, lpos(slider1, 32, 256), 0);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(130, 176, 74, 0, "32"); klab(130, 176, 74, lpos(64, 32, 256), "64"); klab(130, 176, 74, lpos(128, 32, 256), "128"); klab(130, 176, 74, 1, "256");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(130, 84, "FREQ");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%.0f Hz", slider1); text_c(130, 262, #s);
+gfx_setfont(5); col(0.55,0.56,0.60);
+sprintf(#s, "2f %.0f   3f %.0f   4f %.0f   5f %.0f Hz", 2*slider1, 3*slider1, 4*slider1, 5*slider1); text_l(34, 290, #s);
+
+// ---- INTENSITY ----------------------------------------------------------------------
+draw_knob(330, 176, 48, (slider2 + 24)/48, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(330, 176, 74, 0, "-24"); klab(330, 176, 74, 0.25, "-12"); klab(330, 176, 74, 0.5, "0");
+klab(330, 176, 74, 0.75, "+12"); klab(330, 176, 74, 1, "+24");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(330, 84, "INTENSITY");
+gfx_setfont(1); col(1.00,0.70,0.35);
+slider2 <= -23.95 ? strcpy(#s, "OFF") : sprintf(#s, "%+.1f dB", slider2); text_c(330, 262, #s);
+
+// ---- ORIGINAL BASS ---------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(330, 296, "ORIGINAL BASS");
+gfx_setfont(1);
+draw_btn(270, 310, 58, 26, slider3 >= 0.5, "IN");
+draw_btn(332, 310, 58, 26, slider3 < 0.5, "OUT");
+
+// ---- OUTPUT -----------------------------------------------------------------------------
+draw_knob(520, 176, 36, (slider4 + 24)/36, 24/36);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(520, 176, 60, 0, "-24"); klab(520, 176, 60, 1/3, "-12"); klab(520, 176, 60, 2/3, "0"); klab(520, 176, 60, 1, "+12");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(520, 84, "OUTPUT");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%+.1f dB", slider4); text_c(520, 262, #s);
+
+// ---- Vumètres ---------------------------------------------------------------------------
+mb = lin2db(mo_b); mh = lin2db(mo_h); ml = lin2db(mo_l); mr = lin2db(mo_r);
+vbar(624, 90, 22, 220, mb, 0.30, 0.65, 1.00);
+vbar(674, 90, 22, 220, mh, 1.00, 0.58, 0.12);
+vbar(728, 90, 18, 220, ml, 0.35, 0.90, 0.45);
+vbar(752, 90, 18, 220, mr, 0.35, 0.90, 0.45);
+gfx_setfont(3); col(0.62,0.63,0.66);
+text_c(635, 76, "ORIG"); text_c(685, 76, "HARM"); text_c(749, 76, "OUT");
+text_c(635, 326, "BASS"); text_c(685, 326, "GEN");
+ui = 0; loop(5, sprintf(#s, "%d", -ui*12); text_l(776, 90 + ui*220/4 - 1, #s); ui += 1;);
+// voyant CLIP
+col(0.03,0.03,0.035); gfx_circle(PX(749), PY(336), 7*S, 1, 1);
+clip_hold > 0 ? col(1.00,0.20,0.15) : col(0.20,0.05,0.04); gfx_circle(PX(749), PY(336), 5*S, 1, 1);
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(762, 336, "CLIP");
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(598, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider5 + 0.5);
+draw_btn(622, 377, 46, 24, sz == 0, "75%");
+draw_btn(672, 377, 46, 24, sz == 1, "100%");
+draw_btn(722, 377, 46, 24, sz == 2, "125%");
+draw_btn(772, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = 0;
+  in_circ(130, 176, 60) ? ( drag = 1; scp_ = lpos(slider1, 32, 256); );
+  in_circ(330, 176, 60) ? drag = 2;
+  in_circ(520, 176, 48) ? drag = 4;
+  in_rect(270, 310, 58, 26) ? set_sl(3, 1);
+  in_rect(332, 310, 58, 26) ? set_sl(3, 0);
+  in_rect(622, 377, 46, 24) ? (slider5 = 0; sliderchange(slider5););
+  in_rect(672, 377, 46, 24) ? (slider5 = 1; sliderchange(slider5););
+  in_rect(722, 377, 46, 24) ? (slider5 = 2; sliderchange(slider5););
+  in_rect(772, 377, 46, 24) ? (slider5 = 3; sliderchange(slider5););
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? set_sl(1, 100) : drag == 2 ? set_sl(2, -6) : set_sl(4, 0);
+    drag = 0;
+  );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? ( scp_ = min(max(scp_ + dy*0.004, 0), 1); set_sl(1, floor(lval(scp_, 32, 256)*10 + 0.5)/10); ) :
+    drag == 2 ? set_sl(2, floor(min(max(slider2 + dy*0.2, -24), 24)*10 + 0.5)/10) :
+                set_sl(4, floor(min(max(slider4 + dy*0.15, -24), 12)*10 + 0.5)/10);
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;

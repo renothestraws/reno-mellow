@@ -1,8 +1,8 @@
 desc:RM1373 - ReNo Mellow 1373 (Class-A Preamp EQ, 3 Mids)
 //tags: equalizer EQ preamp class-A neve-style 1073 harmonics
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Première version publique
+//@version 1.5
+//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
 //@about Égaliseur de préampli classe A inspiré du Neve 1073, avec trois médiums au lieu d'un : shelfs Baxandall, médiums à inductance, harmoniques du LINE, phase, EQL.
 //
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ slider13:1<0,1,1{Bypass,In}>-EQL
 slider14:0<-12,12,0.1>-Calib (dB)
 slider15:0<-12,12,0.1>-Output (dB)
 slider16:1<0,3,1{75%,100%,125%,150%}>-Size
-slider17:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+slider17:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
 in_pin:Left In
 in_pin:Right In

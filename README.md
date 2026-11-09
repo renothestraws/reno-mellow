@@ -1,6 +1,6 @@
 # ReNo Mellow – plugins gratuits pour REAPER
 
-Collection de compresseurs, processeurs de dynamique et égaliseurs en JSFX pour REAPER.
+Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de couleur et utilitaires en JSFX pour REAPER.
 
 ## Dynamique
 
@@ -16,6 +16,12 @@ Collection de compresseurs, processeurs de dynamique et égaliseurs en JSFX pour
 | **RM9000JDYN** | Dynamiques de tranche (inspirées de la SSL 9000J) |
 | **RM33609** | Limiteur/compresseur à pont de diodes (inspiré du Neve 33609) |
 | **RM1982** | Compresseur/expandeur original « à fenêtre » |
+| **RM1982C** | Compresseur polyvalent et transparent (FF/FB, 3 courbes d'attaque et de release, RMS, side-chain) |
+| **RM1982CL** | Clipper |
+| **RM1982G** | Gate / expandeur (inspiré du FabFilter Pro-G) |
+| **RM1982DB** | Débleeder : gate/expandeur au-dessus d'un crossover |
+| **RM1982DS** | De-esser (inspiré du FabFilter Pro-DS) |
+| **RM1982TD** | Transient designer |
 
 ## Égaliseurs
 
@@ -32,8 +38,24 @@ Collection de compresseurs, processeurs de dynamique et égaliseurs en JSFX pour
 | **RMtownQ** | Égaliseur graphique passif 7 bandes (inspiré de l'EQ Motown) |
 | **RM1982Q** | Égaliseur original à un bouton (courbes de Fletcher-Munson) |
 
+## Couleur
+
+| Plugin | Description |
+|---|---|
+| **RM1982REC** | Simulateur de supports d'enregistrement (cire, laque, bande 1/4", bande 2", numérique 16 bits, flottant) |
+| **RM1982Bass** | Basse psycho-acoustique (harmoniques qui recréent la fondamentale) |
+
+## Utilitaires
+
+| Plugin | Description |
+|---|---|
+| **RM1982GS** | Étage de gain avec VU-mètre RMS calibrable et crête-mètre |
+| **RM1982TG** | Trigger to MIDI (transitoires audio -> notes MIDI) |
+
 Points communs : calibration 0 VU = +4 dBu = −18 dBFS, trim CALIB compensé en sortie,
-interface redimensionnable (75 / 100 / 125 / 150 %), écrêteur de sécurité invisible à 0 dBFS.
+interface redimensionnable (75 / 100 / 125 / 150 %), interface en anglais.
+Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982C, RM1982GS et RM1982REC,
+qui restent sans clipper interne).
 Égaliseurs : aucune latence par défaut, bouton HQ (suréchantillonnage x2, 46 échantillons de latence).
 
 ## Installation avec ReaPack (recommandé)
@@ -50,7 +72,7 @@ Les mises à jour arrivent ensuite automatiquement (Extensions > ReaPack > Synch
 
 ## Installation manuelle
 
-Copier les fichiers des dossiers `Dynamics` et `EQ` dans le dossier `Effects` de REAPER
+Copier les fichiers des dossiers `Dynamics`, `EQ`, `Color` et `Utility` dans le dossier `Effects` de REAPER
 (Options > Show REAPER resource path), puis rescanner les JSFX.
 
 ## Licence
@@ -58,6 +80,7 @@ Copier les fichiers des dossiers `Dynamics` et `EQ` dans le dossier `Effects` de
 Gratuit pour tout usage, y compris commercial.
 
 Les noms de marques cités (1176, LA-2A, LA-3A, Distressor, SSL, dbx, Fairchild, Neve, Pultec,
-Maag, Klark Teknik, API, Manley, Massive Passive, Chandler, Little Devil, Motown, MotorCity)
+Maag, Klark Teknik, API, Manley, Massive Passive, Chandler, Little Devil, Motown, MotorCity,
+FabFilter, Pro-G, Pro-DS)
 appartiennent à leurs propriétaires respectifs et servent uniquement à décrire l'inspiration
 des plugins. ReNo Mellow n'est affilié à aucune de ces marques.

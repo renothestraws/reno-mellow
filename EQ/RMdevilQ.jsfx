@@ -1,8 +1,8 @@
 desc:RMdevilQ - ReNo Mellow devil Q (Colored British 4-Band EQ)
 //tags: equalizer EQ inductor saturation colored 500-series british chandler-style
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Première version publique
+//@version 1.3
+//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
 //@about Égaliseur 4 bandes à l'anglaise inspiré du Chandler Little Devil : shelfs à condensateur, médiums à inductance avec Q hi/lo, low cut, et une couleur riche et épaisse réglable (HEAT).
 //
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ slider12:0<-12,12,0.1>-Calib (dB)
 slider13:0<-12,12,0.1>-Output (dB)
 slider14:1<0,3,1{75%,100%,125%,150%}>-Size
 slider15:5<0,10,0.1>-Heat
-slider16:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+slider16:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
 in_pin:Left In
 in_pin:Right In

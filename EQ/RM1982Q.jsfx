@@ -1,8 +1,8 @@
 desc:RM1982Q - ReNo Mellow 1982Q (Fletcher-Munson Loudness EQ)
 //tags: equalizer EQ loudness fletcher-munson contour one-knob
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Première version publique
+//@version 1.2
+//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
 //@about Égaliseur original à un seul bouton d'après les courbes d'isosonie de Fletcher-Munson : compensation physiologique ou courbe inverse, écart limité à 18 dB, Auto Level, HPF/LPF.
 //
 // ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ slider3:1<0,1,1{Out,In}>-EQ In
 slider4:0<-12,12,0.1>-Calib (dB)
 slider5:0<-12,12,0.1>-Output (dB)
 slider6:1<0,3,1{75%,100%,125%,150%}>-Size
-slider7:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+slider7:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 slider8:0<0,200,1>-HPF (Hz, 0 = Off)
 slider9:20000<5000,20000,1>-LPF (Hz, 20000 = Off)
 

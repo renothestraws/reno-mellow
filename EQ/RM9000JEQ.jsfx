@@ -1,8 +1,8 @@
 desc:RM9000JEQ - ReNo Mellow 9000J EQ (Channel EQ + Filters)
 //tags: equalizer EQ parametric filters console ssl-style 9000j
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Première version publique
+//@version 1.4
+//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
 //@about Section EQ et filtres d'une tranche inspirée de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ slider20:0<0,1,1{Off,On}>-Vintage
 slider21:0<-12,12,0.1>-Calib (dB)
 slider22:0<-12,12,0.1>-Output (dB)
 slider23:1<0,3,1{75%,100%,125%,150%}>-Size
-slider24:0<0,1,1{Off,On}>-HQ (oversampling x2, latence 46 éch.)
+slider24:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
 in_pin:Left In
 in_pin:Right In
