@@ -44,6 +44,8 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 |---|---|
 | **RM1982REC** | Simulateur de supports d'enregistrement (cire, laque, bande 1/4", bande 2", numérique 16 bits, flottant) |
 | **RM1982Bass** | Basse psycho-acoustique (harmoniques qui recréent la fondamentale) |
+| **RM1982Pre** | Étage de préampli coloré : DRIVE + GAIN, 5 couleurs (1073, 512, 610, 4000, 32) |
+| **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
 
 ## Utilitaires
 
@@ -51,10 +53,11 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 |---|---|
 | **RM1982GS** | Étage de gain avec VU-mètre RMS calibrable et crête-mètre |
 | **RM1982TG** | Trigger to MIDI (transitoires audio -> notes MIDI) |
+| **RM1982TT** | Mètre crête / RMS / plage dynamique avec seuils de couleur réglables |
 
 Points communs : calibration 0 VU = +4 dBu = −18 dBFS, trim CALIB compensé en sortie,
 interface redimensionnable (75 / 100 / 125 / 150 %), interface en anglais.
-Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982C, RM1982GS et RM1982REC,
+Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982C, RM1982GS, RM1982TT et RM1982REC,
 qui restent sans clipper interne).
 Égaliseurs : aucune latence par défaut, bouton HQ (suréchantillonnage x2, 46 échantillons de latence).
 

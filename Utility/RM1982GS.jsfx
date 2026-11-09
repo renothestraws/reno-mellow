@@ -1,9 +1,9 @@
 desc:RM1982GS - ReNo Mellow 1982GS (Gain Stage + VU / Peak meters)
 //tags: gain trim utility meter vu peak rms calibration gain-staging
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Première version publique
-//@about Étage de gain transparent avec VU-mètre RMS calibrable (balistique VU) et crête-mètre stéréo, mesure avant ou après le gain.
+//@version 1.4
+//@changelog Bouton AES17 +3 dB ; correctif du maintien de crête
+//@about Étage de gain transparent avec VU-mètre RMS calibrable (balistique VU) et crête-mètre stéréo, mesure avant ou après le gain, option AES17 +3 dB.
 //
 // ---------------------------------------------------------------------------
 // RM1982GS - étage de gain transparent avec vumètres de calibration.
@@ -14,6 +14,7 @@ desc:RM1982GS - ReNo Mellow 1982GS (Gain Stage + VU / Peak meters)
 //                        soit 0 VU = +4 dBu = -18 dBFS).
 // METER IN / OUT       : IN = mesure avant le gain, OUT = mesure après le gain.
 //
+// AES17 +3 : ajoute 3 dB au RMS (un sinus lit la même valeur en RMS et en crête).
 // VU : vraie valeur RMS (puissance), balistique VU normalisée (IEC 60268-17) :
 //      99 % de la déviation en 300 ms, ~1,4 % de dépassement (2e ordre,
 //      fn 1,8 Hz, amortissement 0,75 sur le carré du signal).
@@ -28,6 +29,7 @@ slider1:0<-24,24,0.1>-Gain (dB)
 slider2:-18<-28,-6,0.1>-Calib (dBFS RMS = 0 VU)
 slider3:1<0,1,1{In (pre-gain),Out (post-gain)}>-Meter
 slider4:1<0,3,1{75%,100%,125%,150%}>-Size
+slider5:0<0,1,1{Off,On}>-AES17 (+3 dB RMS)
 
 in_pin:Left In
 in_pin:Right In
@@ -168,7 +170,7 @@ function vu_meter(x, y, w, h, d, ch, rms_db) local(cx, cy, r, ii, dv, p, th, x1,
   gfx_setfont(1); col(0.92,0.93,0.95);
   d <= -40 ? strcpy(#vs, "-inf VU") : sprintf(#vs, "%+.1f VU", d); text_r(x + w - 12, y + h - 26, #vs);
   gfx_setfont(6); col(0.55,0.56,0.60);
-  rms_db <= -80 ? strcpy(#vs, "-inf dBFS RMS") : sprintf(#vs, "%.1f dBFS RMS", rms_db); text_r(x + w - 12, y + h - 11, #vs);
+  rms_db <= -80 ? strcpy(#vs, "-inf dBFS RMS") : sprintf(#vs, "%.1f dBFS RMS", rms_db); aes > 0 ? strcat(#vs, " +3"); text_r(x + w - 12, y + h - 11, #vs);
 );
 // crête-mètre vertical -60..+3 dBFS
 function pk_y(d, y, h) ( y + h*(1 - (min(max(d, -60), 3) + 60)/63); );
@@ -218,8 +220,8 @@ vv1 += vw2*(m1*m1 - vp1) - vzw*vv1; vp1 += vv1;
 // crête
 a0 = abs(m0); a1 = abs(m1);
 pd0 = max(a0, pd0*pk_dec); pd1 = max(a1, pd1*pk_dec);
-a0 >= ph0 ? ( ph0 = a0; hc0 = pk_holdn; ) : ( hc0 > 0 ? hc0 -= 1 : ph0 = pd0; );
-a1 >= ph1 ? ( ph1 = a1; hc1 = pk_holdn; ) : ( hc1 > 0 ? hc1 -= 1 : ph1 = pd1; );
+a0 >= ph0 ? ( ph0 = a0; hc0 = pk_holdn; ) : ( hc0 > 0 ? (hc0 -= 1) : (ph0 = pd0); );
+a1 >= ph1 ? ( ph1 = a1; hc1 = pk_holdn; ) : ( hc1 > 0 ? (hc1 -= 1) : (ph1 = pd1); );
 pm0 = max(pm0, a0); pm1 = max(pm1, a1);
 (a0 > 1 || a1 > 1) ? clip_f = 1;
 spl0 = y0;
@@ -281,7 +283,8 @@ slider3 < 0.5 ? strcpy(#s, "metering BEFORE gain") : strcpy(#s, "metering AFTER 
 text_c(306, 334, #s);
 
 // ---- VU-mètres ---------------------------------------------------------------------------
-r0db = pw2db(vp0); r1db = pw2db(vp1);
+aes = slider5 >= 0.5 ? 3.0103 : 0;
+r0db = pw2db(vp0) + aes; r1db = pw2db(vp1) + aes;
 vu_meter(400, 74, 250, 230, r0db - cal_db, "L", r0db);
 vu_meter(666, 74, 250, 230, r1db - cal_db, "R", r1db);
 
@@ -312,6 +315,7 @@ gfx_setfont(6); col(0.55,0.56,0.60); text_c(1014, 349, "CLIP");
 // ---- Bandeau -------------------------------------------------------------------------
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
+draw_btn(722, 377, 80, 24, slider5 >= 0.5, "AES17 +3");
 sz = floor(slider4 + 0.5);
 draw_btn(842, 377, 46, 24, sz == 0, "75%");
 draw_btn(892, 377, 46, 24, sz == 1, "100%");
@@ -328,6 +332,7 @@ mb1 = mouse_cap & 1;
   in_rect(250, 292, 54, 26) ? set_sl(3, 0);
   in_rect(308, 292, 54, 26) ? set_sl(3, 1);
   (in_rect(934, 322, 64, 32) || in_rect(400, 74, 516, 230)) ? ( pm0 = 0; pm1 = 0; );
+  in_rect(722, 377, 80, 24) ? set_sl(5, slider5 >= 0.5 ? 0 : 1);
   in_rect(842, 377, 46, 24) ? (slider4 = 0; sliderchange(slider4););
   in_rect(892, 377, 46, 24) ? (slider4 = 1; sliderchange(slider4););
   in_rect(942, 377, 46, 24) ? (slider4 = 2; sliderchange(slider4););
