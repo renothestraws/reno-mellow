@@ -1,0 +1,547 @@
+desc:RM1982REC - ReNo Mellow 1982REC (Recording Media Simulator)
+//tags: saturation tape wax lacquer acetate vinyl lofi digital media color
+//@author ReNo Mellow
+//@version 1.1
+//@changelog Première version publique
+//@about Simulateur de supports d'enregistrement : cire, disque laqué, bande 1/4", bande 2" multipiste, numérique 16 bits et virgule flottante ; drive compensé en sortie, bruit du support, usure des disques, HQ.
+//
+// ---------------------------------------------------------------------------
+// RM1982REC - simulateur de supports d'enregistrement (série 1982).
+//
+// DRIVE (-18..+18 dB) : niveau envoyé dans le support virtuel, compensé à la
+//                       sortie -> seule la couleur change, pas le volume.
+//                       (plus de DRIVE = plus de saturation et moins de bruit,
+//                       comme en vrai).
+// SUPPORTS :
+//   WAX      1920-1935 : cire, 200 Hz-4 kHz, résonances du pavillon, fort
+//                        souffle et bruit de surface, distorsion asymétrique
+//                        élevée sur les crêtes. Mono.
+//   LACQUER  1935-1949 : disque laqué (acétate), ~90 Hz-8 kHz, bruit réduit,
+//                        transitoires plus franches ; WEAR = usure (perte
+//                        d'aigus et craquements à chaque lecture). Mono.
+//   TAPE 1/4 1948-1960 : bande 1/4", 30 Hz-15 kHz, pré/désaccentuation autour
+//                        d'une saturation douce des crêtes, souffle régulier.
+//   TAPE 2"  1968-1987 : multipiste 2", compression naturelle et lissage des
+//                        attaques, tape bump (~55 Hz), saturation riche (paires),
+//                        souffle plus bas.
+//   DIGITAL  1987-2000 : virgule fixe 16 bits : linéaire, dither TPDF, écrêtage
+//                        dur et immédiat à 0 dBFS (après le DRIVE).
+//   FLOAT    2000-     : virgule flottante : ne fait rien (sortie = entrée).
+// NOISE (OFF..+12 dB)  : niveau du bruit propre au support (0 dB = naturel).
+// WEAR (0..100 %)      : usure des disques (WAX / LACQUER).
+// CALIB (-28..-6 dBFS) : niveau du 0 VU dans le support (défaut -18 dBFS).
+// OUTPUT (-12..+12 dB) : volume de sortie. Chaque support est compensé pour un
+//                        volume perçu proche (pondération K, petit signal).
+// HQ : suréchantillonnage x2 des saturations (46 éch. de latence, tous supports).
+// Latence nulle par défaut. Pas de clipper interne (sauf le support DIGITAL).
+// ---------------------------------------------------------------------------
+
+slider1:0<-18,18,0.1>-Drive (dB)
+slider2:3<0,5,1{Wax 1920,Lacquer 1935,Tape 1/4 1948,Tape 2in 1968,Digital 16 bit 1987,Float 2000}>-Medium
+slider3:0<-30,12,0.1>-Noise (dB, -30 = off)
+slider4:25<0,100,0.1>-Wear (%)
+slider5:-18<-28,-6,0.1>-Calib (dBFS = 0 VU)
+slider6:0<-12,12,0.1>-Output (dB)
+slider7:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples)
+slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+EPS = 0.000000000001;
+CPRE = 100; CPOST = 130; CHB = 160; CCR = 170; CHS = 180;
+SPRL = 200; SPRR = 210; SPOL = 220; SPOR = 230; SNZ = 240;
+DLL = 300; DLR = 400; DLN = 64;
+HBF = 1400; UXL = 1600; UXR = 1800; DOL = 2000; DOR = 2200; DEL = 2400; DER = 2600;
+NHB = 95; HC0 = 47; LX = 48;
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function bessel_i0(x) local(s, t, k)
+(
+  s = 1; t = 1; k = 1;
+  loop(30, t *= sqr(x/(2*k)); s += t; k += 1;);
+  s;
+);
+function hb_design() local(n, m, w, beta)
+(
+  beta = 8; n = 0;
+  loop(NHB,
+    m = n - HC0;
+    w = bessel_i0(beta*sqrt(max(0, 1 - sqr(m/HC0))))/bessel_i0(beta);
+    HBF[n] = m == 0 ? 0.5 : ((abs(m) % 2) == 0 ? 0 : sin($pi*m*0.5)/($pi*m)*w);
+    n += 1;
+  );
+);
+hb_design();
+function up2(x, buf) instance(p) local(j, s, o)
+(
+  p = (p + 1) % LX;
+  buf[p] = x; buf[p + LX] = x;
+  o = buf + p + LX;
+  s = 0; j = 0;
+  loop(LX, s += HBF[2*j]*o[-j]; j += 1;);
+  up_a = 2*s;
+  up_b = o[-23];
+);
+function down2(va, vb, be, bo) instance(p) local(j, s, o)
+(
+  p = (p + 1) % LX;
+  be[p] = va; be[p + LX] = va;
+  bo[p] = vb; bo[p + LX] = vb;
+  o = bo + p + LX;
+  s = 0; j = 0;
+  loop(LX, s += HBF[2*j]*o[-j]; j += 1;);
+  s + 0.5*be[p + LX - 23];
+);
+
+// ---- Biquads (RBJ) dans des tableaux de coefficients -------------------------------
+function setc(c, b0, b1, b2, a0, a1, a2) ( c[0] = b0/a0; c[1] = b1/a0; c[2] = b2/a0; c[3] = a1/a0; c[4] = a2/a0; );
+function bqd(c, t, f, q, db) local(w, cs, sn, al, A, sq)
+(
+  f = min(f, 0.45*srate);
+  A = pow(10, db/40); w = 2*$pi*f/srate; cs = cos(w); sn = sin(w); al = sn/(2*q);
+  t == 0 ? setc(c, (1 - cs)/2, 1 - cs, (1 - cs)/2, 1 + al, -2*cs, 1 - al) :          // LP
+  t == 1 ? setc(c, (1 + cs)/2, -(1 + cs), (1 + cs)/2, 1 + al, -2*cs, 1 - al) :       // HP
+  t == 2 ? setc(c, 1 + al*A, -2*cs, 1 - al*A, 1 + al/A, -2*cs, 1 - al/A) :         // peak
+  t == 3 ? setc(c, al, 0, -al, 1 + al, -2*cs, 1 - al) :                              // BP
+  ( sq = 2*sqrt(A)*al;                                                               // high shelf
+    setc(c, A*((A + 1) + (A - 1)*cs + sq), -2*A*((A - 1) + (A + 1)*cs), A*((A + 1) + (A - 1)*cs - sq),
+            (A + 1) - (A - 1)*cs + sq, 2*((A - 1) - (A + 1)*cs), (A + 1) - (A - 1)*cs - sq); );
+);
+// chaîne de n biquads (forme transposée), états dans st[]
+function chain(x, c, n, st) local(k, y, cc, ss)
+(
+  k = 0;
+  loop(n,
+    cc = c + 5*k; ss = st + 2*k;
+    y = cc[0]*x + ss[0];
+    ss[0] = cc[1]*x - cc[3]*y + ss[1];
+    ss[1] = cc[2]*x - cc[4]*y;
+    x = y; k += 1;
+  );
+  x;
+);
+function bq1(x, c, st) local(y)
+(
+  y = c[0]*x + st[0];
+  st[0] = c[1]*x - c[3]*y + st[1];
+  st[1] = c[2]*x - c[4]*y;
+  y;
+);
+function th_(v) local(e2) ( v = min(max(v, -20), 20); e2 = exp(2*v); (e2 - 1)/(e2 + 1); );
+// saturation : tanh décalée, pente 1 à l'origine
+function sat(u) ( (th_(sa*u + sb) - s_t)*s_n; );
+function gauss() ( rand(1) + rand(1) + rand(1) - 1.5; );
+
+function update_params() local(w, lpf)
+(
+  med = floor(slider2 + 0.5);
+  dr  = db2lin(min(max(slider1, -18), 18));
+  ref = db2lin(min(max(slider5, -28), -6));
+  wr  = min(max(slider4, 0), 100)*0.01;
+  nz  = slider3 > -29.95 ? db2lin(slider3) : 0;
+  outg = db2lin(min(max(slider6, -12), 12));
+  med == 0 ? (                                     // WAX
+    lpf = 4000*(1 - 0.45*wr);
+    bqd(CPRE, 1, 180, 0.8, 0); bqd(CPRE + 5, 1, 180, 0.8, 0);
+    bqd(CPRE + 10, 2, 700, 1.5, 4); bqd(CPRE + 15, 2, 2200, 2, 3); npre = 4;
+    bqd(CPOST, 0, lpf, 0.9, 0); bqd(CPOST + 5, 0, lpf, 0.9, 0); npost = 2;
+    sa = 0.6; sb = 0.25;
+    n_h = db2lin(-32 + 6*wr); n_cr = (6 + 30*wr)/srate; n_ca = 0.5;
+    bqd(CHB, 3, 2000, 0.7, 0); bqd(CCR, 3, 1500, 1, 0);
+    mkd = 1.0 + 1.5*wr; mono = 1;
+  ) : med == 1 ? (                                 // LACQUER
+    lpf = 8000*(1 - 0.55*wr);
+    bqd(CPRE, 1, 90, 0.7, 0); bqd(CPRE + 5, 2, 3000, 1, 1.5); npre = 2;
+    bqd(CPOST, 0, lpf, 0.75, 0); bqd(CPOST + 5, 0, lpf, 0.75, 0); npost = 2;
+    sa = 0.35; sb = 0.1;
+    n_h = db2lin(-42 + 8*wr); n_cr = (1 + 10*wr)/srate; n_ca = 0.15;
+    bqd(CHB, 3, 2500, 0.5, 0); bqd(CCR, 3, 2500, 1, 0);
+    mkd = 1.4 + 2*wr; mono = 1;
+  ) : med == 2 ? (                                 // TAPE 1/4"
+    bqd(CPRE, 4, 3000, 0.7, 6); npre = 1;
+    bqd(CPOST, 4, 3000, 0.7, -6); bqd(CPOST + 5, 1, 30, 0.7, 0);
+    bqd(CPOST + 10, 2, 70, 1, 1.5); bqd(CPOST + 15, 0, 15000, 0.7, 0); npost = 4;
+    sa = 0.28; sb = 0.05;
+    n_h = db2lin(-58); n_cr = 0;
+    bqd(CHS, 0, 12000, 0.7, 0);
+    mkd = 0.5; mono = 0;
+  ) : med == 3 ? (                                 // TAPE 2"
+    bqd(CPRE, 4, 4000, 0.7, 5); npre = 1;
+    bqd(CPOST, 4, 4000, 0.7, -5); bqd(CPOST + 5, 1, 22, 1.0, 0);
+    bqd(CPOST + 10, 2, 55, 1.2, 2.5); bqd(CPOST + 15, 0, 20000, 0.6, 0); npost = 4;
+    sa = 0.2; sb = 0.07;
+    n_h = db2lin(-64); n_cr = 0;
+    bqd(CHS, 0, 14000, 0.7, 0);
+    mkd = 0.1; mono = 0;
+  ) : (
+    npre = 0; npost = 0; n_h = 0; n_cr = 0; mkd = 0; mono = 0; sa = 1; sb = 0;
+  );
+  s_t = th_(sb); s_n = 1/(sa*(1 - s_t*s_t));
+  mk = db2lin(mkd);
+  med != med_p ? ( memset(SPRL, 0, 50); env0 = env1 = 0; dc0 = dc1 = dx0 = dx1 = 0; med_p = med; );
+  os = (slider7 >= 0.5 && srate < 100000) ? 2 : 1;
+  pdc_delay = os == 2 ? 46 : 0; pdc_bot_ch = 0; pdc_top_ch = 2;
+  k_ca = 1 - exp(-1/(0.0005*srate*os)); k_cr = 1 - exp(-1/(0.04*srate*os));
+  k_dc = 1 - exp(-2*$pi*12/srate);
+  dlp = srate >= 88200;
+  dlp ? ( bqd(CHS + 10, 0, 20000, 0.7, 0); bqd(CHS + 15, 0, 20000, 1.3, 0); );
+  sat_lv = med == 0 ? 0 : med == 1 ? 3 : med == 2 ? 6 : med == 3 ? 9 : med == 4 ? -slider5 : 99;
+);
+// partie non linéaire d'un canal (u en unités "0 VU = 1")
+function nl(u, ch) local(e, gc)
+(
+  med == 3 ? (
+    // compression naturelle de la bande, enveloppe rapide par piste
+    ch == 0 ? ( env0 += (abs(u) > env0 ? k_ca : k_cr)*(abs(u) - env0); e = env0; )
+            : ( env1 += (abs(u) > env1 ? k_ca : k_cr)*(abs(u) - env1); e = env1; );
+    gc = e > 1.6 ? pow(e/1.6, -0.2857) : 1;      // ~1,4:1 au-dessus de ~+4 VU crête
+    u *= gc;
+  );
+  sat(u);
+);
+// bruit du support (u)
+function surf_noise() local(n, c)
+(
+  n = gauss()*n_h*1.41;
+  n = bq1(n, CHB, SNZ);
+  c = 0;
+  (n_cr > 0 && rand(1) < n_cr) ? c = (rand(2) - 1)*pow(rand(1), 3)*n_ca*4;
+  n + bq1(c, CCR, SNZ + 2);
+);
+
+// ---- Outils graphiques (coordonnées logiques 1060 x 412) ------------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+
+function sknob(cx, cy, frac, fz, title, l0, l1)
+(
+  draw_knob(cx, cy, 28, frac, fz);
+  gfx_setfont(6); col(0.55,0.56,0.60); klab(cx, cy, 46, 0, l0); klab(cx, cy, 46, 1, l1);
+  gfx_setfont(4); col(0.92,0.93,0.95); text_c(cx, cy - 54, title);
+);
+
+update_params();
+GSX = 520; GSY = 74; GSW = 280; GSH = 226;
+t_prev = time_precise();
+
+@slider
+update_params();
+
+@block
+update_params();
+
+@sample
+xl = spl0; xr = spl1;
+lvm = max(lvm, max(abs(xl), abs(xr))*dr/ref);
+med == 5 ? (
+  // FLOAT : rien
+  yl = xl; yr = xr;
+) : med == 4 ? (
+  // DIGITAL 16 bits virgule fixe : écrêtage dur à 0 dBFS + dither TPDF
+  dl_ = min(max(xl*dr, -1), 1); dr_ = min(max(xr*dr, -1), 1);
+  dl_ = floor(dl_*32767 + rand(1) - rand(1) + 0.5)/32767;
+  dr_ = floor(dr_*32767 + rand(1) - rand(1) + 0.5)/32767;
+  dlp ? ( dl_ = chain(dl_, CHS + 10, 2, SPOL); dr_ = chain(dr_, CHS + 10, 2, SPOR); );
+  yl = dl_/dr; yr = dr_/dr;
+) : (
+  // supports analogiques
+  mono ? ( xl = xr = 0.5*(xl + xr); );
+  ul = xl*dr/ref; ur = xr*dr/ref;
+  pl = chain(ul, CPRE, npre, SPRL);
+  pr = chain(ur, CPRE, npre, SPRR);
+  os == 2 ? (
+    upL.up2(pl, UXL); a1 = nl(up_a, 0); a2 = nl(up_b, 0); ql = dnL.down2(a1, a2, DEL, DOL);
+    upR.up2(pr, UXR); a1 = nl(up_a, 1); a2 = nl(up_b, 1); qr = dnR.down2(a1, a2, DER, DOR);
+  ) : (
+    ql = nl(pl, 0); qr = nl(pr, 1);
+  );
+  dc0 += k_dc*(ql - dc0); ql -= dc0;
+  dc1 += k_dc*(qr - dc1); qr -= dc1;
+  (mono && nz > 0) ? ( nn = surf_noise()*nz; ql += nn; qr += nn; );
+  vl = chain(ql, CPOST, npost, SPOL);
+  vr = chain(qr, CPOST, npost, SPOR);
+  (!mono && nz > 0) ? (
+    vl += bq1(gauss()*n_h*1.41*nz, CHS, SNZ + 4);
+    vr += bq1(gauss()*n_h*1.41*nz, CHS, SNZ + 6);
+  );
+  yl = vl*ref/dr*mk; yr = vr*ref/dr*mk;
+);
+// HQ : même latence pour tous les supports
+(os == 2 && med >= 4) ? (
+  DLL[dpi] = yl; DLR[dpi] = yr;
+  dpo = dpi - 46; dpo < 0 ? dpo += DLN;
+  yl = DLL[dpo]; yr = DLR[dpo];
+  dpi += 1; dpi >= DLN ? dpi = 0;
+);
+spl0 = yl*outg;
+spl1 = yr*outg;
+
+@gfx 1060 412
+S  = 0.75 + 0.25*floor(slider8 + 0.5);
+ox = max(0, floor((gfx_w - 1060*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+t_now = time_precise(); t_d = min(max(t_now - t_prev, 0), 0.1); t_prev = t_now;
+(play_state & 1) ? rot += t_d*(md_g == 0 || md_g == 1 ? 8.17 : md_g == 4 ? 3 : 2.2);
+md_g = floor(slider2 + 0.5);
+lvv = lvm; lvm = 0;
+lvd = lin2db(lvv); lvh = lvd > lvh ? lvd : lvh - 0.8;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(9*S)), 'b');
+gfx_setfont(7, "Arial", max(8, floor(20*S)), 'b');
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1048,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1048, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1048,2,1);
+col(0.04,0.04,0.045); rct(6,364,1048,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
+
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982REC");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(222, 38, "RECORDING  MEDIA");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+
+// ---- DRIVE ------------------------------------------------------------------------------
+draw_knob(140, 172, 54, (slider1 + 18)/36, 0.5);
+gfx_setfont(3); col(0.62,0.63,0.66);
+klab(140, 172, 81, 0, "-18"); klab(140, 172, 81, 0.25, "-9"); klab(140, 172, 81, 0.5, "0");
+klab(140, 172, 81, 0.75, "+9"); klab(140, 172, 81, 1, "+18");
+gfx_setfont(4); col(0.92,0.93,0.95); text_c(140, 80, "DRIVE");
+gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%+.1f dB", slider1); text_c(140, 264, #s);
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_c(140, 290, "level into the medium,"); text_c(140, 304, "compensated at the output");
+
+// ---- Supports ---------------------------------------------------------------------------
+ui = 0;
+loop(6,
+  yb_ = 74 + ui*44;
+  ui == md_g ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(272, yb_, 228, 38, 1);
+  col(0.03,0.03,0.035); rct(272, yb_, 228, 38, 0);
+  ui == md_g ? col(0.10,0.06,0.02) : col(0.85,0.86,0.88);
+  gfx_setfont(1);
+  ui == 0 ? strcpy(#s, "WAX") : ui == 1 ? strcpy(#s, "LACQUER") : ui == 2 ? strcpy(#s, "TAPE 1/4\"") :
+  ui == 3 ? strcpy(#s, "TAPE 2\" MULTITRACK") : ui == 4 ? strcpy(#s, "DIGITAL 16 BIT") : strcpy(#s, "FLOAT 32 BIT");
+  text_l(284, yb_ + 19, #s);
+  gfx_setfont(6);
+  ui == md_g ? col(0.25,0.15,0.05) : col(0.55,0.56,0.60);
+  ui == 0 ? strcpy(#s, "1920-1935") : ui == 1 ? strcpy(#s, "1935-1949") : ui == 2 ? strcpy(#s, "1948-1960") :
+  ui == 3 ? strcpy(#s, "1968-1987") : ui == 4 ? strcpy(#s, "1987-2000") : strcpy(#s, "2000-");
+  text_r(490, yb_ + 19, #s);
+  ui += 1;
+);
+
+// ---- Écran : illustration + description ------------------------------------------------
+col(0.03,0.03,0.035); rct(GSX - 4, GSY - 4, GSW + 8, GSH + 8, 1);
+col(0.055,0.06,0.07); rct(GSX, GSY, GSW, GSH, 1);
+icx = GSX + GSW/2; icy = GSY + 76;
+md_g <= 1 ? (
+  // disque
+  md_g == 0 ? col(0.36,0.24,0.12) : col(0.09,0.09,0.10);
+  gfx_circle(PX(icx - 30), PY(icy), 66*S, 1, 1);
+  ui = 0;
+  loop(14,
+    md_g == 0 ? col(0.30 + (ui % 2)*0.05, 0.20 + (ui % 2)*0.03, 0.10) : col(0.13 + (ui % 2)*0.04, 0.13 + (ui % 2)*0.04, 0.145 + (ui % 2)*0.04);
+    gfx_circle(PX(icx - 30), PY(icy), (64 - ui*3)*S, 0, 1);
+    ui += 1;
+  );
+  md_g == 0 ? col(0.85,0.78,0.60) : col(0.70,0.12,0.10);
+  gfx_circle(PX(icx - 30), PY(icy), 20*S, 1, 1);
+  col(0.15,0.10,0.05);
+  ln(icx - 30 + 6*cos(rot), icy + 6*sin(rot), icx - 30 + 17*cos(rot), icy + 17*sin(rot));
+  col(0.80,0.80,0.82); gfx_circle(PX(icx - 30), PY(icy), 3*S, 1, 1);
+  // bras
+  col(0.75,0.76,0.78);
+  gfx_circle(PX(icx + 66), PY(icy - 52), 8*S, 1, 1);
+  ui = 0; loop(ceil(3*S), gfx_line(PX(icx + 66) + ui, PY(icy - 52), PX(icx + 14) + ui, PY(icy + 30), 1); ui += 1;);
+  col(0.55,0.56,0.58); rct(icx + 6, icy + 26, 14, 10, 1);
+) : md_g <= 3 ? (
+  // bobines
+  rr = md_g == 2 ? 40 : 52; sp_ = md_g == 2 ? 96 : 120;
+  ui = 0;
+  loop(2,
+    ccx = icx - sp_/2 + ui*sp_;
+    col(0.55,0.42,0.30); gfx_circle(PX(ccx), PY(icy - 6), (rr*(ui == 0 ? 0.85 : 0.55))*S, 1, 1);
+    col(0.62,0.63,0.66); gfx_circle(PX(ccx), PY(icy - 6), rr*S, 0, 1); gfx_circle(PX(ccx), PY(icy - 6), (rr - 1)*S, 0, 1);
+    col(0.75,0.76,0.78); gfx_circle(PX(ccx), PY(icy - 6), 9*S, 1, 1);
+    col(0.30,0.31,0.33);
+    jj = 0; loop(3, an_ = rot + jj*2.0944; ln(ccx + 9*cos(an_), icy - 6 + 9*sin(an_), ccx + (rr - 3)*cos(an_), icy - 6 + (rr - 3)*sin(an_)); jj += 1;);
+    ui += 1;
+  );
+  col(0.45,0.33,0.22);
+  ln(icx - sp_/2, icy - 6 + rr*0.85, icx - 10, icy + 58); ln(icx + 10, icy + 58, icx + sp_/2, icy - 6 + rr*0.55);
+  ln(icx - 10, icy + 58, icx + 10, icy + 58);
+  col(0.70,0.71,0.73); rct(icx - 12, icy + 52, 24, 12, 1);
+) : md_g == 4 ? (
+  // cassette DAT
+  col(0.16,0.165,0.18); rct(icx - 70, icy - 44, 140, 92, 1);
+  col(0.30,0.31,0.33); rct(icx - 70, icy - 44, 140, 92, 0);
+  col(0.85,0.86,0.88); rct(icx - 60, icy - 36, 120, 30, 1);
+  gfx_setfont(4); col(0.10,0.10,0.12); text_c(icx, icy - 21, "DAT  16 BIT");
+  col(0.03,0.03,0.035); rct(icx - 46, icy + 6, 92, 28, 1);
+  ui = 0;
+  loop(2,
+    ccx = icx - 24 + ui*48;
+    col(0.80,0.80,0.82); gfx_circle(PX(ccx), PY(icy + 20), 9*S, 1, 1);
+    col(0.20,0.20,0.22);
+    jj = 0; loop(3, an_ = rot + jj*2.0944; ln(ccx, icy + 20, ccx + 8*cos(an_), icy + 20 + 8*sin(an_)); jj += 1;);
+    ui += 1;
+  );
+) : (
+  // flottant
+  gfx_setfont(7); col(1.00,0.58,0.12); text_c(icx, icy - 18, "32-BIT FLOAT");
+  gfx_setfont(1); col(0.62,0.63,0.66); text_c(icx, icy + 14, "headroom  > 1500 dB");
+  col(0.30,0.32,0.36);
+  ui = 0; xa_ = icx - 110; ya_ = icy + 44;
+  loop(81, xb_ = icx - 110 + ui*220/80; yb_ = icy + 44 - 14*sin(ui*0.45)*sin(ui*0.07); ui > 0 ? ln(xa_, ya_, xb_, yb_); xa_ = xb_; ya_ = yb_; ui += 1;);
+);
+col(0.15,0.16,0.18); rct(GSX + 12, GSY + 164, GSW - 24, 1, 1);
+gfx_setfont(5); col(0.80,0.81,0.84);
+md_g == 0 ? ( strcpy(#d1, "200 Hz - 4 kHz, horn resonances"); strcpy(#d2, "hiss and surface noise"); strcpy(#d3, "heavy distortion on peaks - mono"); ) :
+md_g == 1 ? ( strcpy(#d1, "90 Hz - 8 kHz, sharper transients"); strcpy(#d2, "lower noise, crackles"); strcpy(#d3, "WEAR: wears out with each play - mono"); ) :
+md_g == 2 ? ( strcpy(#d1, "30 Hz - 15 kHz, HF bias"); strcpy(#d2, "steady tape hiss"); strcpy(#d3, "soft saturation on peaks"); ) :
+md_g == 3 ? ( strcpy(#d1, "tape bump, natural compression"); strcpy(#d2, "smoothed attacks, glue"); strcpy(#d3, "rich harmonic saturation"); ) :
+md_g == 4 ? ( strcpy(#d1, "near-zero noise floor, linear"); strcpy(#d2, "16-bit TPDF dither"); strcpy(#d3, "instant hard clipping at 0 dBFS"); ) :
+            ( strcpy(#d1, "virtually infinite headroom"); strcpy(#d2, "total transparency"); strcpy(#d3, "leaves the signal untouched"); );
+text_c(icx, GSY + 182, #d1); text_c(icx, GSY + 198, #d2); text_c(icx, GSY + 214, #d3);
+
+// ---- Niveau dans le support -------------------------------------------------------------
+gfx_setfont(6); col(0.62,0.63,0.66); text_l(GSX, 314, "LEVEL");
+col(0.03,0.03,0.035); rct(GSX + 40, 308, GSW - 40, 12, 1);
+ui = 0;
+loop(48,
+  dl = -24 + ui + 1;
+  lvh >= dl - 0.5 ? ( dl > sat_lv ? col(1.00,0.30,0.20) : dl > sat_lv - 6 ? col(1.00,0.70,0.20) : col(0.35,0.90,0.45); ) : col(0.10,0.11,0.12);
+  rct(GSX + 41 + ui*(GSW - 42)/48, 310, (GSW - 42)/48 - 1, 8, 1);
+  ui += 1;
+);
+gfx_setfont(6); col(0.55,0.56,0.60);
+ui = 0; loop(5, dl = -24 + ui*12; sprintf(#s, "%+d", dl); dl == 0 ? strcpy(#s, "0 VU"); text_c(GSX + 41 + (dl + 24)/48*(GSW - 42), 332, #s); ui += 1;);
+sat_lv < 30 ? ( col(1.00,0.58,0.12); rct(GSX + 41 + (min(sat_lv, 24) + 24)/48*(GSW - 42) - 1, 304, 2, 20, 1); );
+
+// ---- Petits potards ----------------------------------------------------------------------
+sknob(870, 128, (slider3 + 30)/42, 30/42, "NOISE", "OFF", "+12");
+sknob(980, 128, slider4/100, 0, "WEAR", "0", "100");
+sknob(870, 276, (slider5 + 28)/22, 10/22, "CALIB", "-28", "-6");
+sknob(980, 276, (slider6 + 12)/24, 0.5, "OUTPUT", "-12", "+12");
+gfx_setfont(1); col(1.00,0.70,0.35);
+slider3 <= -29.95 ? strcpy(#s, "OFF") : sprintf(#s, "%+.1f dB", slider3); text_c(870, 180, #s);
+md_g <= 1 ? col(1.00,0.70,0.35) : col(0.40,0.41,0.44);
+sprintf(#s, "%.0f %%", slider4); text_c(980, 180, #s);
+col(1.00,0.70,0.35);
+sprintf(#s, "%.1f dBFS", slider5); text_c(870, 328, #s);
+sprintf(#s, "%+.1f dB", slider6); text_c(980, 328, #s);
+gfx_setfont(6); col(0.55,0.56,0.60); md_g >= 4 ? strcpy(#s, "-") : strcpy(#s, "medium noise"); text_c(870, 196, #s);
+md_g <= 1 ? strcpy(#s, "disc wear") : strcpy(#s, "discs only"); text_c(980, 196, #s);
+text_c(870, 344, "= 0 VU");
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(1);
+draw_btn(722, 377, 70, 24, slider7 >= 0.5, "HQ");
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider8 + 0.5);
+draw_btn(842, 377, 46, 24, sz == 0, "75%");
+draw_btn(892, 377, 46, 24, sz == 1, "100%");
+draw_btn(942, 377, 46, 24, sz == 2, "125%");
+draw_btn(992, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = 0;
+  in_circ(140, 172, 66) ? drag = 1;
+  in_circ(870, 128, 40) ? drag = 3;
+  in_circ(980, 128, 40) ? drag = 4;
+  in_circ(870, 276, 40) ? drag = 5;
+  in_circ(980, 276, 40) ? drag = 6;
+  ui = 0; loop(6, in_rect(272, 74 + ui*44, 228, 38) ? set_sl(2, ui); ui += 1;);
+  in_rect(722, 377, 70, 24) ? set_sl(7, slider7 >= 0.5 ? 0 : 1);
+  in_rect(842, 377, 46, 24) ? (slider8 = 0; sliderchange(slider8););
+  in_rect(892, 377, 46, 24) ? (slider8 = 1; sliderchange(slider8););
+  in_rect(942, 377, 46, 24) ? (slider8 = 2; sliderchange(slider8););
+  in_rect(992, 377, 46, 24) ? (slider8 = 3; sliderchange(slider8););
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? set_sl(1, 0) : drag == 3 ? set_sl(3, 0) : drag == 4 ? set_sl(4, 25) : drag == 5 ? set_sl(5, -18) : set_sl(6, 0);
+    drag = 0;
+  );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? set_sl(1, floor(min(max(slider1 + dy*0.15, -18), 18)*10 + 0.5)/10) :
+    drag == 3 ? set_sl(3, floor(min(max(slider3 + dy*0.2, -30), 12)*10 + 0.5)/10) :
+    drag == 4 ? set_sl(4, floor(min(max(slider4 + dy*0.5, 0), 100)*10 + 0.5)/10) :
+    drag == 5 ? set_sl(5, floor(min(max(slider5 + dy*0.1, -28), -6)*10 + 0.5)/10) :
+                set_sl(6, floor(min(max(slider6 + dy*0.12, -12), 12)*10 + 0.5)/10);
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;
