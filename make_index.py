@@ -6,7 +6,7 @@ Génère index.xml (dépôt ReaPack) pour les plugins ReNo Mellow.
 Usage :   python3 make_index.py PSEUDO_GITHUB [NOM_DU_DEPOT] [BRANCHE]
 Exemple : python3 make_index.py renomellow reno-mellow main
 
-Le script lit chaque fichier Dynamics/, EQ/, Color/ et Utility/ (*.jsfx) et récupère dans son en-tête :
+Le script lit chaque fichier Dynamics/, EQ/, Color/, Utility/ et Instruments/ (*.jsfx ; un dossier du même nom = fichiers Data) et récupère dans son en-tête :
   desc:        -> nom affiché dans ReaPack
   //@version   -> version (à augmenter à chaque mise à jour)
   //@author    -> auteur
@@ -18,7 +18,7 @@ import os, re, sys, glob, datetime
 from xml.sax.saxutils import escape, quoteattr
 
 REPO_NAME = "ReNo Mellow"
-CATEGORIES = ["Dynamics", "EQ", "Color", "Utility"]          # un dossier = une catégorie ReaPack
+CATEGORIES = ["Dynamics", "EQ", "Color", "Utility", "Instruments"]          # un dossier = une catégorie ReaPack
 
 
 def rtf(text):
@@ -86,13 +86,19 @@ def main():
             if "changelog" in t:
                 x.append('        <changelog><![CDATA[%s]]></changelog>' % t["changelog"])
             x.append('        <source>%s</source>' % escape(raw + cat + "/" + fn))
+            # fichiers de données (dossier du même nom que le plugin) -> REAPER/Data/<nom>/
+            ddir = os.path.join(root, cat, fn[:-5])
+            if os.path.isdir(ddir):
+                for dp in sorted(glob.glob(os.path.join(ddir, "*"))):
+                    dn = os.path.basename(dp)
+                    x.append('        <source type="data" file=%s>%s</source>' % (quoteattr(fn[:-5] + "/" + dn), escape(raw + cat + "/" + fn[:-5] + "/" + dn)))
             x.append('      </version>')
             x.append('    </reapack>')
             n += 1
         x.append('  </category>')
     x.append('  <metadata>')
     x.append('    <description><![CDATA[%s]]></description>' % rtf(
-        "ReNo Mellow : compresseurs, processeurs de dynamique, égaliseurs, couleur et utilitaires gratuits pour REAPER (JSFX).\n"
+        "ReNo Mellow : compresseurs, processeurs de dynamique, égaliseurs, couleur, utilitaires et instruments gratuits pour REAPER (JSFX).\n"
         "Calibration commune : 0 VU = +4 dBu = -18 dBFS."))
     x.append('    <link rel="website" href=%s>GitHub</link>' % quoteattr(site))
     x.append('  </metadata>')

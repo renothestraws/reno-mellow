@@ -1,0 +1,910 @@
+desc:RMdrumachine - ReNo Mellow Drum Machine (16-pad sample player + step sequencer)
+//tags: drum machine sampler sequencer step 808 909 linn mpc trigger midi
+//@author ReNo Mellow
+//@version 1.6
+//@changelog Première version publique
+//@about Boîte à rythmes / lecteur d'échantillons 16 pads (esprit 808, 909, Linn, Akai) : samples par défaut fournis, glisser-déposer de WAV/OGG, déclenchement MIDI, CV (entrées audio 1-6) et step séquenceur 16 pas par pad avec accent, ghost, découpe des pas (1 à 8), swing, half/double time ; choke des hi-hats, anti machine gun, couches, 8 sorties, sortie MIDI.
+//
+// ---------------------------------------------------------------------------
+// RMdrumachine - boîte à rythmes / lecteur d'échantillons 16 pads, dans l'esprit
+//                des 808, 909, Linn et Akai.
+//
+// PADS (note MIDI GM) : 1 Kick 36, 2 Snare 38, 3 Low Tom 45, 4 Mid Tom 47,
+//   5 Hi Tom 50, 6 Clap 39, 7 Perc 56, 8 Rim 37, 9 Ride 51, 10 Crash 49,
+//   11 HH Closed 42, 12 HH Open 46, 13 Maracas 70, 14 Misc 35, 15 Misc 40,
+//   16 Misc 44. Chaque pad a un sample par défaut (REAPER/Data/RMdrumachine/,
+//   installé par ReaPack) ; s'il manque, un son synthétisé style 808/909 ;
+//   glisser un fichier audio (WAV) sur un pad pour le remplacer,
+//   clic droit = retour au son par défaut. Les chemins sont sauvés dans le projet.
+// DÉCLENCHEMENT :
+//   - MIDI : vélocité 120-127 = ACCENT, 1-30 = GHOST (valeurs fixes),
+//     31-119 = normal, sensible à la vélocité. Le MIDI est renvoyé en sortie.
+//   - MIDI OUT : le séquenceur et le CV envoient aussi leurs notes en sortie
+//     (canal 1, accent 127 / normal 100 / ghost 30, durée = moitié du pas) :
+//     pour piloter un autre instrument, router le MIDI ou faire un render MIDI.
+//   - CV IN (entrées audio 1 à 6 -> pads 1 à 6, bouton CV IN) : crête convertie
+//     linéairement en vélocité (0 dBFS = 127, -36 dB = 30), puis mêmes règles.
+//   - STEP SEQUENCER 16 pas par pad (un affiché, celui du pad sélectionné) :
+//     pas normal = vélocité 100, petit bouton du haut = ACCENT (127), du bas =
+//     GHOST (30). Ne joue que si REAPER est en lecture, calé sur la grille.
+//     SHIFT + clic droit glissé vers le haut / le bas sur un pas : découpe le pas
+//     en 1 à 8 sous-pas égaux (comme le séquenceur MegaBaby) ; chaque sous-pas
+//     s'active et a son accent / ghost.
+//     GRID 1/16, 1/32 ou 1/16T ; TEMPO HALF / NORMAL / DOUBLE ; SWING -100..+100 %
+//     (décale les contretemps d'un demi-pas au maximum) sur les pads choisis.
+// ACCENT : attaque +4,5 dB sur 15 ms (transient designer interne) et pitch -25
+//          cents. GHOST : attaque -4,5 dB et pitch +25 cents.
+// HI-HATS (11, 12, 16) : choke entre eux + "anti machine gun" (variations
+//          aléatoires de niveau, d'enveloppe, de départ et de pitch, à la Linn).
+// GROUPES : pad 14 joue en couche avec le kick ; pad 15 avec la snare ou le clap.
+// PAR PAD : volume, pan, tune (±12 demi-tons), decay, sortie 1-2 / 3-4 / 5-6 /
+//          7-8, mute, solo, swing.
+// Sorties 8 canaux (l'audio d'entrée n'est pas renvoyé). Latence nulle.
+// Clipper caché (écrêtage dur à 0 dBFS) sur les 8 sorties ; 6 dB de marge
+// interne (MASTER affiché 0 dB = -6 dB réels) : le clip ne vient que si on pousse.
+// ---------------------------------------------------------------------------
+
+slider1:0<-60,6,0.1>-Pad 1 Kick Volume (dB)
+slider2:0<-60,6,0.1>-Pad 2 Snare Volume (dB)
+slider3:0<-60,6,0.1>-Pad 3 Low Tom Volume (dB)
+slider4:0<-60,6,0.1>-Pad 4 Mid Tom Volume (dB)
+slider5:0<-60,6,0.1>-Pad 5 Hi Tom Volume (dB)
+slider6:0<-60,6,0.1>-Pad 6 Clap Volume (dB)
+slider7:0<-60,6,0.1>-Pad 7 Perc Volume (dB)
+slider8:0<-60,6,0.1>-Pad 8 Rim Volume (dB)
+slider9:0<-60,6,0.1>-Pad 9 Ride Volume (dB)
+slider10:0<-60,6,0.1>-Pad 10 Crash Volume (dB)
+slider11:0<-60,6,0.1>-Pad 11 HH Closed Volume (dB)
+slider12:0<-60,6,0.1>-Pad 12 HH Open Volume (dB)
+slider13:0<-60,6,0.1>-Pad 13 Maracas Volume (dB)
+slider14:0<-60,6,0.1>-Pad 14 Misc 14 Volume (dB)
+slider15:0<-60,6,0.1>-Pad 15 Misc 15 Volume (dB)
+slider16:0<-60,6,0.1>-Pad 16 Misc 16 Volume (dB)
+slider17:0<-100,100,1>-Pad 1 Kick Pan
+slider18:0<-100,100,1>-Pad 2 Snare Pan
+slider19:0<-100,100,1>-Pad 3 Low Tom Pan
+slider20:0<-100,100,1>-Pad 4 Mid Tom Pan
+slider21:0<-100,100,1>-Pad 5 Hi Tom Pan
+slider22:0<-100,100,1>-Pad 6 Clap Pan
+slider23:0<-100,100,1>-Pad 7 Perc Pan
+slider24:0<-100,100,1>-Pad 8 Rim Pan
+slider25:0<-100,100,1>-Pad 9 Ride Pan
+slider26:0<-100,100,1>-Pad 10 Crash Pan
+slider27:0<-100,100,1>-Pad 11 HH Closed Pan
+slider28:0<-100,100,1>-Pad 12 HH Open Pan
+slider29:0<-100,100,1>-Pad 13 Maracas Pan
+slider30:0<-100,100,1>-Pad 14 Misc 14 Pan
+slider31:0<-100,100,1>-Pad 15 Misc 15 Pan
+slider32:0<-100,100,1>-Pad 16 Misc 16 Pan
+slider33:0<-12,12,0.1>-Pad 1 Kick Tune (st)
+slider34:0<-12,12,0.1>-Pad 2 Snare Tune (st)
+slider35:0<-12,12,0.1>-Pad 3 Low Tom Tune (st)
+slider36:0<-12,12,0.1>-Pad 4 Mid Tom Tune (st)
+slider37:0<-12,12,0.1>-Pad 5 Hi Tom Tune (st)
+slider38:0<-12,12,0.1>-Pad 6 Clap Tune (st)
+slider39:0<-12,12,0.1>-Pad 7 Perc Tune (st)
+slider40:0<-12,12,0.1>-Pad 8 Rim Tune (st)
+slider41:0<-12,12,0.1>-Pad 9 Ride Tune (st)
+slider42:0<-12,12,0.1>-Pad 10 Crash Tune (st)
+slider43:0<-12,12,0.1>-Pad 11 HH Closed Tune (st)
+slider44:0<-12,12,0.1>-Pad 12 HH Open Tune (st)
+slider45:0<-12,12,0.1>-Pad 13 Maracas Tune (st)
+slider46:0<-12,12,0.1>-Pad 14 Misc 14 Tune (st)
+slider47:0<-12,12,0.1>-Pad 15 Misc 15 Tune (st)
+slider48:0<-12,12,0.1>-Pad 16 Misc 16 Tune (st)
+slider49:100<0,100,0.1>-Pad 1 Kick Decay (%)
+slider50:100<0,100,0.1>-Pad 2 Snare Decay (%)
+slider51:100<0,100,0.1>-Pad 3 Low Tom Decay (%)
+slider52:100<0,100,0.1>-Pad 4 Mid Tom Decay (%)
+slider53:100<0,100,0.1>-Pad 5 Hi Tom Decay (%)
+slider54:100<0,100,0.1>-Pad 6 Clap Decay (%)
+slider55:100<0,100,0.1>-Pad 7 Perc Decay (%)
+slider56:100<0,100,0.1>-Pad 8 Rim Decay (%)
+slider57:100<0,100,0.1>-Pad 9 Ride Decay (%)
+slider58:100<0,100,0.1>-Pad 10 Crash Decay (%)
+slider59:100<0,100,0.1>-Pad 11 HH Closed Decay (%)
+slider60:100<0,100,0.1>-Pad 12 HH Open Decay (%)
+slider61:100<0,100,0.1>-Pad 13 Maracas Decay (%)
+slider62:100<0,100,0.1>-Pad 14 Misc 14 Decay (%)
+slider63:100<0,100,0.1>-Pad 15 Misc 15 Decay (%)
+slider64:100<0,100,0.1>-Pad 16 Misc 16 Decay (%)
+
+in_pin:CV 1 (Kick)
+in_pin:CV 2 (Snare)
+in_pin:CV 3 (Low Tom)
+in_pin:CV 4 (Mid Tom)
+in_pin:CV 5 (Hi Tom)
+in_pin:CV 6 (Clap)
+out_pin:Out 1 L
+out_pin:Out 1 R
+out_pin:Out 2 L
+out_pin:Out 2 R
+out_pin:Out 3 L
+out_pin:Out 3 R
+out_pin:Out 4 L
+out_pin:Out 4 R
+
+options:maxmem=33554432
+
+@init
+ext_noinit = 1;
+EPS = 0.000000001;
+PADSZ = 2000000;                 // floats par pad
+SMP = 0;
+BB = 32000000;
+PAT  = BB;                        // 16 pads x 16 pas : 0 off, 1 normal, 2 accent, 3 ghost
+VO   = BB + 300;  VF = 16; NV = 32;
+EVQ  = BB + 900;  EVMAX = 400;    // file d'événements : offset, pad, vel, type
+OUTB = BB + 2600;
+PA   = BB + 3000;                 // tableaux par pad (16 valeurs chacun)
+P_LEN = PA;       P_NCH = PA + 16;  P_SR = PA + 32;   P_USER = PA + 48;
+P_OUT = PA + 64;  P_MUTE = PA + 80; P_SOLO = PA + 96; P_SWG = PA + 112;
+P_REQ = PA + 128; P_NOTE = PA + 144; P_AUD = PA + 160; P_LIT = PA + 176;
+P_RR = PA + 192;  P_G = PA + 208;  P_GL = PA + 224;  P_GR = PA + 240;
+P_DEF = PA + 256; P_FL = PA + 272; P_MOFF = PA + 288; P_COFF = PA + 304;
+OQ = BB + 7000; OQMAX = 600;      // MIDI sortant du bloc : offset, msg1, msg2, msg3
+CVS = PA + 400;                  // 6 détecteurs x 5 états
+SUBN = BB + 4000;                // découpe de chaque pas : 1..8 sous-pas (16 pads x 16 pas)
+SUBV = BB + 4300;                // type de chaque sous-pas : 0 off, 1 normal, 2 accent, 3 ghost (x8)
+TD1 = 0.015*srate; TD2 = 0.030*srate;
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+
+// notes MIDI (GM)
+P_NOTE[0] = 36; P_NOTE[1] = 38; P_NOTE[2] = 45; P_NOTE[3] = 47;
+P_NOTE[4] = 50; P_NOTE[5] = 39; P_NOTE[6] = 56; P_NOTE[7] = 37;
+P_NOTE[8] = 51; P_NOTE[9] = 49; P_NOTE[10] = 42; P_NOTE[11] = 46;
+P_NOTE[12] = 70; P_NOTE[13] = 35; P_NOTE[14] = 40; P_NOTE[15] = 44;
+strcpy(400, "KICK"); strcpy(401, "SNARE"); strcpy(402, "LOW TOM"); strcpy(403, "MID TOM");
+strcpy(404, "HI TOM"); strcpy(405, "CLAP"); strcpy(406, "PERC"); strcpy(407, "RIM");
+strcpy(408, "RIDE"); strcpy(409, "CRASH"); strcpy(410, "HH CLOSED"); strcpy(411, "HH OPEN");
+strcpy(412, "MARACAS"); strcpy(413, "MISC 14"); strcpy(414, "MISC 15"); strcpy(415, "MISC 16");
+// samples par défaut (installés par ReaPack dans REAPER/Data/RMdrumachine/)
+strcpy(500, "RMdrumachine/01_kick.ogg");     strcpy(501, "RMdrumachine/02_snare.ogg");
+strcpy(502, "RMdrumachine/03_lowtom.ogg");   strcpy(503, "RMdrumachine/04_midtom.ogg");
+strcpy(504, "RMdrumachine/05_hitom.ogg");    strcpy(505, "RMdrumachine/06_clap.ogg");
+strcpy(506, "RMdrumachine/07_perc.ogg");     strcpy(507, "RMdrumachine/08_rim.ogg");
+strcpy(508, "RMdrumachine/09_ride.ogg");     strcpy(509, "RMdrumachine/10_crash.ogg");
+strcpy(510, "RMdrumachine/11_hhclosed.ogg"); strcpy(511, "RMdrumachine/12_hhopen.ogg");
+strcpy(512, "RMdrumachine/13_maracas.ogg");  strcpy(513, "RMdrumachine/14_misc.ogg");
+strcpy(514, "RMdrumachine/15_misc.ogg");     strcpy(515, "RMdrumachine/16_misc.ogg");
+
+// ---- Biquad (instance) pour la synthèse des sons par défaut -------------------------
+function bset(t, f, q) instance(c0, c1, c2, c3, c4, z1, z2) local(w, al, cs, a0)
+(
+  w = 2*$pi*min(f, 0.45*srate)/srate; cs = cos(w); al = sin(w)/(2*q); a0 = 1 + al;
+  t == 0 ? ( c0 = (1 - cs)/2/a0; c1 = (1 - cs)/a0; c2 = c0; ) :
+  t == 1 ? ( c0 = (1 + cs)/2/a0; c1 = -(1 + cs)/a0; c2 = c0; ) :
+           ( c0 = al/a0; c1 = 0; c2 = -al/a0; );
+  c3 = -2*cs/a0; c4 = (1 - al)/a0; z1 = z2 = 0;
+);
+function brun(x) instance(c0, c1, c2, c3, c4, z1, z2) local(y)
+( y = c0*x + z1; z1 = c1*x - c3*y + z2; z2 = c2*x - c4*y; y; );
+function sq_(ph) ( ph - floor(ph) < 0.5 ? 1 : -1; );
+function nz() ( rand(2) - 1; );
+// métal 808 : 6 carrés inharmoniques
+function metal(t, k) local(m)
+(
+  m = sq_(t*205.3*k) + sq_(t*304.4*k) + sq_(t*369.6*k) + sq_(t*522.7*k) + sq_(t*540*k) + sq_(t*800*k);
+  m/6;
+);
+
+// ---- Sons par défaut (mono, à la fréquence du projet) -------------------------------
+function gen_pad(p) local(gb, n, i, t, s, f, ph, a, mx, ln_)
+(
+  gb = SMP + p*PADSZ;
+  ln_ = p == 0 ? 1.4 : p == 1 ? 0.6 : p <= 4 ? 1.2 : p == 5 ? 0.6 : p == 6 ? 0.8 : p == 7 ? 0.15 :
+        p == 8 ? 3 : p == 9 ? 3.5 : p == 10 ? 0.3 : p == 11 ? 1.5 : p == 12 ? 0.2 : p == 13 ? 2.5 :
+        p == 14 ? 0.7 : 0.2;
+  n = min(floor(ln_*srate), PADSZ - 8);
+  p == 1 ? ( fA.bset(1, 1500, 0.7); ) :
+  p == 5 ? ( fA.bset(2, 1100, 1.5); fB.bset(1, 600, 0.7); ) :
+  p == 6 ? ( fA.bset(2, 1200, 1.2); ) :
+  p == 8 ? ( fA.bset(1, 4000, 0.7); fB.bset(2, 3500, 1.0); ) :
+  p == 9 ? ( fA.bset(1, 4500, 0.7); fB.bset(1, 5000, 0.7); ) :
+  p == 10 || p == 11 ? ( fA.bset(1, 7000, 0.7); fB.bset(1, 7000, 0.7); ) :
+  p == 12 ? ( fA.bset(1, 5000, 0.7); ) :
+  p == 14 ? ( fA.bset(1, 2000, 0.7); fB.bset(0, 9000, 0.7); ) :
+  p == 15 ? ( fA.bset(1, 6000, 0.7); fB.bset(1, 6000, 0.7); );
+  ph = 0; i = 0; mx = 0;
+  loop(n,
+    t = i/srate;
+    p == 0 ? (                                        // kick 808
+      f = 50 + 110*exp(-t/0.035); ph += f/srate;
+      s = sin(2*$pi*ph)*exp(-t/0.38) + 0.25*exp(-t/0.0015)*nz();
+    ) : p == 1 ? (                                    // snare
+      s = 0.5*(sin(2*$pi*180*t) + 0.6*sin(2*$pi*330*t))*exp(-t/0.06) + 0.7*fA.brun(nz())*exp(-t/0.14);
+    ) : p <= 4 ? (                                    // toms
+      a = p == 2 ? 95 : p == 3 ? 130 : 175;
+      f = a*(1 + 0.35*exp(-t/0.05)); ph += f/srate;
+      s = sin(2*$pi*ph)*exp(-t/(p == 2 ? 0.38 : p == 3 ? 0.3 : 0.24)) + 0.05*exp(-t/0.01)*nz();
+    ) : p == 5 ? (                                    // clap
+      a = exp(-t/0.004) + (t >= 0.011 ? exp(-(t - 0.011)/0.004) : 0) + (t >= 0.022 ? exp(-(t - 0.022)/0.004) : 0)
+          + (t >= 0.03 ? 0.6*exp(-(t - 0.03)/0.12) : 0);
+      s = fB.brun(fA.brun(nz()))*a*2.5;
+    ) : p == 6 ? (                                    // perc : cloche 808
+      s = fA.brun(sq_(t*540) + sq_(t*800))*(0.8*exp(-t/0.03) + 0.3*exp(-t/0.25));
+    ) : p == 7 ? (                                    // rim
+      s = (0.6*sin(2*$pi*1700*t) + 0.8*sin(2*$pi*480*t))*exp(-t/0.012) + 0.3*exp(-t/0.0008)*nz();
+    ) : p == 8 ? (                                    // ride
+      a = fA.brun(metal(t, 1.0));
+      s = a*(0.55*exp(-t/0.9) + 0.25*exp(-t/0.05)) + 0.4*fB.brun(a)*exp(-t/0.4);
+    ) : p == 9 ? (                                    // crash
+      s = (fA.brun(metal(t, 1.13)) + 0.6*fB.brun(nz()))*exp(-t/1.2)*min(t*1000, 1);
+    ) : p == 10 || p == 11 ? (                        // hi-hats
+      s = fB.brun(fA.brun(metal(t, 1.0)))*exp(-t/(p == 10 ? 0.035 : 0.35));
+    ) : p == 12 ? (                                   // maracas
+      s = fA.brun(nz())*min(t/0.004, 1)*exp(-t/0.03);
+    ) : p == 13 ? (                                   // misc 14 : kick long (couche)
+      f = 45 + 70*exp(-t/0.05); ph += f/srate;
+      s = sin(2*$pi*ph)*exp(-t/0.9); s = (exp(3*s) - exp(-3*s))/(exp(3*s) + exp(-3*s))/0.995;
+    ) : p == 14 ? (                                   // misc 15 : snare 909 (couche)
+      s = 0.4*(sin(2*$pi*200*t) + sin(2*$pi*245*t))*exp(-t/0.05) + 0.8*fB.brun(fA.brun(nz()))*exp(-t/0.2);
+    ) : (                                             // misc 16 : charleston au pied
+      s = 0.6*fB.brun(fA.brun(metal(t, 0.95)))*min(t/0.002, 1)*exp(-t/0.02);
+    );
+    gb[i] = s; mx = max(mx, abs(s));
+    i += 1;
+  );
+  mx > 0 ? ( a = 0.8/mx; i = 0; loop(n, gb[i] *= a; i += 1;); );
+  memset(gb + n, 0, 8);
+  P_LEN[p] = n; P_NCH[p] = 1; P_SR[p] = srate; P_USER[p] = 0;
+  strcpy(300 + p, "default");
+);
+function name_from_path(p) local(ln_, i, c, st)
+(
+  ln_ = strlen(200 + p); st = 0; i = 0;
+  loop(ln_, c = str_getchar(200 + p, i); (c == '/' || c == '\\') ? (st = i + 1); i += 1;);
+  strcpy_substr(300 + p, 200 + p, st, ln_ - st);
+);
+function kill_pad(p) local(k, v) ( k = 0; loop(2, v = VO + (p*2 + k)*VF; v[0] = 0; k += 1;); );
+// lecture d'un fichier audio (WAV / OGG) dans la mémoire d'un pad
+function read_file(p, path) local(h, nch, sr, n, gb, ok)
+(
+  ok = 0;
+  strcpy(#lp, path);
+  h = file_open(#lp);
+  h >= 0 ? (
+    nch = 0; sr = 0;
+    file_riff(h, nch, sr);
+    (nch > 0 && sr > 0) ? (
+      n = min(file_avail(h), PADSZ - 16);
+      n = floor(n/nch)*nch;
+      n > nch ? (
+        gb = SMP + p*PADSZ;
+        file_mem(h, gb, n);
+        memset(gb + n, 0, 16);
+        P_LEN[p] = n/nch; P_NCH[p] = nch; P_SR[p] = sr;
+        ok = 1;
+      );
+    );
+    file_close(h);
+  );
+  ok;
+);
+// son par défaut : sample fourni (Data/RMdrumachine/xx_nom.ogg), sinon son synthétisé
+function load_def(p)
+(
+  kill_pad(p);
+  read_file(p, 500 + p) ? ( P_USER[p] = 0; strcpy(300 + p, "default"); ) : gen_pad(p);
+  strcpy(200 + p, "");
+);
+function load_pad(p)
+(
+  kill_pad(p);
+  read_file(p, 200 + p) ? ( P_USER[p] = 1; name_from_path(p); )
+                        : ( load_def(p); strcpy(300 + p, "load failed"); );
+);
+function fade_pad(p, sec) local(k, v)
+(
+  k = 0;
+  loop(2, v = VO + (p*2 + k)*VF; (v[0] && v[10] == 0) ? (v[10] = 1/(sec*srate)); k += 1;);
+);
+// déclenchement d'un pad (typ : 0 normal, 1 accent, 2 ghost)
+function trig1(p, vel, typ) local(v, semi, g, vv, d, tau, hh)
+(
+  P_LEN[p] > 1 ? (
+    fade_pad(p, 0.010);
+    hh = p == 10 || p == 11 || p == 15;
+    hh ? (
+      p != 10 ? fade_pad(10, 0.008); p != 11 ? fade_pad(11, 0.008); p != 15 ? fade_pad(15, 0.008);
+    );
+    v = VO + (p*2 + P_RR[p])*VF; P_RR[p] = 1 - P_RR[p];
+    semi = slider(33 + p) + (typ == 1 ? -0.25 : typ == 2 ? 0.25 : 0);
+    hh ? (semi += (rand(1) - 0.5)*0.12);
+    v[1] = p;
+    v[2] = hh ? rand(1)*0.0005*P_SR[p] : 0;
+    v[3] = P_SR[p]/srate*pow(2, semi/12);
+    vv = typ == 1 ? 127 : typ == 2 ? 30 : min(max(vel, 1), 127);
+    g = pow(vv/100, 1.4);
+    hh ? (g *= 1 + (rand(1) - 0.5)*0.24);
+    v[4] = g; v[5] = 1;
+    d = slider(49 + p);
+    d < 99.9 ? (
+      tau = 0.015*pow(150, d/100)*(hh ? 0.85 + 0.3*rand(1) : 1);
+      v[6] = exp(-1/(tau*srate));
+    ) : hh ? (
+      tau = P_LEN[p]/P_SR[p]*(1.2 + 2.5*rand(1));
+      v[6] = exp(-1/(tau*srate));
+    ) : ( v[6] = 1; );
+    v[7] = 0;
+    v[8] = typ == 1 ? db2lin(4.5) : typ == 2 ? db2lin(-4.5) : 1;
+    v[9] = 1; v[10] = 0;
+    v[0] = 1;
+    P_LIT[p] = 1;
+  );
+);
+function trig(p, vel, typ)
+(
+  trig1(p, vel, typ);
+  (p == 0 && g14) ? trig1(13, vel, typ);
+  ((p == 1 && g15 == 1) || (p == 5 && g15 == 2)) ? trig1(14, vel, typ);
+);
+// découpe d'un pas en n sous-pas (comme le séquenceur MegaBaby)
+function set_subn(pd, st, n) local(o, a, k)
+(
+  n = min(max(floor(n), 1), 8);
+  o = max(SUBN[pd*16 + st], 1);
+  a = SUBV + (pd*16 + st)*8;
+  (o <= 1 && n > 1) ? ( memset(a, 0, 8); a[0] = PAT[pd*16 + st] > 0 ? PAT[pd*16 + st] : 1; );
+  (o > 1 && n <= 1) ? ( PAT[pd*16 + st] = a[0]; );
+  SUBN[pd*16 + st] = n;
+);
+function oq_push(o, a, b, c) local(q)
+(
+  oqn < OQMAX ? ( q = OQ + oqn*4; q[0] = o; q[1] = a; q[2] = b; q[3] = c; oqn += 1; );
+);
+function vel_typ(v) ( v >= 120 ? 1 : v <= 30 ? 2 : 0; );
+function qpush(off, p, vel, typ) local(q)
+(
+  qn < EVMAX ? ( q = EVQ + qn*4; q[0] = off; q[1] = p; q[2] = vel; q[3] = typ; qn += 1; );
+);
+// événement du séquenceur : son interne + note MIDI en sortie (durée = moitié du pas)
+function seq_ev(off, pd, vel, typ, dur) local(ln_)
+(
+  qpush(off, pd, vel, typ);
+  midi_out ? (
+    P_MOFF[pd] > 0 ? ( oq_push(min(max(P_MOFF[pd] - gsp, 0), off), 0x80, P_NOTE[pd], 0); P_MOFF[pd] = 0; );
+    oq_push(off, 0x90, P_NOTE[pd], typ == 1 ? 127 : typ == 2 ? 30 : vel);
+    ln_ = max(floor(0.5*dur), floor(0.002*srate));
+    P_MOFF[pd] = gsp + off + ln_;
+  );
+);
+
+// ---- Outils graphiques (coordonnées logiques 1060 x 620) ------------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+
+function sknob(cx, cy, frac, fz, title)
+(
+  draw_knob(cx, cy, 24, frac, fz);
+  gfx_setfont(6); col(0.62,0.63,0.66); text_c(cx, cy - 44, title);
+);
+
+// ---- État initial ----------------------------------------------------------------------
+TD1 = 0.015*srate; TD2 = 0.030*srate;
+cv_win = max(1, floor(0.001*srate)); cv_mask = floor(0.03*srate); cv_rel = exp(-1/(0.01*srate));
+!dm_ok ? (
+  tmode = 1; grid = 0; swing = 0; cvthr = -36; cv_on = 0; g14 = 0; g15 = 0;
+  master = 0; size_ = 1; seq_on = 1; sel = 0;
+  zi = 0; loop(16, P_OUT[zi] = 0; P_SWG[zi] = 1; zi += 1;);
+  memset(PAT, 0, 256); memset(SUBV, 0, 2048);
+  zi = 0; loop(256, SUBN[zi] = 1; zi += 1;);
+  // petit motif de démarrage : kick 1-5-9-13, snare 5-13, hh fermé sur les croches
+  PAT[0] = 1; PAT[4] = 1; PAT[8] = 1; PAT[12] = 1;
+  PAT[16 + 4] = 1; PAT[16 + 12] = 1;
+  zi = 0; loop(8, PAT[10*16 + zi*2] = zi % 2 ? 3 : 1; zi += 1;);
+);
+zi = 0;
+loop(16,
+  (P_USER[zi] && strlen(200 + zi) > 0) ? ( P_REQ[zi] = 1; ) : ( (!dm_ok || P_LEN[zi] <= 1) ? load_def(zi); );
+  zi += 1;
+);
+zi = 0; loop(6, CVS[zi*5] = 1; zi += 1;);
+dm_ok = 1;
+qn = 0; qi = 0;
+gsp < 1 ? (gsp = 1);
+!mo_init ? ( midi_out = 1; mo_init = 1; );
+
+@serialize
+ser_ver = 3;
+rd_ = file_avail(0) >= 0;
+file_var(0, ser_ver);
+file_var(0, tmode); file_var(0, grid); file_var(0, swing); file_var(0, cvthr); file_var(0, cv_on);
+file_var(0, g14); file_var(0, g15); file_var(0, master); file_var(0, size_); file_var(0, seq_on); file_var(0, sel);
+zi = 0;
+loop(16,
+  file_var(0, P_OUT[zi]); file_var(0, P_MUTE[zi]); file_var(0, P_SOLO[zi]); file_var(0, P_SWG[zi]); file_var(0, P_USER[zi]);
+  zi += 1;
+);
+zi = 0; loop(256, file_var(0, PAT[zi]); zi += 1;);
+ser_ver >= 2 ? (
+  zi = 0; loop(256, file_var(0, SUBN[zi]); zi += 1;);
+  zi = 0; loop(2048, file_var(0, SUBV[zi]); zi += 1;);
+) : (
+  zi = 0; loop(256, SUBN[zi] = 1; zi += 1;); memset(SUBV, 0, 2048);
+);
+ser_ver >= 3 ? file_var(0, midi_out) : (rd_ ? (midi_out = 1));
+zi = 0;
+loop(16,
+  rd_ ? ( file_string(0, #lp); strcpy(200 + zi, #lp); ) : ( strcpy(#lp, 200 + zi); file_string(0, #lp); );
+  zi += 1;
+);
+rd_ ? (
+  zi = 0;
+  loop(16,
+    (P_USER[zi] && strlen(200 + zi) > 0) ? ( P_REQ[zi] = 1; ) : ( P_USER[zi] ? ( P_USER[zi] = 0; P_DEF[zi] = 1; ); );
+    zi += 1;
+  );
+);
+
+@block
+// chargements / sons par défaut demandés
+bi = 0;
+loop(16,
+  P_REQ[bi] ? ( P_REQ[bi] = 0; load_pad(bi); );
+  P_DEF[bi] ? ( P_DEF[bi] = 0; load_def(bi); );
+  bi += 1;
+);
+// gains par pad (volume, mute, solo, pan)
+anysolo = 0; bi = 0; loop(16, P_SOLO[bi] ? (anysolo = 1); bi += 1;);
+mg_ = db2lin(master - 6);              // marge interne de 6 dB : MASTER 0 dB = -6 dB réels
+bi = 0;
+loop(16,
+  vdb_ = slider(1 + bi);
+  P_G[bi] = (vdb_ <= -59.9 ? 0 : db2lin(vdb_))*(!P_MUTE[bi] && (!anysolo || P_SOLO[bi]))*mg_;
+  pn_ = slider(17 + bi)/100;
+  P_GL[bi] = pn_ > 0 ? 1 - pn_ : 1; P_GR[bi] = pn_ < 0 ? 1 + pn_ : 1;
+  bi += 1;
+);
+cv_t = db2lin(cvthr);
+qn = 0; qi = 0; sc_ = 0; oqn = 0;
+// écoute depuis l'interface
+bi = 0; loop(16, P_AUD[bi] ? ( qpush(0, bi, 100, P_AUD[bi] - 1); P_AUD[bi] = 0; ); bi += 1;);
+// MIDI entrant (renvoyé tel quel)
+while (midirecv(mo_, m1_, m2_, m3_)) (
+  ((m1_ & 0xF0) == 0x90 && m3_ > 0) ? (
+    fp_ = -1; bi = 0; loop(16, P_NOTE[bi] == m2_ ? (fp_ = bi); bi += 1;);
+    fp_ >= 0 ? qpush(mo_, fp_, m3_, vel_typ(m3_));
+  );
+  oq_push(mo_, m1_, m2_, m3_);
+);
+// séquenceur (seulement en lecture)
+playing = play_state & 1;
+(playing && seq_on) ? (
+  spb_ = grid == 0 ? 4 : grid == 1 ? 8 : 6;
+  tm_ = tmode == 0 ? 0.5 : tmode == 2 ? 2 : 1;
+  s0_ = beat_position*spb_*tm_;
+  ds_ = samplesblock*tempo/60/srate*spb_*tm_;
+  s1_ = s0_ + ds_;
+  swo_ = swing/100*0.5;
+  n_ = floor(s0_) - 1;
+  loop(floor(s1_) - n_ + 2,
+    st_ = n_ - floor(n_/16)*16;
+    odd_ = (n_ - floor(n_/2)*2) == 1;
+    bi = 0;
+    loop(16,
+      tt_ = n_ + ((P_SWG[bi] && odd_) ? swo_ : 0);
+      sn_ = SUBN[bi*16 + st_];
+      sn_ > 1 ? (
+        // pas découpé : sous-pas répartis entre ce pas et le suivant (swing compris)
+        te_ = n_ + 1 + ((P_SWG[bi] && !odd_) ? swo_ : 0);
+        sk_ = 0;
+        loop(sn_,
+          val_ = SUBV[(bi*16 + st_)*8 + sk_];
+          ts_ = tt_ + (te_ - tt_)*sk_/sn_;
+          (val_ > 0 && ts_ >= s0_ && ts_ < s1_) ? (
+            seq_ev(min(floor((ts_ - s0_)/ds_*samplesblock), samplesblock - 1), bi, val_ == 2 ? 127 : val_ == 3 ? 30 : 100, val_ == 2 ? 1 : val_ == 3 ? 2 : 0, (te_ - tt_)/sn_/ds_*samplesblock);
+          );
+          sk_ += 1;
+        );
+      ) : (
+        val_ = PAT[bi*16 + st_];
+        (val_ > 0 && tt_ >= s0_ && tt_ < s1_) ? (
+          seq_ev(min(floor((tt_ - s0_)/ds_*samplesblock), samplesblock - 1), bi, val_ == 2 ? 127 : val_ == 3 ? 30 : 100, val_ == 2 ? 1 : val_ == 3 ? 2 : 0, 1/ds_*samplesblock);
+        );
+      );
+      bi += 1;
+    );
+    n_ += 1;
+  );
+  cur_step = floor(s0_) - floor(floor(s0_)/16)*16;
+) : ( cur_step = -1; );
+// note-off MIDI qui tombent dans ce bloc (aussi à l'arrêt : pas de note bloquée)
+bi = 0;
+loop(16,
+  (P_MOFF[bi] > 0 && P_MOFF[bi] < gsp + samplesblock) ? ( oq_push(max(P_MOFF[bi] - gsp, 0), 0x80, P_NOTE[bi], 0); P_MOFF[bi] = 0; );
+  bi += 1;
+);
+// MIDI sortant trié par offset puis envoyé
+bi = 1;
+loop(max(oqn - 1, 0),
+  bj = bi;
+  while (bj > 0 && OQ[(bj - 1)*4] > OQ[bj*4]) (
+    k0_ = OQ + (bj - 1)*4; k1_ = OQ + bj*4;
+    t0_ = k0_[0]; k0_[0] = k1_[0]; k1_[0] = t0_;
+    t0_ = k0_[1]; k0_[1] = k1_[1]; k1_[1] = t0_;
+    t0_ = k0_[2]; k0_[2] = k1_[2]; k1_[2] = t0_;
+    t0_ = k0_[3]; k0_[3] = k1_[3]; k1_[3] = t0_;
+    bj -= 1;
+  );
+  bi += 1;
+);
+bi = 0; loop(oqn, k0_ = OQ + bi*4; midisend(k0_[0], k0_[1], k0_[2], k0_[3]); bi += 1;);
+gsp += samplesblock;
+// tri de la file par offset (insertion)
+bi = 1;
+loop(max(qn - 1, 0),
+  bj = bi;
+  while (bj > 0 && EVQ[(bj - 1)*4] > EVQ[bj*4]) (
+    k0_ = EVQ + (bj - 1)*4; k1_ = EVQ + bj*4;
+    t0_ = k0_[0]; k0_[0] = k1_[0]; k1_[0] = t0_;
+    t0_ = k0_[1]; k0_[1] = k1_[1]; k1_[1] = t0_;
+    t0_ = k0_[2]; k0_[2] = k1_[2]; k1_[2] = t0_;
+    t0_ = k0_[3]; k0_[3] = k1_[3]; k1_[3] = t0_;
+    bj -= 1;
+  );
+  bi += 1;
+);
+
+@sample
+// événements programmés à cet échantillon
+while (qi < qn && EVQ[qi*4] <= sc_) (
+  q_ = EVQ + qi*4; trig(q_[1], q_[2], q_[3]); qi += 1;
+);
+// CV : entrées audio 1 à 6 -> pads 1 à 6
+cv_on ? (
+  ci = 0;
+  loop(6,
+    xa_ = abs(spl(ci)); c_ = CVS + ci*5;
+    c_[2] > 0 ? (
+      c_[3] = max(c_[3], xa_); c_[2] -= 1;
+      c_[2] <= 0 ? (
+        vv_ = floor(30 + (lin2db(c_[3]) + 36)*97/36 + 0.5); vv_ = min(max(vv_, 1), 127);
+        trig(ci, vv_, vel_typ(vv_)); c_[4] = cv_mask;
+        midi_out ? (
+          P_COFF[ci] > 0 ? midisend(0, 0x80, P_NOTE[ci], 0);
+          midisend(0, 0x90, P_NOTE[ci], vel_typ(vv_) == 1 ? 127 : vel_typ(vv_) == 2 ? 30 : vv_);
+          P_COFF[ci] = floor(0.05*srate);
+        );
+      );
+    ) : (
+      c_[4] > 0 ? (c_[4] -= 1);
+      (c_[0] && xa_ > cv_t && c_[4] <= 0) ? ( c_[2] = cv_win; c_[3] = xa_; c_[0] = 0; );
+    );
+    c_[1] = max(xa_, c_[1]*cv_rel);
+    (!c_[0] && c_[2] <= 0 && c_[1] < cv_t*0.5) ? (c_[0] = 1);
+    ci += 1;
+  );
+);
+// note-off MIDI des déclenchements CV (50 ms)
+ci = 0; loop(6, P_COFF[ci] > 0 ? ( P_COFF[ci] -= 1; P_COFF[ci] <= 0 ? midisend(0, 0x80, P_NOTE[ci], 0); ); ci += 1;);
+// voix
+memset(OUTB, 0, 8);
+vi = 0;
+loop(NV,
+  v_ = VO + vi*VF;
+  v_[0] ? (
+    vp_ = v_[1]; vl_ = P_LEN[vp_]; ps_ = v_[2]; ip_ = floor(ps_);
+    ip_ >= vl_ - 1 ? ( v_[0] = 0; ) : (
+      nc_ = P_NCH[vp_]; fr_ = ps_ - ip_;
+      a_ = SMP + vp_*PADSZ + ip_*nc_;
+      sl_ = a_[0] + fr_*(a_[nc_] - a_[0]);
+      sr_ = nc_ > 1 ? a_[1] + fr_*(a_[nc_ + 1] - a_[1]) : sl_;
+      tv_ = v_[7];
+      td_ = tv_ < TD1 ? v_[8] : tv_ < TD2 ? 1 + (v_[8] - 1)*0.5*(1 + cos($pi*(tv_ - TD1)/(TD2 - TD1))) : 1;
+      gv_ = v_[4]*v_[5]*v_[9]*td_*P_G[vp_];
+      o_ = OUTB + P_OUT[vp_]*2;
+      o_[0] += sl_*gv_*P_GL[vp_]; o_[1] += sr_*gv_*P_GR[vp_];
+      v_[5] *= v_[6];
+      v_[10] > 0 ? ( v_[9] -= v_[10]; v_[9] <= 0 ? (v_[0] = 0); );
+      v_[5] < 0.00005 ? (v_[0] = 0);
+      v_[2] = ps_ + v_[3]; v_[7] = tv_ + 1;
+    );
+  );
+  vi += 1;
+);
+// clipper caché à 0 dBFS sur les 8 sorties
+spl0 = min(max(OUTB[0], -1), 1); spl1 = min(max(OUTB[1], -1), 1);
+spl2 = min(max(OUTB[2], -1), 1); spl3 = min(max(OUTB[3], -1), 1);
+spl4 = min(max(OUTB[4], -1), 1); spl5 = min(max(OUTB[5], -1), 1);
+spl6 = min(max(OUTB[6], -1), 1); spl7 = min(max(OUTB[7], -1), 1);
+sc_ += 1;
+
+@gfx 1060 620
+S  = 0.75 + 0.25*floor(size_ + 0.5);
+ox = max(0, floor((gfx_w - 1060*S)/2));
+oy = max(0, floor((gfx_h - 620*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(9*S)), 'b');
+gfx_setfont(7, "Arial", max(5, floor(9*S)));
+
+// voyants des pads
+ui = 0; loop(16, P_LIT[ui] ? ( P_FL[ui] = 1; P_LIT[ui] = 0; ) : ( P_FL[ui] = max(P_FL[ui] - 0.12, 0); ); ui += 1;);
+
+// ---- Fichiers glissés sur l'interface -----------------------------------------------------
+gfx_getdropfile(0, #df) ? (
+  dp_ = sel;
+  ui = 0; loop(16, in_rect(34 + (ui % 4)*94, 74 + floor(ui/4)*84, 86, 76) ? (dp_ = ui); ui += 1;);
+  k_ = 0;
+  while (gfx_getdropfile(k_, #df) && dp_ + k_ < 16) (
+    strcpy(200 + dp_ + k_, #df); P_REQ[dp_ + k_] = 1; k_ += 1;
+  );
+  gfx_getdropfile(-1);
+  sel = dp_;
+);
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1048,560,1);
+ui = 0; loop(56, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1048, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1048,2,1);
+col(0.04,0.04,0.045); rct(6,564,1048,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(552), 4*S, 1, 1);
+gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(552), 4*S, 1, 1);
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RMdrumachine");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(268, 38, "DRUM  MACHINE");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+
+// ---- Pads ----------------------------------------------------------------------------------
+ui = 0;
+loop(16,
+  px_ = 34 + (ui % 4)*94; py_ = 74 + floor(ui/4)*84;
+  fl_ = P_FL[ui];
+  col(0.16 + 0.84*fl_*0.9, 0.165 + 0.42*fl_, 0.18 - 0.06*fl_); rct(px_, py_, 86, 76, 1);
+  ui == sel ? ( col(1.00,0.58,0.12); rct(px_, py_, 86, 76, 0); rct(px_ + 1, py_ + 1, 84, 74, 0); )
+            : ( col(0.03,0.03,0.035); rct(px_, py_, 86, 76, 0); );
+  gfx_setfont(6); fl_ > 0.5 ? col(0.10,0.06,0.02) : col(0.55,0.56,0.60);
+  sprintf(#s, "%d", ui + 1); text_l(px_ + 6, py_ + 10, #s);
+  sprintf(#s, "%d", P_NOTE[ui]); text_r(px_ + 80, py_ + 10, #s);
+  gfx_setfont(1); fl_ > 0.5 ? col(0.10,0.06,0.02) : col(0.90,0.91,0.93);
+  text_c(px_ + 43, py_ + 36, 400 + ui);
+  gfx_setfont(7); fl_ > 0.5 ? col(0.20,0.12,0.04) : (P_USER[ui] ? col(1.00,0.70,0.35) : col(0.50,0.51,0.55));
+  strcpy_substr(#sn, 300 + ui, 0, 14); text_c(px_ + 43, py_ + 56, #sn);
+  // mute / solo / motif
+  P_MUTE[ui] ? ( col(0.85,0.25,0.20); rct(px_ + 6, py_ + 64, 14, 8, 1); );
+  P_SOLO[ui] ? ( col(0.98,0.84,0.22); rct(px_ + 22, py_ + 64, 14, 8, 1); );
+  hs_ = 0; k_ = 0; loop(16, (SUBN[ui*16 + k_] > 1 ? (SUBV[(ui*16 + k_)*8] || SUBV[(ui*16 + k_)*8 + 1] || SUBV[(ui*16 + k_)*8 + 2] || SUBV[(ui*16 + k_)*8 + 3] || SUBV[(ui*16 + k_)*8 + 4] || SUBV[(ui*16 + k_)*8 + 5] || SUBV[(ui*16 + k_)*8 + 6] || SUBV[(ui*16 + k_)*8 + 7]) : PAT[ui*16 + k_]) ? (hs_ = 1); k_ += 1;);
+  hs_ ? ( col(1.00,0.58,0.12); gfx_circle(PX(px_ + 78), PY(py_ + 68), 3*S, 1, 1); );
+  ui += 1;
+);
+gfx_setfont(7); col(0.45,0.47,0.52);
+text_l(34, 412, "click: select + play  -  drop audio files on a pad  -  right-click: default sound");
+
+// ---- Pad sélectionné -------------------------------------------------------------------
+col(0.03,0.03,0.035); rct(420, 70, 606, 186, 1);
+col(0.055,0.06,0.07); rct(422, 72, 602, 182, 1);
+gfx_setfont(4); col(1.00,0.58,0.12); sprintf(#s, "PAD %d", sel + 1); text_l(436, 90, #s);
+col(0.92,0.93,0.95); text_l(500, 90, 400 + sel);
+gfx_setfont(7); col(0.55,0.56,0.60);
+sprintf(#s, "MIDI note %d", P_NOTE[sel]); text_l(640, 90, #s);
+P_USER[sel] ? col(1.00,0.70,0.35) : col(0.55,0.56,0.60);
+strcpy(#s, "sample : "); strcat(#s, 300 + sel); text_l(436, 108, #s);
+sknob(470, 178, (slider(1 + sel) + 60)/66, 60/66, "VOLUME");
+sknob(560, 178, (slider(17 + sel) + 100)/200, 0.5, "PAN");
+sknob(650, 178, (slider(33 + sel) + 12)/24, 0.5, "TUNE");
+sknob(740, 178, slider(49 + sel)/100, 0, "DECAY");
+gfx_setfont(1); col(1.00,0.70,0.35);
+slider(1 + sel) <= -59.9 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", slider(1 + sel)); text_c(470, 224, #s);
+pv_ = slider(17 + sel); pv_ == 0 ? strcpy(#s, "C") : pv_ < 0 ? sprintf(#s, "%d L", -pv_) : sprintf(#s, "%d R", pv_); text_c(560, 224, #s);
+sprintf(#s, "%+.1f st", slider(33 + sel)); text_c(650, 224, #s);
+slider(49 + sel) >= 99.9 ? strcpy(#s, "FULL") : sprintf(#s, "%.0f %%", slider(49 + sel)); text_c(740, 224, #s);
+gfx_setfont(6); col(0.62,0.63,0.66); text_c(918, 126, "OUTPUT");
+gfx_setfont(1);
+draw_btn(830, 136, 42, 24, P_OUT[sel] == 0, "1-2");
+draw_btn(874, 136, 42, 24, P_OUT[sel] == 1, "3-4");
+draw_btn(918, 136, 42, 24, P_OUT[sel] == 2, "5-6");
+draw_btn(962, 136, 42, 24, P_OUT[sel] == 3, "7-8");
+draw_btn(830, 184, 56, 26, P_MUTE[sel], "MUTE");
+draw_btn(890, 184, 56, 26, P_SOLO[sel], "SOLO");
+draw_btn(950, 184, 56, 26, P_SWG[sel], "SWING");
+gfx_setfont(7); col(0.45,0.47,0.52); text_c(918, 228, "swing on this pad");
+
+// ---- Réglages globaux ----------------------------------------------------------------------
+col(0.03,0.03,0.035); rct(420, 266, 606, 160, 1);
+col(0.055,0.06,0.07); rct(422, 268, 602, 156, 1);
+gfx_setfont(6); col(0.62,0.63,0.66);
+text_l(436, 284, "TEMPO"); text_l(436, 340, "GRID");
+gfx_setfont(1);
+draw_btn(436, 294, 56, 24, tmode == 0, "HALF");
+draw_btn(496, 294, 56, 24, tmode == 1, "NORMAL");
+draw_btn(556, 294, 56, 24, tmode == 2, "DOUBLE");
+draw_btn(436, 350, 56, 24, grid == 0, "1/16");
+draw_btn(496, 350, 56, 24, grid == 1, "1/32");
+draw_btn(556, 350, 56, 24, grid == 2, "1/16T");
+draw_btn(436, 392, 104, 24, seq_on, "SEQ ON");
+draw_btn(544, 392, 68, 24, midi_out, "MIDI OUT");
+sknob(672, 340, (swing + 100)/200, 0.5, "SWING");
+sknob(752, 340, (cvthr + 60)/54, 0, "CV THR");
+sknob(832, 340, (master + 60)/72, 60/72, "MASTER");
+gfx_setfont(1); col(1.00,0.70,0.35);
+sprintf(#s, "%+.0f %%", swing); text_c(672, 386, #s);
+sprintf(#s, "%.0f dB", cvthr); text_c(752, 386, #s);
+master <= -59.9 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", master); text_c(832, 386, #s);
+draw_btn(722, 400, 60, 20, cv_on, "CV IN");
+gfx_setfont(6); col(0.62,0.63,0.66); text_c(948, 284, "LAYERS");
+gfx_setfont(1);
+draw_btn(882, 294, 132, 24, g14, "14 + KICK");
+gfx_setfont(6); col(0.55,0.56,0.60); text_l(882, 336, "15 +");
+gfx_setfont(1);
+draw_btn(908, 326, 34, 22, g15 == 0, "-");
+draw_btn(944, 326, 34, 22, g15 == 1, "SNR");
+draw_btn(980, 326, 34, 22, g15 == 2, "CLP");
+gfx_setfont(7); col(0.45,0.47,0.52);
+text_l(882, 366, "chokes : 11 / 12 / 16"); text_l(882, 380, "accent : 120-127"); text_l(882, 394, "ghost : 1-30");
+
+// ---- Séquenceur ----------------------------------------------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95); sprintf(#s, "STEPS  -  PAD %d  ", sel + 1); text_l(34, 440, #s);
+gfx_measurestr(#s, sw_, sh_); col(1.00,0.58,0.12); text_l(34 + sw_/S, 440, 400 + sel);
+gfx_setfont(7); col(0.45,0.47,0.52); text_c(560, 440, "top: accent (127)  -  middle: step (100)  -  bottom: ghost (30)  -  shift + right-drag up/down: split a step (1-8)");
+gfx_setfont(1); draw_btn(966, 430, 60, 22, 0, "CLEAR");
+ui = 0;
+loop(16,
+  sx_ = 34 + ui*62;
+  floor(ui/4) % 2 == 0 ? ( col(0.09,0.095,0.105); rct(sx_ - 3, 456, 62, 98, 1); );
+  sn_g = max(SUBN[sel*16 + ui], 1);
+  cw_ = (56 - (sn_g - 1)*2)/sn_g;
+  k_ = 0;
+  loop(sn_g,
+    sv_ = sn_g > 1 ? SUBV[(sel*16 + ui)*8 + k_] : PAT[sel*16 + ui];
+    cx_ = sx_ + k_*(cw_ + 2);
+    // accent
+    sv_ == 2 ? col(1.00,0.30,0.20) : col(0.16,0.165,0.18); rct(cx_, 460, cw_, 14, 1);
+    col(0.03,0.03,0.035); rct(cx_, 460, cw_, 14, 0);
+    // pas / sous-pas
+    sv_ > 0 ? ( sv_ == 3 ? col(0.55,0.36,0.14) : col(1.00,0.58,0.12); ) : col(0.16,0.165,0.18);
+    rct(cx_, 478, cw_, 44, 1);
+    col(0.03,0.03,0.035); rct(cx_, 478, cw_, 44, 0);
+    // ghost
+    sv_ == 3 ? col(0.45,0.60,0.95) : col(0.16,0.165,0.18); rct(cx_, 526, cw_, 14, 1);
+    col(0.03,0.03,0.035); rct(cx_, 526, cw_, 14, 0);
+    k_ += 1;
+  );
+  ui == cur_step ? ( col(1,1,1); rct(sx_ - 1, 477, 58, 46, 0); rct(sx_ - 2, 476, 60, 48, 0); );
+  gfx_setfont(6); col(0.55,0.56,0.60);
+  sn_g > 1 ? sprintf(#s, "%d  /%d", ui + 1, sn_g) : sprintf(#s, "%d", ui + 1); text_c(sx_ + 28, 548, #s);
+  ui += 1;
+);
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 589, "SIZE");
+gfx_setfont(1);
+draw_btn(842, 577, 46, 24, floor(size_ + 0.5) == 0, "75%");
+draw_btn(892, 577, 46, 24, floor(size_ + 0.5) == 1, "100%");
+draw_btn(942, 577, 46, 24, floor(size_ + 0.5) == 2, "125%");
+draw_btn(992, 577, 46, 24, floor(size_ + 0.5) == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 589, "Ctrl-click: default value   -   Shift: fine adjust   -   sequencer runs while REAPER plays");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1; mb2 = mouse_cap & 2;
+(mb2 && !last_mb2) ? (
+  ui = 0; loop(16, in_rect(34 + (ui % 4)*94, 74 + floor(ui/4)*84, 86, 76) ? ( P_DEF[ui] = 1; sel = ui; ); ui += 1;);
+  // shift + clic droit sur un pas : début de découpe
+  sd_st = -1;
+  (mouse_cap & 8) ? (
+    ui = 0; loop(16, in_rect(34 + ui*62, 456, 56, 90) ? ( sd_st = ui; sd_o = max(SUBN[sel*16 + ui], 1); sd_y = my; ); ui += 1;);
+  );
+);
+(mb2 && sd_st >= 0) ? (
+  sd_n = min(max(sd_o + floor((sd_y - my)/10), 1), 8);
+  sd_n != max(SUBN[sel*16 + sd_st], 1) ? set_subn(sel, sd_st, sd_n);
+);
+!mb2 ? (sd_st = -1);
+(mb1 && !last_mb) ? (
+  drag = 0;
+  ui = 0;
+  loop(16,
+    in_rect(34 + (ui % 4)*94, 74 + floor(ui/4)*84, 86, 76) ? ( sel = ui; P_AUD[ui] = 1; );
+    ui += 1;
+  );
+  in_circ(470, 178, 34) ? drag = 1;
+  in_circ(560, 178, 34) ? drag = 2;
+  in_circ(650, 178, 34) ? drag = 3;
+  in_circ(740, 178, 34) ? drag = 4;
+  in_circ(672, 340, 34) ? drag = 5;
+  in_circ(752, 340, 34) ? drag = 6;
+  in_circ(832, 340, 34) ? drag = 7;
+  ui = 0; loop(4, in_rect(830 + ui*44, 136, 42, 24) ? (P_OUT[sel] = ui); ui += 1;);
+  in_rect(830, 184, 56, 26) ? (P_MUTE[sel] = !P_MUTE[sel]);
+  in_rect(890, 184, 56, 26) ? (P_SOLO[sel] = !P_SOLO[sel]);
+  in_rect(950, 184, 56, 26) ? (P_SWG[sel] = !P_SWG[sel]);
+  ui = 0; loop(3, in_rect(436 + ui*60, 294, 56, 24) ? (tmode = ui); in_rect(436 + ui*60, 350, 56, 24) ? (grid = ui); ui += 1;);
+  in_rect(436, 392, 104, 24) ? (seq_on = !seq_on);
+  in_rect(544, 392, 68, 24) ? (midi_out = !midi_out);
+  in_rect(722, 400, 60, 20) ? (cv_on = !cv_on);
+  in_rect(882, 294, 132, 24) ? (g14 = !g14);
+  ui = 0; loop(3, in_rect(908 + ui*36, 326, 34, 22) ? (g15 = ui); ui += 1;);
+  in_rect(966, 430, 60, 22) ? ( memset(PAT + sel*16, 0, 16); memset(SUBV + sel*128, 0, 128); ui = 0; loop(16, SUBN[sel*16 + ui] = 1; ui += 1;); );
+  ui = 0;
+  loop(16,
+    sx_ = 34 + ui*62; ad_ = PAT + sel*16 + ui;
+    sn_m = max(SUBN[sel*16 + ui], 1);
+    (sn_m > 1 && mx >= sx_ && mx < sx_ + 56) ? ( ad_ = SUBV + (sel*16 + ui)*8 + min(floor((mx - sx_)/56*sn_m), sn_m - 1); );
+    in_rect(sx_, 460, 56, 14) ? ( ad_[0] = ad_[0] == 2 ? 1 : 2; );
+    in_rect(sx_, 478, 56, 44) ? ( ad_[0] = ad_[0] > 0 ? 0 : 1; );
+    in_rect(sx_, 526, 56, 14) ? ( ad_[0] = ad_[0] == 3 ? 1 : 3; );
+    ui += 1;
+  );
+  ui = 0; loop(4, in_rect(842 + ui*50, 577, 46, 24) ? (size_ = ui); ui += 1;);
+  (drag > 0 && (mouse_cap & 4)) ? (
+    drag == 1 ? set_sl(1 + sel, 0) : drag == 2 ? set_sl(17 + sel, 0) : drag == 3 ? set_sl(33 + sel, 0) :
+    drag == 4 ? set_sl(49 + sel, 100) : drag == 5 ? (swing = 0) : drag == 6 ? (cvthr = -36) : (master = 0);
+    drag = 0;
+  );
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? (
+    drag == 1 ? set_sl(1 + sel, floor(min(max(slider(1 + sel) + dy*0.3, -60), 6)*10 + 0.5)/10) :
+    drag == 2 ? set_sl(17 + sel, floor(min(max(slider(17 + sel) + dy, -100), 100) + 0.5)) :
+    drag == 3 ? set_sl(33 + sel, floor(min(max(slider(33 + sel) + dy*0.1, -12), 12)*10 + 0.5)/10) :
+    drag == 4 ? set_sl(49 + sel, floor(min(max(slider(49 + sel) + dy*0.5, 0), 100)*10 + 0.5)/10) :
+    drag == 5 ? ( swing = floor(min(max(swing + dy, -100), 100) + 0.5); ) :
+    drag == 6 ? ( cvthr = floor(min(max(cvthr + dy*0.25, -60), -6) + 0.5); ) :
+                ( master = floor(min(max(master + dy*0.3, -60), 12)*10 + 0.5)/10; );
+  );
+);
+!mb1 ? (drag = 0);
+last_mb = mb1; last_mb2 = mb2;
+last_my = (mouse_y - oy)/S;

@@ -1,6 +1,6 @@
 # ReNo Mellow – plugins gratuits pour REAPER
 
-Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de couleur et utilitaires en JSFX pour REAPER.
+Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de couleur, utilitaires et instruments en JSFX pour REAPER.
 
 ## Dynamique
 
@@ -47,6 +47,12 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Pre** | Étage de préampli coloré : DRIVE + GAIN, 5 couleurs (1073, 512, 610, 4000, 32) |
 | **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
 
+## Instruments
+
+| Plugin | Description |
+|---|---|
+| **RMdrumachine** | Boîte à rythmes 16 pads avec samples fournis, step séquenceur (accent, ghost, découpe des pas, swing), MIDI et CV, 8 sorties |
+
 ## Utilitaires
 
 | Plugin | Description |
@@ -75,8 +81,10 @@ Les mises à jour arrivent ensuite automatiquement (Extensions > ReaPack > Synch
 
 ## Installation manuelle
 
-Copier les fichiers des dossiers `Dynamics`, `EQ`, `Color` et `Utility` dans le dossier `Effects` de REAPER
+Copier les fichiers des dossiers `Dynamics`, `EQ`, `Color`, `Utility` et `Instruments` dans le dossier `Effects` de REAPER
 (Options > Show REAPER resource path), puis rescanner les JSFX.
+Pour les sons par défaut du RMdrumachine, copier aussi le dossier `Instruments/RMdrumachine`
+(les fichiers .ogg) dans le dossier `Data` de REAPER : `Data/RMdrumachine/01_kick.ogg`, etc.
 
 ## Licence
 
