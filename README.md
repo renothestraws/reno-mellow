@@ -52,6 +52,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | Plugin | Description |
 |---|---|
 | **RMdrumachine** ([manuel PDF](Instruments/RMdrumachine/RMdrumachine_Manual.pdf)) | Boîte à rythmes 16 pads avec 4 kits fournis, 8 motifs, step séquenceur (accent, ghost, découpe des pas, swing, play style), MIDI et CV, 8 sorties |
+| **RMoneshot** | Lecteur one-shot intelligent (snare, kick) : la vélocité, le hasard et le rythme de jeu font varier niveau, timbre, résonance et pitch d'un seul sample |
 
 ## Utilitaires
 
