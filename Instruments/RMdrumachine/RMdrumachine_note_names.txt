@@ -1,0 +1,26 @@
+# RMdrumachine - MIDI note names (default mapping)
+# REAPER MIDI editor: File > Note names > Load note names from file...
+35 Misc 14 (kick layer)
+36 Kick
+37 Rim
+38 Snare
+39 Clap
+40 Misc 15 (snare/clap layer)
+42 HH Closed
+44 Misc 16 (hi-hat group)
+45 Low Tom
+46 HH Open
+47 Mid Tom
+49 Crash
+50 Hi Tom
+51 Ride
+56 Perc
+70 Maracas
+101 Pattern A
+102 Pattern B
+103 Pattern C
+104 Pattern D
+105 Pattern E
+106 Pattern F
+107 Pattern G
+108 Pattern H

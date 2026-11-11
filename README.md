@@ -51,7 +51,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 
 | Plugin | Description |
 |---|---|
-| **RMdrumachine** | Boîte à rythmes 16 pads avec samples fournis, step séquenceur (accent, ghost, découpe des pas, swing), MIDI et CV, 8 sorties |
+| **RMdrumachine** ([manuel PDF](Instruments/RMdrumachine/RMdrumachine_Manual.pdf)) | Boîte à rythmes 16 pads avec 4 kits fournis, 8 motifs, step séquenceur (accent, ghost, découpe des pas, swing, play style), MIDI et CV, 8 sorties |
 
 ## Utilitaires
 
@@ -84,7 +84,7 @@ Les mises à jour arrivent ensuite automatiquement (Extensions > ReaPack > Synch
 Copier les fichiers des dossiers `Dynamics`, `EQ`, `Color`, `Utility` et `Instruments` dans le dossier `Effects` de REAPER
 (Options > Show REAPER resource path), puis rescanner les JSFX.
 Pour les sons par défaut du RMdrumachine, copier aussi le dossier `Instruments/RMdrumachine`
-(les fichiers .ogg) dans le dossier `Data` de REAPER : `Data/RMdrumachine/01_kick.ogg`, etc.
+(les 4 dossiers de kits et le fichier de noms de notes) dans le dossier `Data` de REAPER : `Data/RMdrumachine/Doves/01_kick.ogg`, etc.
 
 ## Licence
 

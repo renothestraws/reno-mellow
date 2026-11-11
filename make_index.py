@@ -89,8 +89,10 @@ def main():
             # fichiers de données (dossier du même nom que le plugin) -> REAPER/Data/<nom>/
             ddir = os.path.join(root, cat, fn[:-5])
             if os.path.isdir(ddir):
-                for dp in sorted(glob.glob(os.path.join(ddir, "*"))):
-                    dn = os.path.basename(dp)
+                for dp in sorted(glob.glob(os.path.join(ddir, "**", "*"), recursive=True)):
+                    if not os.path.isfile(dp):
+                        continue
+                    dn = os.path.relpath(dp, ddir).replace(os.sep, "/")
                     x.append('        <source type="data" file=%s>%s</source>' % (quoteattr(fn[:-5] + "/" + dn), escape(raw + cat + "/" + fn[:-5] + "/" + dn)))
             x.append('      </version>')
             x.append('    </reapack>')
