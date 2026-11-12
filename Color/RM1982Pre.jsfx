@@ -6,7 +6,7 @@ desc:RM1982Pre - ReNo Mellow 1982Pre (Colored Preamp Gain Stage + VU / Peak mete
 //@about Étage de gain de préampli coloré : DRIVE (couleur à volume constant) et GAIN propre, 5 couleurs (1073, 512, 610, 4000, 32), VU-mètres calibrables, crête-mètre, clipper interne, HQ.
 //
 // ---------------------------------------------------------------------------
-// RM1982Pre - étage de gain de préampli (basé sur le RM1982GS) avec 5 couleurs.
+// RM1982Pre - étage de gain de préampli (basé sur le RM1982Gain) avec 5 couleurs.
 //
 // DRIVE (-12..+24 dB)  : niveau envoyé dans le préampli, compensé en sortie :
 //                        la couleur change, pas le volume. Plus le niveau

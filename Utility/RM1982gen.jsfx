@@ -1,0 +1,448 @@
+desc:RM1982gen - ReNo Mellow 1982 Tone Gate Generator
+//tags: generator gate tone sub kick noise
+//@author ReNo Mellow
+//@version 1.3
+//@changelog Passe-bas de 50 Hz à 15 kHz ; nouveau passe-haut (off à 500 Hz) sur le générateur
+//@about Générateur déclenché par l'entrée (tone gate, d'après Tone Gate de remaincalm.org, GPL) : sinus, carré, dent de scie (anti-repliement), bruit rose, bruit blanc ; seuil, hold, fade in/out, passe-bas (50 Hz - 15 kHz) et passe-haut (off - 500 Hz) ; Dynamic pitch (à l'ouverture, glissement de Freq vers Freq /4 à x4 en un temps égal au Fade out) ; saisie des valeurs au clavier (double-clic) ; phase remise à zéro à chaque déclenchement ; idéal pour un sub sous un kick ou une tonalité sous une snare.
+//
+// ---------------------------------------------------------------------------
+// License: GPL - http://www.gnu.org/licenses/gpl.html (dérivé de Tone Gate)
+// RM1982gen - générateur déclenché par l'entrée ("tone gate"), d'après Tone
+// Gate de remaincalm.org (GPL), réécrit pour la série 1982.
+//
+// Quand l'entrée dépasse le seuil, un générateur s'ouvre (Fade in) ; quand
+// elle reste sous le seuil plus longtemps que Hold, il se referme (Fade out).
+// Dynamic pitch : à chaque ouverture (ou nouvelle attaque après 20 ms sous le
+// seuil), le générateur part de Freq et glisse vers Freq x rapport en un temps
+// égal à Fade out (glissement exponentiel). Ex. 80 Hz, /2, Fade out 200 ms :
+// 80 -> 40 Hz en 200 ms après l'ouverture.
+// Usage typique : sub sous un kick, tonalité sous une snare, bruit sous une
+// caisse claire, etc.
+//
+// Améliorations par rapport à l'original :
+//   - formes d'onde : Sine, Square, Saw (anti-repliement PolyBLEP), Pink noise
+//     (filtre de Paul Kellet), White noise ; carré symétrique (sans offset DC)
+//   - Dynamic pitch : Normal, /1.18, /1.5, /2, /2.3, /3, /4, x1.18, x1.5,
+//     x2, x2.3, x3, x4 (fréquence de fermeture atteinte en Fade out ms)
+//   - double-clic sur un bouton : saisie d'une valeur précise au clavier
+//   - phase remise à zéro quand le générateur repart du silence (pas de clic,
+//     attaque identique à chaque coup)
+//   - passe-bas 50 Hz - 15 kHz et passe-haut (off - 500 Hz), 12 dB/oct
+//     (Butterworth), sur le générateur
+//   - seuil en vrais dBFS, temps de fondu en ms (constantes de temps)
+// Latence nulle. Clipper caché (écrêtage dur à 0 dBFS) en sortie.
+// ---------------------------------------------------------------------------
+
+slider1:-15<-120,6,0.1>-Wet Mix (dB)
+slider2:0<-120,6,0.1>-Dry Mix (dB)
+slider3:80<20,400,0.1>-Frequency (Hz)
+slider4:0<0,4,1{Sine,Square,Saw,Pink Noise,White Noise}>-Waveform
+slider5:1000<50,15000,1>-Lowpass (Hz)
+slider6:-20<-80,0,0.1>-Threshold (dB)
+slider7:50<1,4000,1>-Hold / Silence Length (ms)
+slider8:10<1,100,0.1>-Fade In (ms)
+slider9:100<1,1000,1>-Fade Out (ms)
+slider10:0<0,12,1{Normal,Div 1.18,Div 1.5,Div 2,Div 2.3,Div 3,Div 4,Mult 1.18,Mult 1.5,Mult 2,Mult 2.3,Mult 3,Mult 4}>-Dynamic Pitch
+slider12:1<0,3,1{75%,100%,125%,150%}>-Size
+slider13:0<0,500,1>-Highpass (Hz, 0 = off)
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+ext_noinit = 1;
+EPS = 0.000000001;
+function db2lin(d) ( d <= -119.95 ? 0 : exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function pratio(m) (
+  m == 0 ? 1 : m == 1 ? 1/1.18 : m == 2 ? 1/1.5 : m == 3 ? 0.5 : m == 4 ? 1/2.3 : m == 5 ? 1/3 : m == 6 ? 0.25 :
+  m == 7 ? 1.18 : m == 8 ? 1.5 : m == 9 ? 2 : m == 10 ? 2.3 : m == 11 ? 3 : 4;
+);
+// PolyBLEP (t = phase 0..1, dt = incrément)
+function blep(t, dt) (
+  t < dt ? ( t /= dt; t + t - t*t - 1; ) :
+  t > 1 - dt ? ( t = (t - 1)/dt; t*t + t + t + 1; ) : 0;
+);
+ph = 0; env = 0; silcnt = 1000000000; gate = 0; glcnt = 1000000000; edit_k = -1;
+pk0 = pk1 = pk2 = pk3 = pk4 = pk5 = pk6 = 0;
+lx1 = lx2 = ly1 = ly2 = 0; hx1 = hx2 = hy1 = hy2 = 0;
+pdi = pd0 = pd1 = 0;
+cur_f = 80;
+
+// ---- Outils graphiques (coordonnées logiques 1060 x 412) ---------------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(pow(2, idx - 1)); ); );
+
+function draw_led(x, y, r, on)
+(
+  col(0.03,0.03,0.035); gfx_circle(PX(x), PY(y), (r + 2)*S, 1, 1);
+  col(0.20 + 0.80*on, 0.10 + 0.50*on, 0.04 + 0.08*on); gfx_circle(PX(x), PY(y), r*S, 1, 1);
+);
+// ---- Boutons : valeur <-> position (0..1) ----------------------------------------
+// k = 0 wet, 1 dry, 2 freq, 3 lowpass, 4 threshold, 5 hold, 6 fade in, 7 fade out, 8 highpass
+function k_frac(k)
+(
+  k == 0 ? (slider1 + 120)/126 :
+  k == 1 ? (slider2 + 120)/126 :
+  k == 2 ? log(slider3/20)/log(20) :
+  k == 3 ? log(slider5/50)/log(300) :
+  k == 4 ? (slider6 + 80)/80 :
+  k == 5 ? log(slider7)/log(4000) :
+  k == 6 ? log(slider8)/log(100) :
+  k == 7 ? log(slider9)/log(1000) :
+  sqrt(slider13/500);
+);
+function k_set(k, f)
+(
+  f = min(max(f, 0), 1);
+  k == 0 ? set_sl(1, floor((f*126 - 120)*10 + 0.5)/10) :
+  k == 1 ? set_sl(2, floor((f*126 - 120)*10 + 0.5)/10) :
+  k == 2 ? set_sl(3, floor(20*pow(20, f)*10 + 0.5)/10) :
+  k == 3 ? set_sl(5, floor(50*pow(300, f) + 0.5)) :
+  k == 4 ? set_sl(6, floor((f*80 - 80)*10 + 0.5)/10) :
+  k == 5 ? set_sl(7, floor(pow(4000, f) + 0.5)) :
+  k == 6 ? set_sl(8, floor(pow(100, f)*10 + 0.5)/10) :
+  k == 7 ? set_sl(9, floor(pow(1000, f) + 0.5)) :
+  set_sl(13, floor(500*f*f + 0.5));
+);
+function k_def(k)
+(
+  k == 0 ? set_sl(1, -15) : k == 1 ? set_sl(2, 0) : k == 2 ? set_sl(3, 80) : k == 3 ? set_sl(5, 1000) :
+  k == 4 ? set_sl(6, -20) : k == 5 ? set_sl(7, 50) : k == 6 ? set_sl(8, 10) : k == 7 ? set_sl(9, 100) : set_sl(13, 0);
+);
+function kxpos(u) ( 70 + u*100; );
+// ordre d'affichage : wet, dry, freq, highpass, lowpass, threshold, hold, fade in, fade out
+function kd(u) ( u < 3 ? u : u == 3 ? 8 : u - 1; );
+// valeur saisie au clavier (bornée)
+function k_type(k, v)
+(
+  k == 0 ? set_sl(1, min(max(v, -120), 6)) :
+  k == 1 ? set_sl(2, min(max(v, -120), 6)) :
+  k == 2 ? set_sl(3, min(max(v, 20), 400)) :
+  k == 3 ? set_sl(5, min(max(v, 50), 15000)) :
+  k == 4 ? set_sl(6, min(max(v, -80), 0)) :
+  k == 5 ? set_sl(7, min(max(v, 1), 4000)) :
+  k == 6 ? set_sl(8, min(max(v, 1), 100)) :
+  k == 7 ? set_sl(9, min(max(v, 1), 1000)) :
+  set_sl(13, min(max(v, 0), 500));
+);
+
+@slider
+// (réglages relus à chaque bloc dans @block)
+
+@block
+wet = db2lin(slider1);
+dry = db2lin(slider2);
+thr = exp(slider6*0.11512925464970228);
+hold_n = slider7*0.001*srate;
+c_in = exp(-1/(max(slider8, 0.1)*0.001*srate));
+c_out = exp(-1/(max(slider9, 0.1)*0.001*srate));
+fo_n = max(1, slider9*0.001*srate);
+retrig_n = 0.02*srate;
+f0 = slider3; ratio = pratio(floor(slider10 + 0.5));
+wf = floor(slider4 + 0.5);
+// passe-bas Butterworth 12 dB/oct (RBJ, Q 0.7071)
+lp_f != slider5 || lp_sr != srate ? (
+  w_ = 2*$pi*min(slider5, 0.45*srate)/srate; cs_ = cos(w_); al_ = sin(w_)/(2*0.7071); a0_ = 1 + al_;
+  lb0 = (1 - cs_)*0.5/a0_; lb1 = (1 - cs_)/a0_; lb2 = lb0; la1 = -2*cs_/a0_; la2 = (1 - al_)/a0_;
+  lp_f = slider5; lp_sr = srate;
+);
+// passe-haut 12 dB/oct (RBJ, Q 0.7071), 0 = coupé
+hp_on = slider13 >= 1;
+hp_on && (hp_f != slider13 || hp_sr != srate) ? (
+  w_ = 2*$pi*slider13/srate; cs_ = cos(w_); al_ = sin(w_)/(2*0.7071); a0_ = 1 + al_;
+  hb0 = (1 + cs_)*0.5/a0_; hb1 = -(1 + cs_)/a0_; hb2 = hb0; ha1 = -2*cs_/a0_; ha2 = (1 - al_)/a0_;
+  hp_f = slider13; hp_sr = srate;
+);
+
+@sample
+inL = spl0; inR = spl1;
+ai = max(abs(inL), abs(inR));
+// détecteur
+ai > thr ? (
+  (gate == 0 || silcnt > retrig_n) ? ( glcnt = 0; );
+  (gate == 0 && env < 0.001) ? ( ph = 0; );
+  silcnt = 0;
+  gate = 1;
+) : (
+  silcnt += 1;
+  silcnt > hold_n ? ( gate = 0; );
+);
+env = gate ? 1 - (1 - env)*c_in : env*c_out;
+// fréquence : de f0 (ouverture) vers f0 x ratio (fermeture) en Fade out ms
+glcnt += 1;
+gk = min(glcnt/fo_n, 1);
+cur_f = ratio == 1 ? f0 : f0*exp(log(ratio)*gk);
+dt_ = min(cur_f/srate, 0.5);
+// générateur
+wf == 0 ? ( g = sin(2*$pi*ph); ) :
+wf == 1 ? (
+  g = (ph < 0.5 ? 1 : -1) + blep(ph, dt_) - blep(ph + 0.5 - floor(ph + 0.5), dt_);
+  g *= 0.7;
+) :
+wf == 2 ? (
+  g = (2*ph - 1 - blep(ph, dt_))*0.8;
+) :
+wf == 3 ? (
+  wn = rand(2) - 1;
+  pk0 = 0.99886*pk0 + wn*0.0555179; pk1 = 0.99332*pk1 + wn*0.0750759;
+  pk2 = 0.96900*pk2 + wn*0.1538520; pk3 = 0.86650*pk3 + wn*0.3104856;
+  pk4 = 0.55000*pk4 + wn*0.5329522; pk5 = -0.7616*pk5 - wn*0.0168980;
+  g = (pk0 + pk1 + pk2 + pk3 + pk4 + pk5 + pk6 + wn*0.5362)*0.11;
+  pk6 = wn*0.115926;
+  g *= 2.5;
+) : (
+  g = (rand(2) - 1)*0.7;
+);
+ph += dt_; ph >= 1 ? ( ph -= 1; );
+// passe-bas
+ly = lb0*g + lb1*lx1 + lb2*lx2 - la1*ly1 - la2*ly2;
+lx2 = lx1; lx1 = g; ly2 = ly1; ly1 = ly;
+// passe-haut
+hp_on ? (
+  hy = hb0*ly + hb1*hx1 + hb2*hx2 - ha1*hy1 - ha2*hy2;
+  hx2 = hx1; hx1 = ly; hy2 = hy1; hy1 = hy;
+  ly = hy;
+);
+gv = ly*env*wet;
+oL = gv + inL*dry;
+oR = gv + inR*dry;
+// clipper caché à 0 dBFS
+(abs(oL) > 1 || abs(oR) > 1) ? ( clip_f = 1; );
+spl0 = min(max(oL, -1), 1);
+spl1 = min(max(oR, -1), 1);
+pdi = max(ai, pdi*0.99985);
+pd0 = max(abs(spl0), pd0*0.99985);
+pd1 = max(abs(spl1), pd1*0.99985);
+gate_disp = env;
+
+@gfx 1060 412
+S  = 0.75 + 0.25*floor(slider12 + 0.5);
+ox = max(0, floor((gfx_w - 1060*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+clip_f ? ( clip_hold = 60; clip_f = 0; ) : ( clip_hold = max(clip_hold - 1, 0); );
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(9*S)), 'b');
+gfx_setfont(7, "Arial", max(6, floor(16*S)), 'b');
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1048,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1048, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1048,2,1);
+col(0.04,0.04,0.045); rct(6,364,1048,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982gen");
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(206, 38, "TONE  GATE  GENERATOR");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+
+// ---- Forme d'onde ------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(34, 76, "WAVEFORM");
+gfx_setfont(1);
+ui = 0;
+loop(5,
+  ui == 0 ? strcpy(#s, "SINE") : ui == 1 ? strcpy(#s, "SQUARE") : ui == 2 ? strcpy(#s, "SAW") : ui == 3 ? strcpy(#s, "PINK NOISE") : strcpy(#s, "WHITE NOISE");
+  draw_btn(34 + ui*100, 88, 94, 28, wf_ui == ui, #s);
+  ui += 1;
+);
+wf_ui = floor(slider4 + 0.5);
+
+// ---- Dynamic pitch -----------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(34, 134, "DYNAMIC PITCH");
+gfx_setfont(1);
+dp_ui = floor(slider10 + 0.5);
+draw_btn(34, 146, 64, 58, dp_ui == 0, "NORMAL");
+ui = 1;
+loop(12,
+  ui == 1 ? strcpy(#s, "/ 1.18") : ui == 2 ? strcpy(#s, "/ 1.5") : ui == 3 ? strcpy(#s, "/ 2") : ui == 4 ? strcpy(#s, "/ 2.3") : ui == 5 ? strcpy(#s, "/ 3") : ui == 6 ? strcpy(#s, "/ 4") :
+  ui == 7 ? strcpy(#s, "x 1.18") : ui == 8 ? strcpy(#s, "x 1.5") : ui == 9 ? strcpy(#s, "x 2") : ui == 10 ? strcpy(#s, "x 2.3") : ui == 11 ? strcpy(#s, "x 3") : strcpy(#s, "x 4");
+  draw_btn(104 + ((ui - 1) % 6)*70, ui <= 6 ? 146 : 176, 64, 28, dp_ui == ui, #s);
+  ui += 1;
+);
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_l(530, 160, "DOWN"); text_l(530, 190, "UP");
+
+// ---- Gate -------------------------------------------------------------------------
+col(0.03,0.03,0.035); rct(600, 70, 300, 134, 1);
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(612, 84, "INPUT  /  THRESHOLD");
+// barre d'entrée (-80 .. 0 dBFS)
+udb = lin2db(pdi); uf = min(max((udb + 80)/80, 0), 1);
+col(0.16,0.165,0.18); rct(612, 98, 276, 14, 1);
+uf > 0.003 ? ( col(0.30,0.75,0.35); rct(612, 98, 276*uf, 14, 1); );
+ut = (slider6 + 80)/80;
+col(1.00,0.58,0.12); rct(612 + 276*ut - 1, 94, 3, 22, 1);
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_l(612, 124, "-80"); text_c(612 + 138, 124, "-40"); text_r(888, 124, "0 dBFS");
+// LED gate + fréquence courante
+draw_led(624, 156, 8, min(gate_disp*1.2, 1));
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(640, 156, "GATE");
+gfx_setfont(6); col(0.55,0.56,0.60); text_l(740, 148, "GENERATOR");
+gfx_setfont(7); col(1.00,0.70,0.35);
+wf_ui >= 3 ? strcpy(#s, "NOISE") : sprintf(#s, "%.1f Hz", gate_disp > 0.001 ? cur_f : slider3);
+text_l(740, 168, #s);
+gfx_setfont(6); col(0.55,0.56,0.60);
+dp_ui == 0 ? strcpy(#s, "no glide") : sprintf(#s, "%.1f > %.1f Hz in %d ms", slider3, slider3*pratio(dp_ui), slider9);
+wf_ui < 3 ? text_l(740, 188, #s);
+
+// ---- Crête-mètre de sortie ------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(960, 76, "OUTPUT");
+ui = 0;
+loop(2,
+  udb = lin2db(ui == 0 ? pd0 : pd1);
+  uf = min(max((udb + 60)/60, 0), 1);
+  col(0.03,0.03,0.035); rct(930 + ui*22, 88, 16, 200, 1);
+  uf > 0.003 ? ( col(0.30,0.75,0.35); rct(932 + ui*22, 88 + 198*(1 - min(uf, 0.8)), 12, 198*min(uf, 0.8), 1); );
+  uf > 0.8 ? ( col(1.00,0.58,0.12); rct(932 + ui*22, 88 + 198*(1 - min(uf, 0.95)), 12, 198*(min(uf, 0.95) - 0.8), 1); );
+  uf > 0.95 ? ( col(1.00,0.25,0.18); rct(932 + ui*22, 90, 12, 198*(uf - 0.95), 1); );
+  ui += 1;
+);
+gfx_setfont(6); col(0.55,0.56,0.60);
+ui = 0;
+loop(6,
+  udb = ui == 0 ? 0 : ui == 1 ? -6 : ui == 2 ? -12 : ui == 3 ? -24 : ui == 4 ? -36 : -60;
+  sprintf(#s, "%d", udb); text_l(976, 88 + 198*(-udb/60) + 2, #s);
+  ui += 1;
+);
+text_c(938, 298, "L"); text_c(960, 298, "R");
+col(0.03,0.03,0.035); gfx_circle(PX(1010), PY(300), 7*S, 1, 1);
+clip_hold > 0 ? col(1.00,0.20,0.15) : col(0.20,0.05,0.04); gfx_circle(PX(1010), PY(300), 5*S, 1, 1);
+gfx_setfont(6); col(0.55,0.56,0.60); text_c(1010, 316, "CLIP");
+
+// ---- Boutons rotatifs -------------------------------------------------------------------
+KNY = 292;
+ui = 0;
+loop(9,
+  kcx = kxpos(ui); uk = kd(ui);
+  ufz = (uk == 0 || uk == 1) ? 120/126 : 0;
+  draw_knob(kcx, KNY, 25, k_frac(uk), ufz);
+  gfx_setfont(4); col(0.92,0.93,0.95);
+  uk == 0 ? strcpy(#s, "WET") : uk == 1 ? strcpy(#s, "DRY") : uk == 2 ? strcpy(#s, "FREQ") : uk == 3 ? strcpy(#s, "LOWPASS") :
+  uk == 4 ? strcpy(#s, "THRESHOLD") : uk == 5 ? strcpy(#s, "HOLD") : uk == 6 ? strcpy(#s, "FADE IN") : uk == 7 ? strcpy(#s, "FADE OUT") : strcpy(#s, "HIGHPASS");
+  text_c(kcx, KNY - 52, #s);
+  gfx_setfont(1); col(1.00,0.70,0.35);
+  uk == 0 ? ( slider1 <= -119.95 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", slider1); ) :
+  uk == 1 ? ( slider2 <= -119.95 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", slider2); ) :
+  uk == 2 ? sprintf(#s, "%.1f Hz", slider3) :
+  uk == 3 ? ( slider5 >= 1000 ? sprintf(#s, "%.2f kHz", slider5/1000) : sprintf(#s, "%d Hz", slider5); ) :
+  uk == 4 ? sprintf(#s, "%.1f dB", slider6) :
+  uk == 5 ? ( slider7 >= 1000 ? sprintf(#s, "%.2f s", slider7/1000) : sprintf(#s, "%d ms", slider7); ) :
+  uk == 6 ? sprintf(#s, "%.1f ms", slider8) :
+  uk == 7 ? sprintf(#s, "%d ms", slider9) :
+  ( slider13 < 0.5 ? strcpy(#s, "OFF") : sprintf(#s, "%d Hz", slider13); );
+  edit_k == uk ? (
+    col(0.03,0.03,0.035); rct(kcx - 42, KNY + 38, 84, 20, 1);
+    col(1.00,0.58,0.12); rct(kcx - 42, KNY + 38, 84, 20, 0);
+    strcpy(#s, #ed); time_precise()*2 % 2 < 1 ? strcat(#s, "_");
+    col(1.00,0.85,0.60);
+  );
+  text_c(kcx, KNY + 48, #s);
+  ui += 1;
+);
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider12 + 0.5);
+draw_btn(842, 377, 46, 24, sz == 0, "75%");
+draw_btn(892, 377, 46, 24, sz == 1, "100%");
+draw_btn(942, 377, 46, 24, sz == 2, "125%");
+draw_btn(992, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50);
+text_l(34, 389, "Double-click: type a value  -  Ctrl-click: default  -  Shift: fine  -  based on Tone Gate by remaincalm.org (GPL)");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = -1;
+  ui = 0; loop(9, (in_circ(kxpos(ui), KNY, 36) || in_rect(kxpos(ui) - 42, KNY + 36, 84, 24)) ? ( drag = kd(ui); ); ui += 1;);
+  edit_k >= 0 && drag != edit_k ? ( edit_k = -1; );
+  (drag >= 0 && (mouse_cap & 4)) ? ( k_def(drag); drag = -1; );
+  drag >= 0 ? (
+    (time_precise() - lc_t < 0.35 && lc_k == drag) ? ( edit_k = drag; strcpy(#ed, ""); drag = -1; lc_k = -1; ) : ( lc_t = time_precise(); lc_k = drag; );
+  );
+  ui = 0; loop(5, in_rect(34 + ui*100, 88, 94, 28) ? ( set_sl(4, ui); ); ui += 1;);
+  in_rect(34, 146, 64, 58) ? ( set_sl(10, 0); );
+  ui = 1; loop(12, in_rect(104 + ((ui - 1) % 6)*70, ui <= 6 ? 146 : 176, 64, 28) ? ( set_sl(10, ui); ); ui += 1;);
+  in_rect(842, 377, 46, 24) ? ( set_sl(12, 0); );
+  in_rect(892, 377, 46, 24) ? ( set_sl(12, 1); );
+  in_rect(942, 377, 46, 24) ? ( set_sl(12, 2); );
+  in_rect(992, 377, 46, 24) ? ( set_sl(12, 3); );
+);
+(mb1 && drag >= 0) ? (
+  fine = (mouse_cap & 8) ? 0.15 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? k_set(drag, k_frac(drag) + dy*0.006);
+);
+!mb1 ? ( drag = -1; );
+// saisie clavier
+edit_k >= 0 ? (
+  while ((ch = gfx_getchar()) > 0) (
+    (ch >= '0' && ch <= '9') || ch == '.' || ch == '-' ? ( strlen(#ed) < 8 ? ( sprintf(#ch1, "%c", ch); strcat(#ed, #ch1); ); ) :
+    ch == 8 ? ( strlen(#ed) > 0 ? strcpy_substr(#ed, #ed, 0, strlen(#ed) - 1); ) :
+    ch == 13 ? ( strlen(#ed) > 0 && match("%f", #ed, ed_v) ? k_type(edit_k, ed_v); edit_k = -1; ) :
+    ch == 27 ? ( edit_k = -1; );
+  );
+);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;
