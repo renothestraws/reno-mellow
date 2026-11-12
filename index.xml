@@ -6,7 +6,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/limiteur FET inspir\u233? du 1176 : ratios 4/8/12/20 et all-buttons, attaque et release ultra-rapides, Punch, Analog, Calib.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1176.jsfx</source>
       </version>
@@ -16,79 +16,79 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/limiteur VCA \u224? RMS vrai inspir\u233? du dbx 160A : OverEasy, ratios jusqu'\u224? -1:1, vum\u232?tres LED.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM160A.jsfx</source>
       </version>
     </reapack>
-    <reapack name="RM1982.jsfx" type="effect" desc="RM1982 - ReNo Mellow 1982 (Dynamic Window Compressor/Expander)">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/expandeur original \u224? fen\u234?tre : signal intact autour du seuil, compression 2/4/20:1 au-dessus, expansion 1:2/1:4/1:8 en dessous, side-chain externe.}]]></description>
-        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
-      </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982.jsfx</source>
-      </version>
-    </reapack>
-    <reapack name="RM1982C.jsfx" type="effect" desc="RM1982C - ReNo Mellow 1982C (Versatile Compressor)">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur polyvalent et transparent : feedforward/feedback, attaque 0,1-50 ms et release 25 ms-3 s avec 3 courbes chacune, auto-release, fen\u234?tre RMS 0-500 ms, knee, side-chain externe avec HPF, make-up, mix, m\u232?tre de r\u233?duction et courbe de transfert.}]]></description>
-        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
-      </metadata>
-      <version name="1.3" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982C.jsfx</source>
-      </version>
-    </reapack>
-    <reapack name="RM1982CL.jsfx" type="effect" desc="RM1982CL - ReNo Mellow 1982CL (Clipper)">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Clipper : seuil, gain d'entr\u233?e, knee de dur \u224? doux, gain de sortie, affichage de la forme d'onde avant/apr\u232?s, HQ.}]]></description>
-        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
-      </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982CL.jsfx</source>
-      </version>
-    </reapack>
-    <reapack name="RM1982DB.jsfx" type="effect" desc="RM1982DB - ReNo Mellow 1982DB (De-Bleeder)">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 D\u233?bleeder : gate/expandeur appliqu\u233? au-dessus d'un crossover r\u233?glable (200 Hz-5 kHz), le grave reste intact ; ratio, range, knee, hold, close, lookahead, side-chain filtr\u233? ou externe.}]]></description>
-        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
-      </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982DB.jsfx</source>
-      </version>
-    </reapack>
-    <reapack name="RM1982DS.jsfx" type="effect" desc="RM1982DS - ReNo Mellow 1982DS (De-Esser)">
+    <reapack name="RM1982De-ess.jsfx" type="effect" desc="RM1982De-ess - ReNo Mellow 1982 (De-Esser)">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 De-esser inspir\u233? du FabFilter Pro-DS : modes Vocal/Allround, Wide/Split, side-chain filtr\u233? ou externe, stereo link (st\u233?r\u233?o/mid/side), lookahead, \u233?coute du side-chain.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982DS.jsfx</source>
+      <version name="1.2" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982De-ess)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982De-ess.jsfx</source>
       </version>
     </reapack>
-    <reapack name="RM1982G.jsfx" type="effect" desc="RM1982G - ReNo Mellow 1982G (Gate / Expander)">
+    <reapack name="RM1982Gate.jsfx" type="effect" desc="RM1982Gate - ReNo Mellow 1982 (Gate / Expander)">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Gate/expandeur inspir\u233? du FabFilter Pro-G : ratio jusqu'\u224? l'infini, range, knee, attack/hold/release, hyst\u233?r\u233?sis (close), lookahead, side-chain filtr\u233? ou externe, audition, mix.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.3" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982G.jsfx</source>
+      <version name="1.4" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982Gate)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982Gate.jsfx</source>
       </version>
     </reapack>
-    <reapack name="RM1982TD.jsfx" type="effect" desc="RM1982TD - ReNo Mellow 1982TD (Transient Designer)">
+    <reapack name="RM1982Transient.jsfx" type="effect" desc="RM1982Transient - ReNo Mellow 1982 (Transient Designer)">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Transient designer : attaque, sustain et pump, speed (fen\u234?tre d'attaque), side-chain, Vintage, clip optionnel.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.3" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982TD.jsfx</source>
+      <version name="1.4" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982Transient)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982Transient.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982clip.jsfx" type="effect" desc="RM1982clip - ReNo Mellow 1982 (Clipper)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Clipper : seuil, gain d'entr\u233?e, knee de dur \u224? doux, gain de sortie, affichage de la forme d'onde avant/apr\u232?s, HQ.}]]></description>
+        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.2" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982clip)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982clip.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982comp.jsfx" type="effect" desc="RM1982comp - ReNo Mellow 1982 (Versatile Compressor)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur polyvalent et transparent : feedforward/feedback, attaque 0,1-50 ms et release 25 ms-3 s avec 3 courbes chacune, auto-release, fen\u234?tre RMS 0-500 ms, knee, side-chain externe avec HPF, make-up, mix, m\u232?tre de r\u233?duction et courbe de transfert.}]]></description>
+        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.4" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982comp)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982comp.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982debleed.jsfx" type="effect" desc="RM1982debleed - ReNo Mellow 1982 (De-Bleeder)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 D\u233?bleeder : gate/expandeur appliqu\u233? au-dessus d'un crossover r\u233?glable (200 Hz-5 kHz), le grave reste intact ; ratio, range, knee, hold, close, lookahead, side-chain filtr\u233? ou externe.}]]></description>
+        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.2" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982debleed)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982debleed.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982dynawindow.jsfx" type="effect" desc="RM1982dynawindow - ReNo Mellow 1982 (Dynamic Window Compressor/Expander)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur/expandeur original \u224? fen\u234?tre : signal intact autour du seuil, compression 2/4/20:1 au-dessus, expansion 1:2/1:4/1:8 en dessous, side-chain externe.}]]></description>
+        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.1" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM1982dynawindow.jsfx</source>
       </version>
     </reapack>
     <reapack name="RM2A.jsfx" type="effect" desc="RM2A - ReNo Mellow 2A (Optical Leveling Amplifier)">
@@ -96,7 +96,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Leveler optique inspir\u233? du LA-2A : cellule T4 mod\u233?lis\u233?e (release en deux temps avec m\u233?moire), modes Compress/Limit, Classic/Vintage.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM2A.jsfx</source>
       </version>
@@ -106,7 +106,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Limiteur/compresseur st\u233?r\u233?o \u224? pont de diodes inspir\u233? du Neve 33609 : sections Limit et Compress, auto-recovery a1/a2, couleur transfos et classe A.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM33609.jsfx</source>
       </version>
@@ -116,7 +116,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Leveler optique transistoris\u233? inspir\u233? du LA-3A : cellule optique rapide, contour HF dans le side-chain, Vintage.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM3A.jsfx</source>
       </version>
@@ -126,7 +126,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Limiteur st\u233?r\u233?o variable-mu \u224? lampes inspir\u233? du Fairchild 670 : 6 constantes de temps, modes Mid/Side, seuil AC/DC, Vintage.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM670.jsfx</source>
       </version>
@@ -136,7 +136,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Dynamiques de tranche inspir\u233?es de la SSL 9000J : compresseur RMS/peak, gate/expandeur avec hold, bypass s\u233?par\u233?s, vum\u232?tre d'entr\u233?e.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RM9000JDYN.jsfx</source>
       </version>
@@ -146,7 +146,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur de caract\u232?re inspir\u233? du Distressor : ratios de 1:1 \u224? Nuke, d\u233?tecteur HP/Band/Link, Dist2/Dist3, Mix, Smooth.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RMEL8.jsfx</source>
       </version>
@@ -156,7 +156,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Compresseur de bus VCA inspir\u233? du compresseur de bus SSL s\u233?rie G : d\u233?tection feedback, Auto release, filtre side-chain, Mix, Modern.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.0" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.0" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Dynamics/RMGbuss.jsfx</source>
       </version>
@@ -168,19 +168,19 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur de pr\u233?ampli classe A inspir\u233? du Neve 1073, avec trois m\u233?diums au lieu d'un : shelfs Baxandall, m\u233?diums \u224? inductance, harmoniques du LINE, phase, EQL.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.5" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.5" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RM1373.jsfx</source>
       </version>
     </reapack>
-    <reapack name="RM1982Q.jsfx" type="effect" desc="RM1982Q - ReNo Mellow 1982Q (Fletcher-Munson Loudness EQ)">
+    <reapack name="RM1982Fletcher.jsfx" type="effect" desc="RM1982Fletcher - ReNo Mellow 1982 (Fletcher-Munson Loudness EQ)">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur original \u224? un seul bouton d'apr\u232?s les courbes d'isosonie de Fletcher-Munson : compensation physiologique ou courbe inverse, \u233?cart limit\u233? \u224? 18 dB, Auto Level, HPF/LPF.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.2" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RM1982Q.jsfx</source>
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982Fletcher)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RM1982Fletcher.jsfx</source>
       </version>
     </reapack>
     <reapack name="RM360.jsfx" type="effect" desc="RM360 - ReNo Mellow 360 (Dual 30-Band Graphic Equaliser)">
@@ -188,7 +188,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur graphique st\u233?r\u233?o 2 x 30 bandes au tiers d'octave inspir\u233? du Klark Teknik DN360 : Q proportionnel, \u233?chelles 6/12 dB, coupe-bas, Link.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.3" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RM360.jsfx</source>
       </version>
@@ -198,7 +198,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur 4 bandes inspir\u233? de l'API 550b : Q proportionnel r\u233?ciproque cal\u233? sur les courbes d'usine, crans de gain, shelf/cloche en HF et LF, couleur ampli discret + transfo.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.1" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RM550b.jsfx</source>
       </version>
@@ -208,7 +208,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Section EQ et filtres d'une tranche inspir\u233?e de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vum\u232?tres LED.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.4" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.4" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RM9000JEQ.jsfx</source>
       </version>
@@ -218,7 +218,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur 4 bandes \u224? l'anglaise inspir\u233? du Chandler Little Devil : shelfs \u224? condensateur, m\u233?diums \u224? inductance avec Q hi/lo, low cut, et une couleur riche et \u233?paisse r\u233?glable (HEAT).}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.3" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RMdevilQ.jsfx</source>
       </version>
@@ -228,7 +228,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur 6 bandes inspir\u233? du Maag EQ4 : cloches larges cal\u233?es sur les relev\u233?s, shelf 2,5 kHz et Air Band (2,5 \u224? 40 kHz) aux aigus soyeux.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.3" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RMeq4.jsfx</source>
       </version>
@@ -238,7 +238,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur passif \u224? lampes inspir\u233? du Pultec EQP-1A : courbes calcul\u233?es par analyse nodale, boost et cut simultan\u233?s (truc Pultec), \u233?tage \u224? lampes bypassable, HPF/LPF, vum\u232?tres LED.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.5" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.5" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RMeqp1A.jsfx</source>
       </version>
@@ -248,7 +248,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur graphique passif 7 bandes inspir\u233? de l'EQ Motown (MotorCity) : commutateurs rotatifs \u177?8 dB par crans de 1 dB, Q proportionnel, gain g\u233?n\u233?ral, transfos.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.2" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.2" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RMtownQ.jsfx</source>
       </version>
@@ -258,7 +258,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?galiseur passif st\u233?r\u233?o \u224? lampes inspir\u233? du Manley Massive Passive (version Mastering) : 2 x 4 bandes \u224? crans, BANDWIDTH qui sculpte les shelfs (courbes Pultec), combinaison parall\u232?le, LP/HP, Link.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.1" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Nom du paramètre HQ en anglais (interface 100 % anglaise)]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/EQ/RMvioletQ.jsfx</source>
       </version>
@@ -270,7 +270,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Basse psycho-acoustique : compl\u232?te ou remplace le grave sous FREQ par des harmoniques qui recr\u233?ent la fondamentale sur les petites enceintes ; intensit\u233?, grave d'origine In/Out, vum\u232?tres.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.1" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Color/RM1982Bass.jsfx</source>
       </version>
@@ -280,7 +280,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?tage de gain de pr\u233?ampli color\u233? : DRIVE (couleur \u224? volume constant) et GAIN propre, 5 couleurs (1073, 512, 610, 4000, 32), VU-m\u232?tres calibrables, cr\u234?te-m\u232?tre, clipper interne, HQ.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.2" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.2" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Color/RM1982Pre.jsfx</source>
       </version>
@@ -290,7 +290,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Simulateur de supports d'enregistrement : cire, disque laqu\u233?, bande 1/4", bande 2" multipiste, num\u233?rique 16 bits et virgule flottante ; drive compens\u233? en sortie, bruit du support, usure des disques, HQ.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.1" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Color/RM1982REC.jsfx</source>
       </version>
@@ -300,41 +300,51 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Couleur de bus de sommation analogique pour master ou sous-groupe : DRIVE (couleur \u224? volume constant) et GAIN propre, 5 couleurs (80, 4000, 2448, 2B, 32) avec diaphonie, glue et saturation, VU-m\u232?tres, clipper interne, HQ.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.1" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.1" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Première version publique]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Color/RM1982Sum.jsfx</source>
       </version>
     </reapack>
   </category>
   <category name="Utility">
-    <reapack name="RM1982GS.jsfx" type="effect" desc="RM1982GS - ReNo Mellow 1982GS (Gain Stage + VU / Peak meters)">
+    <reapack name="RM1982Gain.jsfx" type="effect" desc="RM1982Gain - ReNo Mellow 1982 (Gain Stage + VU / Peak meters)">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 \u201?tage de gain transparent avec VU-m\u232?tre RMS calibrable (balistique VU) et cr\u234?te-m\u232?tre st\u233?r\u233?o, mesure avant ou apr\u232?s le gain, option AES17 +3 dB.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.4" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Bouton AES17 +3 dB ; correctif du maintien de crête]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982GS.jsfx</source>
+      <version name="1.5" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982Gain)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982Gain.jsfx</source>
       </version>
     </reapack>
-    <reapack name="RM1982TG.jsfx" type="effect" desc="RM1982TG - ReNo Mellow 1982TG (Trigger to MIDI)">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Trigger to MIDI : transforme les transitoires audio en notes MIDI (seuil, sensibilit\u233?, masque, v\u233?locit\u233? cr\u234?te/RMS avec 5 courbes, note, canal, dur\u233?e), 6 entr\u233?es de rejet, volume audio.}]]></description>
-        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
-      </metadata>
-      <version name="1.2" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982TG.jsfx</source>
-      </version>
-    </reapack>
-    <reapack name="RM1982TT.jsfx" type="effect" desc="RM1982TT - ReNo Mellow 1982TT (Peak / RMS / Dynamic Range Meter)">
+    <reapack name="RM1982Meter.jsfx" type="effect" desc="RM1982Meter - ReNo Mellow 1982 (Peak / RMS / Dynamic Range Meter)">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 M\u232?tre cr\u234?te / RMS / plage dynamique dans l'esprit du TT Dynamic Range Meter : barres horizontales, DR sur 3 s, corr\u233?lation, seuils de couleur r\u233?glables (peak, RMS, DR), Mono, Link, AES17.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.2" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
-        <changelog><![CDATA[Première version publique]]></changelog>
-        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982TT.jsfx</source>
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982Meter)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982Meter.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982Trig.jsfx" type="effect" desc="RM1982Trig - ReNo Mellow 1982 (Trigger to MIDI)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Trigger to MIDI : transforme les transitoires audio en notes MIDI (seuil, sensibilit\u233?, masque, v\u233?locit\u233? cr\u234?te/RMS avec 5 courbes, note, canal, dur\u233?e), 6 entr\u233?es de rejet, volume audio.}]]></description>
+        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Nouveau nom (anciennement RM1982Trig)]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982Trig.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RM1982gen.jsfx" type="effect" desc="RM1982gen - ReNo Mellow 1982 Tone Gate Generator">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 G\u233?n\u233?rateur d\u233?clench\u233? par l'entr\u233?e (tone gate, d'apr\u232?s Tone Gate de remaincalm.org, GPL) : sinus, carr\u233?, dent de scie (anti-repliement), bruit rose, bruit blanc ; seuil, hold, fade in/out, passe-bas (50 Hz - 15 kHz) et passe-haut (off - 500 Hz) ; Dynamic pitch (\u224? l'ouverture, glissement de Freq vers Freq /4 \u224? x4 en un temps \u233?gal au Fade out) ; saisie des valeurs au clavier (double-clic) ; phase remise \u224? z\u233?ro \u224? chaque d\u233?clenchement ; id\u233?al pour un sub sous un kick ou une tonalit\u233? sous une snare.}]]></description>
+        <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
+      </metadata>
+      <version name="1.3" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
+        <changelog><![CDATA[Passe-bas de 50 Hz à 15 kHz ; nouveau passe-haut (off à 500 Hz) sur le générateur]]></changelog>
+        <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Utility/RM1982gen.jsfx</source>
       </version>
     </reapack>
   </category>
@@ -344,7 +354,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Bo\u238?te \u224? rythmes / lecteur d'\u233?chantillons 16 pads (esprit 808, 909, Linn, Akai) : 4 kits fournis (Doves, IWDwS, Vogue, Monday), Load/Save kit, glisser-d\u233?poser de WAV/OGG, notes MIDI r\u233?glables, d\u233?clenchement MIDI, CV (entr\u233?es audio 1-6) et step s\u233?quenceur 16 pas par pad avec 8 motifs (A-H, notes 101-108), accent, ghost, d\u233?coupe des pas, swing, play style push/laid back, half/double time ; choke des hi-hats, anti machine gun, couches, 8 sorties, sortie MIDI.}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.7" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.7" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Kits Doves (défaut), IWDwS, Vogue, Monday ; LOAD / SAVE KIT ; 8 motifs A-H (notes 101-108) ; note MIDI de chaque pad réglable (1-100) ; PLAY STYLE push / normal / laid back ; accent ramené à +3 dB ; swing par défaut sur 9-13 et 16 ; fichier de noms de notes pour l'éditeur MIDI]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Instruments/RMdrumachine.jsfx</source>
         <source type="data" file="RMdrumachine/Doves/01_kick.ogg">https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Instruments/RMdrumachine/Doves/01_kick.ogg</source>
@@ -420,7 +430,7 @@
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}}\f0\fs20 Lecteur d'\u233?chantillon one-shot intelligent (snare et kick) : un seul sample = la frappe de r\u233?f\u233?rence \u224? v\u233?locit\u233? 100 ; niveau, timbre (f\u251?t / clic de batte), r\u233?sonance, attaque et pitch recalcul\u233?s selon la v\u233?locit\u233? d'apr\u232?s un mod\u232?le cal\u233? sur des s\u233?ries r\u233?elles de 12 v\u233?locit\u233?s ; variations al\u233?atoires (pas d'effet mitraillette), roulements rapides et alternance des mains, \u233?touffement du coup pr\u233?c\u233?dent ; volume, pitch, ADSR, dynamic range ; glisser-d\u233?poser WAV/OGG (mono, st\u233?r\u233?o ou multicanal).}]]></description>
         <link rel="website" href="https://github.com/renothestraws/reno-mellow">GitHub</link>
       </metadata>
-      <version name="1.7" author="ReNo Mellow" time="2026-11-11T22:25:06Z">
+      <version name="1.7" author="ReNo Mellow" time="2026-11-12T19:44:56Z">
         <changelog><![CDATA[Attack size passe en millisecondes (5 à 80 ms, 20 par défaut) : durée de la zone d'attaque traitée par le transitoire interne et de la rampe d'adoucissement des coups doux]]></changelog>
         <source>https://raw.githubusercontent.com/renothestraws/reno-mellow/main/Instruments/RMoneshot.jsfx</source>
       </version>

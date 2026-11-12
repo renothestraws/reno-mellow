@@ -15,13 +15,13 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM670** | Limiteur stéréo variable-mu à lampes (inspiré du Fairchild 670) |
 | **RM9000JDYN** | Dynamiques de tranche (inspirées de la SSL 9000J) |
 | **RM33609** | Limiteur/compresseur à pont de diodes (inspiré du Neve 33609) |
-| **RM1982** | Compresseur/expandeur original « à fenêtre » |
-| **RM1982C** | Compresseur polyvalent et transparent (FF/FB, 3 courbes d'attaque et de release, RMS, side-chain) |
-| **RM1982CL** | Clipper |
-| **RM1982G** | Gate / expandeur (inspiré du FabFilter Pro-G) |
-| **RM1982DB** | Débleeder : gate/expandeur au-dessus d'un crossover |
-| **RM1982DS** | De-esser (inspiré du FabFilter Pro-DS) |
-| **RM1982TD** | Transient designer |
+| **RM1982dynawindow** | Compresseur/expandeur original « à fenêtre » |
+| **RM1982comp** | Compresseur polyvalent et transparent (FF/FB, 3 courbes d'attaque et de release, RMS, side-chain) |
+| **RM1982clip** | Clipper |
+| **RM1982Gate** | Gate / expandeur (inspiré du FabFilter Pro-G) |
+| **RM1982debleed** | Débleeder : gate/expandeur au-dessus d'un crossover |
+| **RM1982De-ess** | De-esser (inspiré du FabFilter Pro-DS) |
+| **RM1982Transient** | Transient designer |
 
 ## Égaliseurs
 
@@ -36,7 +36,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RMvioletQ** | Égaliseur passif stéréo de mastering (inspiré du Manley Massive Passive Mastering) |
 | **RMdevilQ** | Égaliseur 4 bandes très coloré (inspiré du Chandler Little Devil) |
 | **RMtownQ** | Égaliseur graphique passif 7 bandes (inspiré de l'EQ Motown) |
-| **RM1982Q** | Égaliseur original à un bouton (courbes de Fletcher-Munson) |
+| **RM1982Fletcher** | Égaliseur original à un bouton (courbes de Fletcher-Munson) |
 
 ## Couleur
 
@@ -58,13 +58,14 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 
 | Plugin | Description |
 |---|---|
-| **RM1982GS** | Étage de gain avec VU-mètre RMS calibrable et crête-mètre |
-| **RM1982TG** | Trigger to MIDI (transitoires audio -> notes MIDI) |
-| **RM1982TT** | Mètre crête / RMS / plage dynamique avec seuils de couleur réglables |
+| **RM1982Gain** | Étage de gain avec VU-mètre RMS calibrable et crête-mètre |
+| **RM1982Trig** | Trigger to MIDI (transitoires audio -> notes MIDI) |
+| **RM1982Meter** | Mètre crête / RMS / plage dynamique avec seuils de couleur réglables |
+| **RM1982gen** | Tone gate : générateur (sinus, carré, scie, bruit rose / blanc) déclenché par l'entrée, avec glissement de pitch |
 
 Points communs : calibration 0 VU = +4 dBu = −18 dBFS, trim CALIB compensé en sortie,
 interface redimensionnable (75 / 100 / 125 / 150 %), interface en anglais.
-Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982C, RM1982GS, RM1982TT et RM1982REC,
+Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982comp, RM1982Gain, RM1982Meter et RM1982REC,
 qui restent sans clipper interne).
 Égaliseurs : aucune latence par défaut, bouton HQ (suréchantillonnage x2, 46 échantillons de latence).
 
