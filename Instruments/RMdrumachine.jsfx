@@ -1,8 +1,8 @@
 desc:RMdrumachine - ReNo Mellow Drum Machine (16-pad sample player + step sequencer)
 //tags: drum machine sampler sequencer step 808 909 linn mpc trigger midi
 //@author ReNo Mellow
-//@version 1.7
-//@changelog Kits Doves (défaut), IWDwS, Vogue, Monday ; LOAD / SAVE KIT ; 8 motifs A-H (notes 101-108) ; note MIDI de chaque pad réglable (1-100) ; PLAY STYLE push / normal / laid back ; accent ramené à +3 dB ; swing par défaut sur 9-13 et 16 ; fichier de noms de notes pour l'éditeur MIDI
+//@version 1.8
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Boîte à rythmes / lecteur d'échantillons 16 pads (esprit 808, 909, Linn, Akai) : 4 kits fournis (Doves, IWDwS, Vogue, Monday), Load/Save kit, glisser-déposer de WAV/OGG, notes MIDI réglables, déclenchement MIDI, CV (entrées audio 1-6) et step séquenceur 16 pas par pad avec 8 motifs (A-H, notes 101-108), accent, ghost, découpe des pas, swing, play style push/laid back, half/double time ; choke des hi-hats, anti machine gun, couches, 8 sorties, sortie MIDI.
 //
 // ---------------------------------------------------------------------------
@@ -120,6 +120,7 @@ slider61:100<0,100,0.1>-Pad 13 Maracas Decay (%)
 slider62:100<0,100,0.1>-Pad 14 Misc 14 Decay (%)
 slider63:100<0,100,0.1>-Pad 15 Misc 15 Decay (%)
 slider64:100<0,100,0.1>-Pad 16 Misc 16 Decay (%)
+slider65:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:CV 1 (Kick)
 in_pin:CV 2 (Snare)
@@ -420,7 +421,7 @@ function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
 function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 (
   col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
-  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(thc0r,thc0g,thc0b); arc(cx, cy, r + 9, fz, frac, 4);
   col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
   i = 0;
   loop(10,
@@ -439,10 +440,10 @@ function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  on ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
   rct(x,y,w,h,1);
   col(0.03,0.03,0.035); rct(x,y,w,h,0);
-  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  on ? col(thc5r,thc5g,thc5b) : col(0.72,0.73,0.76);
   text_c(x + w*0.5, y + h*0.5, str);
 );
 function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
@@ -733,6 +734,16 @@ spl6 = min(max(OUTB[6], -1), 1); spl7 = min(max(OUTB[7], -1), 1);
 sc_ += 1;
 
 @gfx 1060 620
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider65
+slider65 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc1r = 0.6; thc1g = 0.92; thc1b = 0.86;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+);
 S  = 0.75 + 0.25*floor(size_ + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 620*S)/2));
@@ -771,19 +782,19 @@ col(0.04,0.04,0.045); rct(6,564,1048,2,1);
 col(0.06,0.06,0.065);
 gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(552), 4*S, 1, 1);
 gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(552), 4*S, 1, 1);
-gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RMdrumachine");
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RMdrumachine"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RMdrumachine", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(268, 38, "DRUM  MACHINE");
 gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
 setpat();
 // ---- Kit ----------------------------------------------------------------------------------
 gfx_setfont(6); col(0.62,0.63,0.66); text_r(512, 36, "KIT");
 col(0.03,0.03,0.035); rct(520, 24, 150, 24, 1);
-gfx_setfont(1); col(1.00,0.70,0.35);
+gfx_setfont(1); col(thc1r,thc1g,thc1b);
 cur_kit < NFK ? strcpy(#s, 520 + cur_kit) : sprintf(#s, "USER %d", cur_kit - NFK + 1);
 text_c(595, 36, #s);
 draw_btn(676, 24, 82, 24, 0, "LOAD KIT");
 draw_btn(762, 24, 82, 24, 0, "SAVE KIT");
-col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+col(thc0r,thc0g,thc0b); rct(34, 56, 992, 2, 1);
 
 // ---- Pads ----------------------------------------------------------------------------------
 ui = 0;
@@ -791,20 +802,20 @@ loop(16,
   px_ = 34 + (ui % 4)*94; py_ = 74 + floor(ui/4)*84;
   fl_ = P_FL[ui];
   col(0.16 + 0.84*fl_*0.9, 0.165 + 0.42*fl_, 0.18 - 0.06*fl_); rct(px_, py_, 86, 76, 1);
-  ui == sel ? ( col(1.00,0.58,0.12); rct(px_, py_, 86, 76, 0); rct(px_ + 1, py_ + 1, 84, 74, 0); )
+  ui == sel ? ( col(thc0r,thc0g,thc0b); rct(px_, py_, 86, 76, 0); rct(px_ + 1, py_ + 1, 84, 74, 0); )
             : ( col(0.03,0.03,0.035); rct(px_, py_, 86, 76, 0); );
-  gfx_setfont(6); fl_ > 0.5 ? col(0.10,0.06,0.02) : col(0.55,0.56,0.60);
+  gfx_setfont(6); fl_ > 0.5 ? col(thc5r,thc5g,thc5b) : col(0.55,0.56,0.60);
   sprintf(#s, "%d", ui + 1); text_l(px_ + 6, py_ + 10, #s);
   sprintf(#s, "%d", P_NOTE[ui]); text_r(px_ + 80, py_ + 10, #s);
-  gfx_setfont(1); fl_ > 0.5 ? col(0.10,0.06,0.02) : col(0.90,0.91,0.93);
+  gfx_setfont(1); fl_ > 0.5 ? col(thc5r,thc5g,thc5b) : col(0.90,0.91,0.93);
   text_c(px_ + 43, py_ + 36, 400 + ui);
-  gfx_setfont(7); fl_ > 0.5 ? col(0.20,0.12,0.04) : (P_USER[ui] ? col(1.00,0.70,0.35) : col(0.50,0.51,0.55));
+  gfx_setfont(7); fl_ > 0.5 ? col(0.20,0.12,0.04) : (P_USER[ui] ? col(thc1r,thc1g,thc1b) : col(0.50,0.51,0.55));
   strcpy_substr(#sn, 300 + ui, 0, 14); text_c(px_ + 43, py_ + 56, #sn);
   // mute / solo / motif
   P_MUTE[ui] ? ( col(0.85,0.25,0.20); rct(px_ + 6, py_ + 64, 14, 8, 1); );
   P_SOLO[ui] ? ( col(0.98,0.84,0.22); rct(px_ + 22, py_ + 64, 14, 8, 1); );
   hs_ = 0; k_ = 0; loop(16, (SUBNc[ui*16 + k_] > 1 ? (SUBVc[(ui*16 + k_)*8] || SUBVc[(ui*16 + k_)*8 + 1] || SUBVc[(ui*16 + k_)*8 + 2] || SUBVc[(ui*16 + k_)*8 + 3] || SUBVc[(ui*16 + k_)*8 + 4] || SUBVc[(ui*16 + k_)*8 + 5] || SUBVc[(ui*16 + k_)*8 + 6] || SUBVc[(ui*16 + k_)*8 + 7]) : PATc[ui*16 + k_]) ? (hs_ = 1); k_ += 1;);
-  hs_ ? ( col(1.00,0.58,0.12); gfx_circle(PX(px_ + 78), PY(py_ + 68), 3*S, 1, 1); );
+  hs_ ? ( col(thc0r,thc0g,thc0b); gfx_circle(PX(px_ + 78), PY(py_ + 68), 3*S, 1, 1); );
   ui += 1;
 );
 gfx_setfont(7); col(0.45,0.47,0.52);
@@ -813,20 +824,20 @@ text_l(34, 412, "click: select + play  -  drop audio files on a pad  -  right-cl
 // ---- Pad sélectionné -------------------------------------------------------------------
 col(0.03,0.03,0.035); rct(420, 70, 606, 186, 1);
 col(0.055,0.06,0.07); rct(422, 72, 602, 182, 1);
-gfx_setfont(4); col(1.00,0.58,0.12); sprintf(#s, "PAD %d", sel + 1); text_l(436, 90, #s);
+gfx_setfont(4); col(thc0r,thc0g,thc0b); sprintf(#s, "PAD %d", sel + 1); text_l(436, 90, #s);
 col(0.92,0.93,0.95); text_l(500, 90, 400 + sel);
 gfx_setfont(7); col(0.55,0.56,0.60);
 gfx_setfont(6); col(0.62,0.63,0.66); text_r(706, 90, "MIDI NOTE");
 col(0.03,0.03,0.035); rct(712, 80, 44, 20, 1);
-gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%d", P_NOTE[sel]); text_c(734, 90, #s);
+gfx_setfont(1); col(thc1r,thc1g,thc1b); sprintf(#s, "%d", P_NOTE[sel]); text_c(734, 90, #s);
 gfx_setfont(7); col(0.45,0.47,0.52); text_l(762, 90, "drag: 1-100");
-P_USER[sel] ? col(1.00,0.70,0.35) : col(0.55,0.56,0.60);
+P_USER[sel] ? col(thc1r,thc1g,thc1b) : col(0.55,0.56,0.60);
 strcpy(#s, "sample : "); strcat(#s, 300 + sel); text_l(436, 108, #s);
 sknob(470, 178, (slider(1 + sel) + 60)/66, 60/66, "VOLUME");
 sknob(560, 178, (slider(17 + sel) + 100)/200, 0.5, "PAN");
 sknob(650, 178, (slider(33 + sel) + 12)/24, 0.5, "TUNE");
 sknob(740, 178, slider(49 + sel)/100, 0, "DECAY");
-gfx_setfont(1); col(1.00,0.70,0.35);
+gfx_setfont(1); col(thc1r,thc1g,thc1b);
 slider(1 + sel) <= -59.9 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", slider(1 + sel)); text_c(470, 224, #s);
 pv_ = slider(17 + sel); pv_ == 0 ? strcpy(#s, "C") : pv_ < 0 ? sprintf(#s, "%d L", -pv_) : sprintf(#s, "%d R", pv_); text_c(560, 224, #s);
 sprintf(#s, "%+.1f st", slider(33 + sel)); text_c(650, 224, #s);
@@ -859,7 +870,7 @@ draw_btn(544, 392, 68, 24, midi_out, "MIDI OUT");
 sknob(672, 340, (swing + 100)/200, 0.5, "SWING");
 sknob(752, 340, (cvthr + 60)/54, 0, "CV THR");
 sknob(832, 340, (master + 60)/72, 60/72, "MASTER");
-gfx_setfont(1); col(1.00,0.70,0.35);
+gfx_setfont(1); col(thc1r,thc1g,thc1b);
 sprintf(#s, "%+.0f %%", swing); text_c(672, 386, #s);
 sprintf(#s, "%.0f dB", cvthr); text_c(752, 386, #s);
 master <= -59.9 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", master); text_c(832, 386, #s);
@@ -882,7 +893,7 @@ gfx_setfont(7); col(0.45,0.47,0.52); text_c(948, 404, "snare / clap / pad 15");
 
 // ---- Séquenceur ----------------------------------------------------------------------------
 gfx_setfont(4); col(0.92,0.93,0.95); sprintf(#s, "STEPS  -  PAD %d  ", sel + 1); text_l(34, 440, #s);
-gfx_measurestr(#s, sw_, sh_); col(1.00,0.58,0.12); text_l(34 + sw_/S, 440, 400 + sel);
+gfx_measurestr(#s, sw_, sh_); col(thc0r,thc0g,thc0b); text_l(34 + sw_/S, 440, 400 + sel);
 gfx_setfont(6); col(0.62,0.63,0.66); text_r(560, 441, "PATTERN");
 gfx_setfont(1);
 ui = 0;
@@ -907,7 +918,7 @@ loop(16,
     sv_ == 2 ? col(1.00,0.30,0.20) : col(0.16,0.165,0.18); rct(cx_, 460, cw_, 14, 1);
     col(0.03,0.03,0.035); rct(cx_, 460, cw_, 14, 0);
     // pas / sous-pas
-    sv_ > 0 ? ( sv_ == 3 ? col(0.55,0.36,0.14) : col(1.00,0.58,0.12); ) : col(0.16,0.165,0.18);
+    sv_ > 0 ? ( sv_ == 3 ? col(0.55,0.36,0.14) : col(thc0r,thc0g,thc0b); ) : col(0.16,0.165,0.18);
     rct(cx_, 478, cw_, 44, 1);
     col(0.03,0.03,0.035); rct(cx_, 478, cw_, 44, 0);
     // ghost
@@ -1049,3 +1060,12 @@ mb1 = mouse_cap & 1; mb2 = mouse_cap & 2;
 !mb1 ? (drag = 0);
 last_mb = mb1; last_mb2 = mb2;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider65 = slider65 >= 0.5 ? 0 : 1; sliderchange(slider65); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

@@ -17,6 +17,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM33609** | Limiteur/compresseur à pont de diodes (inspiré du Neve 33609) |
 | **RM1982dynawindow** | Compresseur/expandeur original « à fenêtre » |
 | **RM1982comp** | Compresseur polyvalent et transparent (FF/FB, 3 courbes d'attaque et de release, RMS, side-chain) |
+| **RMMultidyn** | Compresseur / expandeur multibande transparent (6 bandes, crossovers 6-48 dB/oct, Mid/Side, side-chain 3/4 et 5/6, sorties séparées, analyseur) |
 | **RM1982clip** | Clipper |
 | **RM1982Gate** | Gate / expandeur (inspiré du FabFilter Pro-G) |
 | **RM1982debleed** | Débleeder : gate/expandeur au-dessus d'un crossover |
@@ -37,6 +38,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RMdevilQ** | Égaliseur 4 bandes très coloré (inspiré du Chandler Little Devil) |
 | **RMtownQ** | Égaliseur graphique passif 7 bandes (inspiré de l'EQ Motown) |
 | **RM1982Fletcher** | Égaliseur original à un bouton (courbes de Fletcher-Munson) |
+| **RMcleanEQ** | EQ précise et transparente inspirée du Pro-Q 3 : 10 bandes, cuts jusqu'à 96 dB/oct, Mid/Side, solo, analyseur |
 
 ## Couleur
 
@@ -67,7 +69,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 
 Points communs : calibration 0 VU = +4 dBu = −18 dBFS, trim CALIB compensé en sortie,
 interface redimensionnable (75 / 100 / 125 / 150 %), interface en anglais.
-Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982comp, RM1982Gain, RM1982Meter et RM1982REC,
+Écrêteur de sécurité invisible à 0 dBFS sur les clones (pas sur RM1982comp, RMMultidyn, RM1982Gain, RM1982Meter et RM1982REC,
 qui restent sans clipper interne).
 Égaliseurs : aucune latence par défaut, bouton HQ (suréchantillonnage x2, 46 échantillons de latence).
 
@@ -99,3 +101,5 @@ Maag, Klark Teknik, API, Manley, Massive Passive, Chandler, Little Devil, Motown
 FabFilter, Pro-G, Pro-DS)
 appartiennent à leurs propriétaires respectifs et servent uniquement à décrire l'inspiration
 des plugins. ReNo Mellow n'est affilié à aucune de ces marques.
+
+**Couleur de l'interface :** sur tous les plug-ins dont l'interface a un accent orange, un double-clic sur le nom du plug-in bascule entre orange et vert (réglage mémorisé dans le projet, par instance).

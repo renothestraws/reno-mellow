@@ -1,8 +1,8 @@
 desc:RM1982gen - ReNo Mellow 1982 Tone Gate Generator
 //tags: generator gate tone sub kick noise
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Passe-bas de 50 Hz à 15 kHz ; nouveau passe-haut (off à 500 Hz) sur le générateur
+//@version 1.4
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Générateur déclenché par l'entrée (tone gate, d'après Tone Gate de remaincalm.org, GPL) : sinus, carré, dent de scie (anti-repliement), bruit rose, bruit blanc ; seuil, hold, fade in/out, passe-bas (50 Hz - 15 kHz) et passe-haut (off - 500 Hz) ; Dynamic pitch (à l'ouverture, glissement de Freq vers Freq /4 à x4 en un temps égal au Fade out) ; saisie des valeurs au clavier (double-clic) ; phase remise à zéro à chaque déclenchement ; idéal pour un sub sous un kick ou une tonalité sous une snare.
 //
 // ---------------------------------------------------------------------------
@@ -45,6 +45,7 @@ slider9:100<1,1000,1>-Fade Out (ms)
 slider10:0<0,12,1{Normal,Div 1.18,Div 1.5,Div 2,Div 2.3,Div 3,Div 4,Mult 1.18,Mult 1.5,Mult 2,Mult 2.3,Mult 3,Mult 4}>-Dynamic Pitch
 slider12:1<0,3,1{75%,100%,125%,150%}>-Size
 slider13:0<0,500,1>-Highpass (Hz, 0 = off)
+slider14:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -96,7 +97,7 @@ function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
 function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 (
   col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
-  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(thc0r,thc0g,thc0b); arc(cx, cy, r + 9, fz, frac, 4);
   col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
   i = 0;
   loop(10,
@@ -114,10 +115,10 @@ function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  on ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
   rct(x,y,w,h,1);
   col(0.03,0.03,0.035); rct(x,y,w,h,0);
-  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  on ? col(thc5r,thc5g,thc5b) : col(0.72,0.73,0.76);
   text_c(x + w*0.5, y + h*0.5, str);
 );
 function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
@@ -268,6 +269,18 @@ pd1 = max(abs(spl1), pd1*0.99985);
 gate_disp = env;
 
 @gfx 1060 412
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider14
+slider14 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc1r = 0.6; thc1g = 0.92; thc1b = 0.86;
+  thc3r = 0.8; thc3g = 0.97; thc3b = 0.93;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
+  thc3r = 1.0; thc3g = 0.85; thc3b = 0.6;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+);
 S  = 0.75 + 0.25*floor(slider12 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
@@ -292,10 +305,10 @@ col(0.04,0.04,0.045); rct(6,364,1048,2,1);
 col(0.06,0.06,0.065);
 gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(352), 4*S, 1, 1);
 gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
-gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982gen");
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RM1982gen"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982gen", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(206, 38, "TONE  GATE  GENERATOR");
 gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
-col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+col(thc0r,thc0g,thc0b); rct(34, 56, 992, 2, 1);
 
 // ---- Forme d'onde ------------------------------------------------------------------
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(34, 76, "WAVEFORM");
@@ -331,14 +344,14 @@ udb = lin2db(pdi); uf = min(max((udb + 80)/80, 0), 1);
 col(0.16,0.165,0.18); rct(612, 98, 276, 14, 1);
 uf > 0.003 ? ( col(0.30,0.75,0.35); rct(612, 98, 276*uf, 14, 1); );
 ut = (slider6 + 80)/80;
-col(1.00,0.58,0.12); rct(612 + 276*ut - 1, 94, 3, 22, 1);
+col(thc0r,thc0g,thc0b); rct(612 + 276*ut - 1, 94, 3, 22, 1);
 gfx_setfont(6); col(0.55,0.56,0.60);
 text_l(612, 124, "-80"); text_c(612 + 138, 124, "-40"); text_r(888, 124, "0 dBFS");
 // LED gate + fréquence courante
 draw_led(624, 156, 8, min(gate_disp*1.2, 1));
 gfx_setfont(4); col(0.92,0.93,0.95); text_l(640, 156, "GATE");
 gfx_setfont(6); col(0.55,0.56,0.60); text_l(740, 148, "GENERATOR");
-gfx_setfont(7); col(1.00,0.70,0.35);
+gfx_setfont(7); col(thc1r,thc1g,thc1b);
 wf_ui >= 3 ? strcpy(#s, "NOISE") : sprintf(#s, "%.1f Hz", gate_disp > 0.001 ? cur_f : slider3);
 text_l(740, 168, #s);
 gfx_setfont(6); col(0.55,0.56,0.60);
@@ -353,7 +366,7 @@ loop(2,
   uf = min(max((udb + 60)/60, 0), 1);
   col(0.03,0.03,0.035); rct(930 + ui*22, 88, 16, 200, 1);
   uf > 0.003 ? ( col(0.30,0.75,0.35); rct(932 + ui*22, 88 + 198*(1 - min(uf, 0.8)), 12, 198*min(uf, 0.8), 1); );
-  uf > 0.8 ? ( col(1.00,0.58,0.12); rct(932 + ui*22, 88 + 198*(1 - min(uf, 0.95)), 12, 198*(min(uf, 0.95) - 0.8), 1); );
+  uf > 0.8 ? ( col(thc0r,thc0g,thc0b); rct(932 + ui*22, 88 + 198*(1 - min(uf, 0.95)), 12, 198*(min(uf, 0.95) - 0.8), 1); );
   uf > 0.95 ? ( col(1.00,0.25,0.18); rct(932 + ui*22, 90, 12, 198*(uf - 0.95), 1); );
   ui += 1;
 );
@@ -380,7 +393,7 @@ loop(9,
   uk == 0 ? strcpy(#s, "WET") : uk == 1 ? strcpy(#s, "DRY") : uk == 2 ? strcpy(#s, "FREQ") : uk == 3 ? strcpy(#s, "LOWPASS") :
   uk == 4 ? strcpy(#s, "THRESHOLD") : uk == 5 ? strcpy(#s, "HOLD") : uk == 6 ? strcpy(#s, "FADE IN") : uk == 7 ? strcpy(#s, "FADE OUT") : strcpy(#s, "HIGHPASS");
   text_c(kcx, KNY - 52, #s);
-  gfx_setfont(1); col(1.00,0.70,0.35);
+  gfx_setfont(1); col(thc1r,thc1g,thc1b);
   uk == 0 ? ( slider1 <= -119.95 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", slider1); ) :
   uk == 1 ? ( slider2 <= -119.95 ? strcpy(#s, "-inf") : sprintf(#s, "%+.1f dB", slider2); ) :
   uk == 2 ? sprintf(#s, "%.1f Hz", slider3) :
@@ -392,9 +405,9 @@ loop(9,
   ( slider13 < 0.5 ? strcpy(#s, "OFF") : sprintf(#s, "%d Hz", slider13); );
   edit_k == uk ? (
     col(0.03,0.03,0.035); rct(kcx - 42, KNY + 38, 84, 20, 1);
-    col(1.00,0.58,0.12); rct(kcx - 42, KNY + 38, 84, 20, 0);
+    col(thc0r,thc0g,thc0b); rct(kcx - 42, KNY + 38, 84, 20, 0);
     strcpy(#s, #ed); time_precise()*2 % 2 < 1 ? strcat(#s, "_");
-    col(1.00,0.85,0.60);
+    col(thc3r,thc3g,thc3b);
   );
   text_c(kcx, KNY + 48, #s);
   ui += 1;
@@ -446,3 +459,12 @@ edit_k >= 0 ? (
 );
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider14 = slider14 >= 0.5 ? 0 : 1; sliderchange(slider14); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;
