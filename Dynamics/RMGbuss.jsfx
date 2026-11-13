@@ -1,8 +1,8 @@
 desc:RMGbuss - ReNo Mellow G Buss (VCA Bus Compressor)
 //tags: dynamics compressor bus VCA SSL G
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Compresseur de bus VCA inspiré du compresseur de bus SSL série G : détection feedback, Auto release, filtre side-chain, Mix, Modern.
 //
 // ---------------------------------------------------------------------------
@@ -58,6 +58,7 @@ slider9:0<0,1,1{Off,On}>-Analog
 slider10:0<0,1,1{Off,On}>-Modern
 slider11:0<0,500,1>-SC Filter (Hz)
 slider12:100<0,100,0.1>-Mix (%)
+slider13:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -217,7 +218,7 @@ function dot(cx,cy,rad,deg) ( ang_pt(cx,cy,rad,deg); gfx_circle(PX(kx), PY(ky), 
 function lbl(cx,cy,rad,deg,s) ( ang_pt(cx,cy,rad,deg); text_c(kx,ky,s); );
 function draw_btn(x,y,w,h,on,s)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -318,6 +319,12 @@ m = comp_in ? cv : 0;
 gr_a = m + vu_c*(gr_a - m);  gr_b = gr_a + vu_c*(gr_b - gr_a);
 
 @gfx 360 760
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider13
+slider13 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider7 + 0.5);
 ox = max(0, floor((gfx_w - 360*S)/2));
 oy = max(0, floor((gfx_h - 760*S)/2));
@@ -338,7 +345,7 @@ rl = floor(slider4 + 0.5);
 col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
 col(0.20,0.20,0.21);  rct(6,6,348,748,1);
 col(0.08,0.08,0.08);  rct(6,6,348,30,1);
-gfx_setfont(2); col(0.93,0.62,0.22); text_l(16, 21, "RMGbuss");
+gfx_setfont(2); col(thc6r,thc6g,thc6b); text_l(16, 21, "RMGbuss"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RMGbuss", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.72,0.69,0.63); text_l(120, 22, "RENO MELLOW  -  VCA BUSS COMPRESSOR");
 col(0.62,0.62,0.62); rct(16,44,328,662,0);
 screw(30, 58); screw(330, 58); screw(30, 692); screw(330, 692);
@@ -567,3 +574,12 @@ md = mouse_cap & 1;
 !md ? (drag = 0);
 last_md = md;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider13 = slider13 >= 0.5 ? 0 : 1; sliderchange(slider13); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

@@ -1,8 +1,8 @@
 desc:RM9000JDYN - ReNo Mellow 9000J Channel Dynamics
 //tags: dynamics compressor gate expander VCA SSL 9000J channel strip
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Dynamiques de tranche inspirées de la SSL 9000J : compresseur RMS/peak, gate/expandeur avec hold, bypass séparés, vumètre d'entrée.
 //
 // ---------------------------------------------------------------------------
@@ -63,6 +63,7 @@ slider16:0<-12,12,0.1>-Calib (dB)
 slider17:1<0,1,1{Bypass,In}>-Comp In
 slider18:1<0,1,1{Bypass,In}>-Gate In
 slider19:0<-12,12,0.1>-Out (dB)
+slider20:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -243,7 +244,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -263,7 +264,7 @@ function sq_btn(cx,cy,w,on)
 );
 function draw_btn(x,y,w,h,on,s)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -343,6 +344,12 @@ m = max(ggl, ggr); gm = m > gm ? m : m + c_led*(gm - m);
 in_m = 10*log10(max(in_p, 0.00000000000000000001)) + REF_DB;
 
 @gfx 320 760
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider20
+slider20 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 320*S)/2));
 oy = max(0, floor((gfx_h - 760*S)/2));
@@ -361,8 +368,8 @@ col(0.30,0.30,0.31);  rct(6,6,308,748,1);
 j = 0; col(0.33,0.33,0.34);
 loop(60, ln(8, 40 + j*11, 312, 40 + j*11); j += 1;);
 col(0.08,0.08,0.08);  rct(6,6,308,32,1);
-gfx_setfont(2); col(0.95,0.95,0.95); text_l(16, 22, "RM");
-col(0.93,0.62,0.22); text_l(56, 22, "9000J");
+gfx_setfont(2); col(0.95,0.95,0.95); text_l(16, 22, "RM"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM", th_w, th_h); th_x0 = th_x1 - th_w;
+col(thc6r,thc6g,thc6b); text_l(56, 22, "9000J");
 gfx_setfont(5); col(0.95,0.95,0.95); text_l(200, 22, "DYN");
 col(0.06,0.06,0.06); gfx_circle(PX(160), PY(22), 8*S, 1, 1);
 
@@ -579,3 +586,12 @@ md = mouse_cap & 1;
 !md ? (drag = 0);
 last_md = md;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider20 = slider20 >= 0.5 ? 0 : 1; sliderchange(slider20); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

@@ -1,8 +1,8 @@
 desc:RM1982Fletcher - ReNo Mellow 1982 (Fletcher-Munson Loudness EQ)
 //tags: equalizer EQ loudness fletcher-munson contour one-knob
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Nouveau nom (anciennement RM1982Fletcher)
+//@version 1.4
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Égaliseur original à un seul bouton d'après les courbes d'isosonie de Fletcher-Munson : compensation physiologique ou courbe inverse, écart limité à 18 dB, Auto Level, HPF/LPF.
 //
 // ---------------------------------------------------------------------------
@@ -37,6 +37,7 @@ slider6:1<0,3,1{75%,100%,125%,150%}>-Size
 slider7:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 slider8:0<0,200,1>-HPF (Hz, 0 = Off)
 slider9:20000<5000,20000,1>-LPF (Hz, 20000 = Off)
+slider10:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -250,7 +251,7 @@ function plot(a, r, g, b, w, fl) local(i, f, x0, y0, x1, y1)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(0.98,0.70,0.22) : col(0.17,0.18,0.21);
+  on ? col(thc9r,thc9g,thc9b) : col(0.17,0.18,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.05); rct(x,y,w,h,0);
   on ? col(0.12,0.07,0.02) : col(0.80,0.82,0.86);
@@ -261,7 +262,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t, a)
   a = -135 + 270*frac;
   col(0.07,0.07,0.08); disc(cx, cy, r);
   col(0.38,0.40,0.45); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.98,0.70,0.22);
+  col(thc9r,thc9g,thc9b);
   apt(cx,cy,r*0.15,a); x1 = kx; y1 = ky; apt(cx,cy,r*0.8,a);
   t = 0; loop(max(1, ceil(1.5*S)), gfx_line(PX(x1)+t, PY(y1), PX(kx)+t, PY(ky), 1); t += 1;);
 );
@@ -308,6 +309,12 @@ spl0 = min(max(yl*calib_c*out_g, -1), 1);
 spl1 = min(max(yr*calib_c*out_g, -1), 1);
 
 @gfx 720 520
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider10
+slider10 >= 0.5 ? (
+  thc9r = 0.45; thc9g = 0.86; thc9b = 0.78;
+) : (
+  thc9r = 0.98; thc9g = 0.7; thc9b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider6 + 0.5);
 ox = max(0, floor((gfx_w - 720*S)/2));
 oy = max(0, floor((gfx_h - 520*S)/2));
@@ -328,8 +335,8 @@ col(0.07,0.07,0.08); gfx_rect(0,0,gfx_w,gfx_h);
 col(0.13,0.14,0.16); rct(4, 4, 712, 452, 1);
 col(0.20,0.21,0.24); rct(4, 4, 712, 2, 1);
 // titre
-gfx_setfont(2); col(0.95,0.95,0.97); text_l(26, 40, "RM1982Fletcher"); gfx_measurestr("RM1982Fletcher", t_w, t_h); t_x = 26 + t_w/S + 14;
-gfx_setfont(3); col(0.98,0.70,0.22); text_l(t_x, 44, "LOUDNESS CONTOUR EQ");
+gfx_setfont(2); col(0.95,0.95,0.97); text_l(26, 40, "RM1982Fletcher"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982Fletcher", th_w, th_h); th_x0 = th_x1 - th_w; gfx_measurestr("RM1982Fletcher", t_w, t_h); t_x = 26 + t_w/S + 14;
+gfx_setfont(3); col(thc9r,thc9g,thc9b); text_l(t_x, 44, "LOUDNESS CONTOUR EQ");
 gfx_setfont(6); col(0.92,0.92,0.95); text_r(640, 38, "reno");
 gfx_setfont(5); col(0.92,0.20,0.18); text_r(694, 41, "MELLOW");
 
@@ -471,3 +478,12 @@ mouse_wheel != 0 ? (
 !mb1 ? (drag = 0);
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider10 = slider10 >= 0.5 ? 0 : 1; sliderchange(slider10); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

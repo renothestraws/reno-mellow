@@ -1,8 +1,8 @@
 desc:RM1982REC - ReNo Mellow 1982REC (Recording Media Simulator)
 //tags: saturation tape wax lacquer acetate vinyl lofi digital media color
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Première version publique
+//@version 1.2
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Simulateur de supports d'enregistrement : cire, disque laqué, bande 1/4", bande 2" multipiste, numérique 16 bits et virgule flottante ; drive compensé en sortie, bruit du support, usure des disques, HQ.
 //
 // ---------------------------------------------------------------------------
@@ -44,6 +44,7 @@ slider5:-18<-28,-6,0.1>-Calib (dBFS = 0 VU)
 slider6:0<-12,12,0.1>-Output (dB)
 slider7:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples)
 slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+slider9:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -238,7 +239,7 @@ function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
 function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 (
   col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
-  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(thc0r,thc0g,thc0b); arc(cx, cy, r + 9, fz, frac, 4);
   col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
   i = 0;
   loop(10,
@@ -257,10 +258,10 @@ function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 function klab(cx,cy,r,frac,str) ( knob_pt(cx,cy,r,frac); text_c(kx,ky,str); );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  on ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
   rct(x,y,w,h,1);
   col(0.03,0.03,0.035); rct(x,y,w,h,0);
-  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  on ? col(thc5r,thc5g,thc5b) : col(0.72,0.73,0.76);
   text_c(x + w*0.5, y + h*0.5, str);
 );
 function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
@@ -331,6 +332,18 @@ spl0 = yl*outg;
 spl1 = yr*outg;
 
 @gfx 1060 412
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider9
+slider9 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc1r = 0.6; thc1g = 0.92; thc1b = 0.86;
+  thc2r = 0.55; thc2g = 0.9; thc2b = 0.83;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
+  thc2r = 1.0; thc2g = 0.7; thc2b = 0.2;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+);
 S  = 0.75 + 0.25*floor(slider8 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
@@ -360,10 +373,10 @@ col(0.06,0.06,0.065);
 gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(352), 4*S, 1, 1);
 gfx_circle(PX(1042), PY(20), 4*S, 1, 1); gfx_circle(PX(1042), PY(352), 4*S, 1, 1);
 
-gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982REC");
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RM1982REC"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982REC", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(222, 38, "RECORDING  MEDIA");
 gfx_setfont(4); col(0.85,0.86,0.88); text_r(1026, 34, "ReNo Mellow");
-col(1.00,0.58,0.12); rct(34, 56, 992, 2, 1);
+col(thc0r,thc0g,thc0b); rct(34, 56, 992, 2, 1);
 
 // ---- DRIVE ------------------------------------------------------------------------------
 draw_knob(140, 172, 54, (slider1 + 18)/36, 0.5);
@@ -371,7 +384,7 @@ gfx_setfont(3); col(0.62,0.63,0.66);
 klab(140, 172, 81, 0, "-18"); klab(140, 172, 81, 0.25, "-9"); klab(140, 172, 81, 0.5, "0");
 klab(140, 172, 81, 0.75, "+9"); klab(140, 172, 81, 1, "+18");
 gfx_setfont(4); col(0.92,0.93,0.95); text_c(140, 80, "DRIVE");
-gfx_setfont(1); col(1.00,0.70,0.35); sprintf(#s, "%+.1f dB", slider1); text_c(140, 264, #s);
+gfx_setfont(1); col(thc1r,thc1g,thc1b); sprintf(#s, "%+.1f dB", slider1); text_c(140, 264, #s);
 gfx_setfont(6); col(0.55,0.56,0.60);
 text_c(140, 290, "level into the medium,"); text_c(140, 304, "compensated at the output");
 
@@ -379,10 +392,10 @@ text_c(140, 290, "level into the medium,"); text_c(140, 304, "compensated at the
 ui = 0;
 loop(6,
   yb_ = 74 + ui*44;
-  ui == md_g ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  ui == md_g ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
   rct(272, yb_, 228, 38, 1);
   col(0.03,0.03,0.035); rct(272, yb_, 228, 38, 0);
-  ui == md_g ? col(0.10,0.06,0.02) : col(0.85,0.86,0.88);
+  ui == md_g ? col(thc5r,thc5g,thc5b) : col(0.85,0.86,0.88);
   gfx_setfont(1);
   ui == 0 ? strcpy(#s, "WAX") : ui == 1 ? strcpy(#s, "LACQUER") : ui == 2 ? strcpy(#s, "TAPE 1/4\"") :
   ui == 3 ? strcpy(#s, "TAPE 2\" MULTITRACK") : ui == 4 ? strcpy(#s, "DIGITAL 16 BIT") : strcpy(#s, "FLOAT 32 BIT");
@@ -453,7 +466,7 @@ md_g <= 1 ? (
   );
 ) : (
   // flottant
-  gfx_setfont(7); col(1.00,0.58,0.12); text_c(icx, icy - 18, "32-BIT FLOAT");
+  gfx_setfont(7); col(thc0r,thc0g,thc0b); text_c(icx, icy - 18, "32-BIT FLOAT");
   gfx_setfont(1); col(0.62,0.63,0.66); text_c(icx, icy + 14, "headroom  > 1500 dB");
   col(0.30,0.32,0.36);
   ui = 0; xa_ = icx - 110; ya_ = icy + 44;
@@ -475,24 +488,24 @@ col(0.03,0.03,0.035); rct(GSX + 40, 308, GSW - 40, 12, 1);
 ui = 0;
 loop(48,
   dl = -24 + ui + 1;
-  lvh >= dl - 0.5 ? ( dl > sat_lv ? col(1.00,0.30,0.20) : dl > sat_lv - 6 ? col(1.00,0.70,0.20) : col(0.35,0.90,0.45); ) : col(0.10,0.11,0.12);
+  lvh >= dl - 0.5 ? ( dl > sat_lv ? col(1.00,0.30,0.20) : dl > sat_lv - 6 ? col(thc2r,thc2g,thc2b) : col(0.35,0.90,0.45); ) : col(0.10,0.11,0.12);
   rct(GSX + 41 + ui*(GSW - 42)/48, 310, (GSW - 42)/48 - 1, 8, 1);
   ui += 1;
 );
 gfx_setfont(6); col(0.55,0.56,0.60);
 ui = 0; loop(5, dl = -24 + ui*12; sprintf(#s, "%+d", dl); dl == 0 ? strcpy(#s, "0 VU"); text_c(GSX + 41 + (dl + 24)/48*(GSW - 42), 332, #s); ui += 1;);
-sat_lv < 30 ? ( col(1.00,0.58,0.12); rct(GSX + 41 + (min(sat_lv, 24) + 24)/48*(GSW - 42) - 1, 304, 2, 20, 1); );
+sat_lv < 30 ? ( col(thc0r,thc0g,thc0b); rct(GSX + 41 + (min(sat_lv, 24) + 24)/48*(GSW - 42) - 1, 304, 2, 20, 1); );
 
 // ---- Petits potards ----------------------------------------------------------------------
 sknob(870, 128, (slider3 + 30)/42, 30/42, "NOISE", "OFF", "+12");
 sknob(980, 128, slider4/100, 0, "WEAR", "0", "100");
 sknob(870, 276, (slider5 + 28)/22, 10/22, "CALIB", "-28", "-6");
 sknob(980, 276, (slider6 + 12)/24, 0.5, "OUTPUT", "-12", "+12");
-gfx_setfont(1); col(1.00,0.70,0.35);
+gfx_setfont(1); col(thc1r,thc1g,thc1b);
 slider3 <= -29.95 ? strcpy(#s, "OFF") : sprintf(#s, "%+.1f dB", slider3); text_c(870, 180, #s);
-md_g <= 1 ? col(1.00,0.70,0.35) : col(0.40,0.41,0.44);
+md_g <= 1 ? col(thc1r,thc1g,thc1b) : col(0.40,0.41,0.44);
 sprintf(#s, "%.0f %%", slider4); text_c(980, 180, #s);
-col(1.00,0.70,0.35);
+col(thc1r,thc1g,thc1b);
 sprintf(#s, "%.1f dBFS", slider5); text_c(870, 328, #s);
 sprintf(#s, "%+.1f dB", slider6); text_c(980, 328, #s);
 gfx_setfont(6); col(0.55,0.56,0.60); md_g >= 4 ? strcpy(#s, "-") : strcpy(#s, "medium noise"); text_c(870, 196, #s);
@@ -545,3 +558,12 @@ mb1 = mouse_cap & 1;
 !mb1 ? (drag = 0);
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider9 = slider9 >= 0.5 ? 0 : 1; sliderchange(slider9); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

@@ -1,8 +1,8 @@
 desc:RM360 - ReNo Mellow 360 (Dual 30-Band Graphic Equaliser)
 //tags: equalizer EQ graphic 1/3 octave klark-teknik-style dn360
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
+//@version 1.4
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Égaliseur graphique stéréo 2 x 30 bandes au tiers d'octave inspiré du Klark Teknik DN360 : Q proportionnel, échelles 6/12 dB, coupe-bas, Link.
 //
 // ---------------------------------------------------------------------------
@@ -98,6 +98,7 @@ slider68:0<-12,12,0.1>-Calib (dB)
 slider69:0<-12,12,0.1>-Output (dB)
 slider70:1<0,3,1{75%,100%,125%,150%}>-Size
 slider71:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
+slider72:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -297,7 +298,7 @@ function vtog(cx,cy,pos,n) local(ty)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -311,7 +312,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -441,6 +442,12 @@ spl0 = min(max(zl, -1), 1);
 spl1 = min(max(zr, -1), 1);
 
 @gfx 1780 590
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider72
+slider72 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider70 + 0.5);
 ox = max(0, floor((gfx_w - 1780*S)/2));
 oy = max(0, floor((gfx_h - 590*S)/2));
@@ -500,7 +507,7 @@ gfx_setfont(3); col(0.98,0.92,0.92); text_c(1604, 296, "LINK");
 // ---- Bandeau -------------------------------------------------------------------------------
 col(0.06,0.06,0.065); rct(6, 534, 1768, 52, 1);
 oby = 549; cky = oby + 11;
-gfx_setfont(4); col(0.93,0.62,0.22); text_l(22, cky, "RM360");
+gfx_setfont(4); col(thc6r,thc6g,thc6b); text_l(22, cky, "RM360"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM360", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.85,0.82,0.75);
 text_c(140, cky, "CALIB");
 draw_knob_s(176, cky, 10, (slider68 + 12)/24);
@@ -510,7 +517,7 @@ draw_knob_s(332, cky, 10, (slider69 + 12)/24);
 col(0.93,0.90,0.82); sprintf(#s, "%+.1f dB", slider69); text_l(348, cky, #s);
 // valeur du fader survolé
 hov > 0 ? (
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   hov > 33 ? strcpy(#t, "B") : strcpy(#t, "A");
   sprintf(#s, "%s %s : %+.1f dB", #t, #hf, slider(hov)*((hov > 33 ? slider64 : slider31) >= 1.5 ? 6 : 12));
   text_l(470, cky, #s);
@@ -573,3 +580,12 @@ mb1 = mouse_cap & 1;
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
 link_sync(1);
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider72 = slider72 >= 0.5 ? 0 : 1; sliderchange(slider72); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

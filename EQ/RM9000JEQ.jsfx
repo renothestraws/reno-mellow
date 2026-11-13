@@ -1,8 +1,8 @@
 desc:RM9000JEQ - ReNo Mellow 9000J EQ (Channel EQ + Filters)
 //tags: equalizer EQ parametric filters console ssl-style 9000j
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
+//@version 1.5
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Section EQ et filtres d'une tranche inspirée de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -59,6 +59,7 @@ slider21:0<-12,12,0.1>-Calib (dB)
 slider22:0<-12,12,0.1>-Output (dB)
 slider23:1<0,3,1{75%,100%,125%,150%}>-Size
 slider24:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
+slider25:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -269,7 +270,7 @@ function vled(x,y,on,r,g,b)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -283,7 +284,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -369,6 +370,12 @@ spl1 = min(max(zr, -1), 1);
 mo += k_mt*(max(zl*zl, zr*zr) - mo);
 
 @gfx 340 952
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider25
+slider25 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider23 + 0.5);
 ox = max(0, floor((gfx_w - 340*S)/2));
 oy = max(0, floor((gfx_h - 952*S)/2));
@@ -395,8 +402,8 @@ col(0.10,0.10,0.11); gfx_rect(0,0,gfx_w,gfx_h);
 col(0.29,0.29,0.30); rct(6,6,328,858,1);
 i = 0; loop(85, col(0.31,0.31,0.32); rct(6, 10 + i*10, 328, 1, 1); i += 1;);
 col(0.12,0.12,0.13); rct(6,6,328,40,1);
-gfx_setfont(5); col(0.95,0.95,0.95); text_l(16, 26, "RM");
-col(0.93,0.62,0.22); text_l(52, 26, "9000J");
+gfx_setfont(5); col(0.95,0.95,0.95); text_l(16, 26, "RM"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM", th_w, th_h); th_x0 = th_x1 - th_w;
+col(thc6r,thc6g,thc6b); text_l(52, 26, "9000J");
 col(0.95,0.95,0.95); gfx_setfont(4); text_l(132, 27, "EQ");
 gfx_setfont(6); pbtn(236, 13, 88, 26, slider20 >= 0.5, "VINTAGE");
 
@@ -417,7 +424,7 @@ klab(HPX, HPY, RG + 20, 1, "600");
 cknob(HPX, HPY, RG, hp_pos(slider1), 0.20, 0.20, 0.21);
 col(0.95,0.95,0.95); slider2 >= 0.5 ? strcpy(#s, "Hz  x3") : strcpy(#s, "Hz"); text_c(HPX, HPY + 52, #s);
 led(HPX + 50, HPY + 52, slider1 >= 20); col(0.95,0.95,0.95); text_l(HPX + 60, HPY + 52, "HPF");
-col(0.93,0.62,0.22); slider1 < 20 ? strcpy(#s, "OUT") : sprintf(#s, "%d Hz", slider1*(slider2 >= 0.5 ? 3 : 1));
+col(thc6r,thc6g,thc6b); slider1 < 20 ? strcpy(#s, "OUT") : sprintf(#s, "%d Hz", slider1*(slider2 >= 0.5 ? 3 : 1));
 text_c(HPX, HPY + 70, #s);
 // LPF
 gfx_setfont(3); col(0.95,0.95,0.95);
@@ -427,7 +434,7 @@ klab(LPX, LPY, RG + 20, 1, "3");
 cknob(LPX, LPY, RG, lp_pos(slider3), 0.92, 0.45, 0.62);
 col(0.95,0.95,0.95); slider4 >= 0.5 ? strcpy(#s, "kHz  /3") : strcpy(#s, "kHz"); text_c(LPX, LPY + 50, #s);
 led(LPX + 52, LPY + 50, slider3 < 29999); col(0.95,0.95,0.95); text_l(LPX + 62, LPY + 50, "LPF");
-col(0.93,0.62,0.22); slider3 >= 29999 ? strcpy(#s, "OUT") : sprintf(#s, "%.1f kHz", slider3/(slider4 >= 0.5 ? 3 : 1)/1000);
+col(thc6r,thc6g,thc6b); slider3 >= 29999 ? strcpy(#s, "OUT") : sprintf(#s, "%.1f kHz", slider3/(slider4 >= 0.5 ? 3 : 1)/1000);
 text_c(LPX, LPY + 66, #s);
 gfx_setfont(6); pbtn(212, 192, 110, 22, slider19 < 0.5, "EQ BYPASS");
 
@@ -441,7 +448,7 @@ klab(HFFX, HFFY, RG + 20, lpos(15000, 1500, 22000), "15"); klab(HFFX, HFFY, RG +
 cknob(HFFX, HFFY, RG, lpos(slider6, 1500, 22000), 0.88, 0.30, 0.26);
 col(0.95,0.95,0.95); text_c(HFFX, HFFY + 46, "kHz");
 gfx_setfont(6); pbtn(122, 226, 70, 22, slider7 >= 0.5, "SHELF");
-gfx_setfont(3); col(0.93,0.62,0.22);
+gfx_setfont(3); col(thc6r,thc6g,thc6b);
 sprintf(#s, "%+.1f dB", slider5); text_c(158, 286, #s);
 sprintf(#s, "%.1f kHz", slider6/1000); text_c(158, 302, #s);
 slider7 >= 0.5 ? strcpy(#s, "shelf") : strcpy(#s, "bell"); text_c(158, 318, #s);
@@ -457,7 +464,7 @@ klab(HMFX, HMFY, RG + 20, lpos(5000, 600, 7000), "5"); klab(HMFX, HMFY, RG + 20,
 cknob(HMFX, HMFY, RG, lpos(slider9, 600, 7000), 0.25, 0.55, 0.32);
 col(0.95,0.95,0.95); slider11 >= 0.5 ? strcpy(#s, "kHz  x3") : strcpy(#s, "kHz"); text_c(HMFX, HMFY + 46, #s);
 gfx_setfont(6); pbtn(136, 466, 44, 22, slider11 >= 0.5, "x3");
-gfx_setfont(3); col(0.93,0.62,0.22);
+gfx_setfont(3); col(thc6r,thc6g,thc6b);
 sprintf(#s, "%+.1f dB", slider8); text_c(158, 418, #s);
 sprintf(#s, "%.2f kHz", slider9*(slider11 >= 0.5 ? 3 : 1)/1000); text_c(158, 434, #s);
 sprintf(#s, "Q %.2f", slider10); text_c(158, 450, #s);
@@ -473,7 +480,7 @@ klab(LMFX, LMFY, RG + 20, lpos(1600, 200, 2500), "1.6"); klab(LMFX, LMFY, RG + 2
 cknob(LMFX, LMFY, RG, lpos(slider13, 200, 2500), 0.32, 0.58, 0.84);
 col(0.95,0.95,0.95); slider15 >= 0.5 ? strcpy(#s, "kHz  /3") : strcpy(#s, "kHz"); text_c(LMFX, LMFY + 46, #s);
 gfx_setfont(6); pbtn(136, 630, 44, 22, slider15 >= 0.5, "/3");
-gfx_setfont(3); col(0.93,0.62,0.22);
+gfx_setfont(3); col(thc6r,thc6g,thc6b);
 sprintf(#s, "%+.1f dB", slider12); text_c(158, 582, #s);
 sprintf(#s, "%.0f Hz", slider13/(slider15 >= 0.5 ? 3 : 1)); text_c(158, 598, #s);
 sprintf(#s, "Q %.2f", slider14); text_c(158, 614, #s);
@@ -488,7 +495,7 @@ klab(LFFX, LFFY, RG + 20, lpos(400, 40, 600), "400"); klab(LFFX, LFFY, RG + 20, 
 cknob(LFFX, LFFY, RG, lpos(slider17, 40, 600), 0.20, 0.20, 0.21);
 col(0.95,0.95,0.95); text_c(LFFX, LFFY + 46, "Hz");
 gfx_setfont(6); pbtn(122, 682, 70, 22, slider18 >= 0.5, "SHELF");
-gfx_setfont(3); col(0.93,0.62,0.22);
+gfx_setfont(3); col(thc6r,thc6g,thc6b);
 sprintf(#s, "%+.1f dB", slider16); text_c(158, 726, #s);
 sprintf(#s, "%d Hz", slider17); text_c(158, 742, #s);
 slider18 >= 0.5 ? strcpy(#s, "shelf") : strcpy(#s, "bell"); text_c(158, 758, #s);
@@ -587,3 +594,12 @@ mb1 = mouse_cap & 1;
 !mb1 ? (drag = 0);
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider25 = slider25 >= 0.5 ? 0 : 1; sliderchange(slider25); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

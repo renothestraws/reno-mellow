@@ -1,8 +1,8 @@
 desc:RM1176 - ReNo Mellow 1176 (FET Limiting Amplifier)
 //tags: dynamics compressor limiter FET 1176
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Compresseur/limiteur FET inspiré du 1176 : ratios 4/8/12/20 et all-buttons, attaque et release ultra-rapides, Punch, Analog, Calib.
 //
 // ---------------------------------------------------------------------------
@@ -42,6 +42,7 @@ slider8:1<0,3,1{75%,100%,125%,150%}>-Size
 slider9:0<0,1,1{Off,On}>-Analog
 slider10:0<0,1,1{Off,On}>-Punch
 slider11:0<-12,12,0.1>-Calib (dB)
+slider12:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -197,7 +198,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -208,7 +209,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
 );
 function draw_btn(x,y,w,h,on,s)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -298,6 +299,14 @@ m = max(grl, grr);
 gr_a = m + vu_c*(gr_a - m);    gr_b = gr_a + vu_c*(gr_b - gr_a);
 
 @gfx 640 310
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider12
+slider12 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+  thc7r = 0.8; thc7g = 0.96; thc7b = 0.92;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+  thc7r = 0.97; thc7g = 0.87; thc7b = 0.6;
+);
 S  = 0.75 + 0.25*floor(slider8 + 0.5);
 ox = max(0, floor((gfx_w - 640*S)/2));
 oy = max(0, floor((gfx_h - 310*S)/2));
@@ -315,7 +324,7 @@ col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
 col(0.24,0.23,0.215); rct(6,6,628,298,1);
 col(0.33,0.31,0.29);  rct(6,6,628,298,0);
 col(0.08,0.08,0.08);  rct(6,6,628,30,1);
-gfx_setfont(2); col(0.93,0.62,0.22); text_l(16, 10, "RM1176");
+gfx_setfont(2); col(thc6r,thc6g,thc6b); text_l(16, 10, "RM1176"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1176", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.72,0.69,0.63); text_l(118, 17, "RENO MELLOW  -  FET LIMITING AMPLIFIER");
 
 // ---- Boutons Input / Output -------------------------------------------------
@@ -371,7 +380,7 @@ draw_btn(392, by+130, 40, 24, gm == 4, "ALL");
 // ---- VU-mètre ---------------------------------------------------------------
 vx = 452; vy = 48; vw = 172; vh = 128;
 col(0.05,0.05,0.05); rct(vx-3,vy-3,vw+6,vh+6,1);
-sm < 3 ? col(0.97,0.87,0.60) : col(0.40,0.37,0.31);
+sm < 3 ? col(thc7r,thc7g,thc7b) : col(0.40,0.37,0.31);
 rct(vx,vy,vw,vh,1);
 pvx = vx + vw*0.5;
 pvy = vy + vh + 36;
@@ -502,3 +511,12 @@ md = mouse_cap & 1;
 !md ? (drag = 0);
 last_md = md;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider12 = slider12 >= 0.5 ? 0 : 1; sliderchange(slider12); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

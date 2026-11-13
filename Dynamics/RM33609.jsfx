@@ -1,8 +1,8 @@
 desc:RM33609 - ReNo Mellow 33609 (Diode-Bridge Stereo Limiter/Compressor)
 //tags: dynamics compressor limiter diode-bridge class-A stereo
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Limiteur/compresseur stéréo à pont de diodes inspiré du Neve 33609 : sections Limit et Compress, auto-recovery a1/a2, couleur transfos et classe A.
 //
 // ---------------------------------------------------------------------------
@@ -76,6 +76,7 @@ slider23:0<0,1,1{Mono,Stereo}>-Mono/Stereo
 slider24:1<0,3,1{75%,100%,125%,150%}>-Size
 slider25:0<0,1,1{Off,On}>-Analog
 slider26:0<-12,12,0.1>-Calib (dB)
+slider27:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -354,7 +355,7 @@ function led(x,y,on)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -368,7 +369,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -496,6 +497,12 @@ m = chA.sys ? chA.G : 0; gma += c_gm*(m - gma);
 m = chB.sys ? chB.G : 0; gmb += c_gm*(m - gmb);
 
 @gfx 1320 380
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider27
+slider27 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider24 + 0.5);
 ox = max(0, floor((gfx_w - 1320*S)/2));
 oy = max(0, floor((gfx_h - 380*S)/2));
@@ -603,12 +610,12 @@ col(0.92,0.93,0.94); frame(942, 16, 300, 288);
 draw_meter(956, 42, gma, "gain reduction 1");
 draw_meter(1086, 180, gmb, "gain reduction 2");
 // marque
-col(0.93,0.62,0.22);
+col(thc6r,thc6g,thc6b);
 t = 0; loop(3, ln(1122+t, 98, 1134+t, 58); ln(1134+t, 58, 1134+t, 98); ln(1134+t, 98, 1146+t, 58); t += 1;);
 gfx_setfont(5); col(0.95,0.95,0.96); text_l(1154, 78, "ReNo");
 gfx_setfont(4); text_l(1158, 104, "MELLOW");
 gfx_setfont(3); col(0.95,0.95,0.96);
-text_l(956, 212, "RM33609 DISCRETE");
+text_l(956, 212, "RM33609 DISCRETE"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM33609 DISCRETE", th_w, th_h); th_x0 = th_x1 - th_w;
 text_l(956, 236, "PRECISION STEREO");
 text_l(956, 260, "LIMITER/COMPRESSOR");
 
@@ -690,3 +697,12 @@ mb1 = mouse_cap & 1;
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
 link_sync(1);
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider27 = slider27 >= 0.5 ? 0 : 1; sliderchange(slider27); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

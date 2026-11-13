@@ -1,8 +1,8 @@
 desc:RM1982maximizer - ReNo Mellow 1982 (Sonic Maximizer)
 //tags: enhancer maximizer exciter bbe phase
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Sonic maximizer façon BBE, d'après Sonic Enhancer de lubomir i. ivanov (GPL v2+) : passe-tout à 700 Hz + LOW CONTOUR (grave) + PROCESS (aigu piloté par un CV dynamique) ; input / output, noise floor ; crête-mètres et activité du process ; saisie des valeurs au clavier.
 //
 // ---------------------------------------------------------------------------
@@ -29,6 +29,7 @@ slider4:2<0,10,0.1>-CV
 slider5:0<-12,12,0.1>-Output (dB)
 slider6:1<0,1,1{Off,On}>-Noise Floor
 slider7:1<0,3,1{75%,100%,125%,150%}>-Size
+slider8:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -72,7 +73,7 @@ function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
 function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 (
   col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
-  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(thc0r,thc0g,thc0b); arc(cx, cy, r + 9, fz, frac, 4);
   col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
   i = 0;
   loop(10,
@@ -90,10 +91,10 @@ function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  on ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
   rct(x,y,w,h,1);
   col(0.03,0.03,0.035); rct(x,y,w,h,0);
-  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  on ? col(thc5r,thc5g,thc5b) : col(0.72,0.73,0.76);
   text_c(x + w*0.5, y + h*0.5, str);
 );
 function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
@@ -135,7 +136,7 @@ function hbar(x, y, w, h, v) local(f)
   f = min(max((lin2db(v) + 60)/60, 0), 1);
   col(0.16,0.165,0.18); rct(x, y, w, h, 1);
   f > 0.003 ? ( col(0.30,0.75,0.35); rct(x, y, w*min(f, 0.8), h, 1); );
-  f > 0.8 ? ( col(1.00,0.58,0.12); rct(x + w*0.8, y, w*(min(f, 0.95) - 0.8), h, 1); );
+  f > 0.8 ? ( col(thc0r,thc0g,thc0b); rct(x + w*0.8, y, w*(min(f, 0.95) - 0.8), h, 1); );
   f > 0.95 ? ( col(1.00,0.25,0.18); rct(x + w*0.95, y, w*(f - 0.95), h, 1); );
 );
 
@@ -204,6 +205,18 @@ pi0 = max(abs(in0), pi0*0.99985); pi1 = max(abs(in1), pi1*0.99985);
 po0 = max(abs(spl0), po0*0.99985); po1 = max(abs(spl1), po1*0.99985);
 
 @gfx 860 412
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider8
+slider8 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc1r = 0.6; thc1g = 0.92; thc1b = 0.86;
+  thc3r = 0.8; thc3g = 0.97; thc3b = 0.93;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
+  thc3r = 1.0; thc3g = 0.85; thc3b = 0.6;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+);
 S  = 0.75 + 0.25*floor(slider7 + 0.5);
 ox = max(0, floor((gfx_w - 860*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
@@ -227,10 +240,10 @@ col(0.04,0.04,0.045); rct(6,364,848,2,1);
 col(0.06,0.06,0.065);
 gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
 gfx_circle(PX(842), PY(20), 4*S, 1, 1); gfx_circle(PX(842), PY(352), 4*S, 1, 1);
-gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982maximizer"); gfx_measurestr("RM1982maximizer", t_w, t_h); t_x = 34 + t_w/S + 14;
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RM1982maximizer"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982maximizer", th_w, th_h); th_x0 = th_x1 - th_w; gfx_measurestr("RM1982maximizer", t_w, t_h); t_x = 34 + t_w/S + 14;
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(t_x, 38, "SONIC  MAXIMIZER");
 gfx_setfont(4); col(0.85,0.86,0.88); text_r(826, 34, "ReNo Mellow");
-col(1.00,0.58,0.12); rct(34, 56, 792, 2, 1);
+col(thc0r,thc0g,thc0b); rct(34, 56, 792, 2, 1);
 
 // ---- Mètres : entrée, activité du process, sortie ------------------------------------
 col(0.03,0.03,0.035); rct(34, 72, 792, 82, 1);
@@ -245,7 +258,7 @@ ui = 0;
 loop(2,
   ua = min(max((ui == 0 ? cv_rc0 : cv_rc1)*g_hp/5, 0), 1);
   col(0.16,0.165,0.18); rct(328, 102 + ui*20, 220, 12, 1);
-  ua > 0.003 ? ( col(1.00,0.58,0.12); rct(328, 102 + ui*20, 220*ua, 12, 1); );
+  ua > 0.003 ? ( col(thc0r,thc0g,thc0b); rct(328, 102 + ui*20, 220*ua, 12, 1); );
   ui += 1;
 );
 gfx_setfont(6); col(0.45,0.46,0.50);
@@ -264,14 +277,14 @@ loop(5,
   gfx_setfont(4); col(0.92,0.93,0.95);
   ui == 0 ? strcpy(#s, "INPUT") : ui == 1 ? strcpy(#s, "LOW CONTOUR") : ui == 2 ? strcpy(#s, "PROCESS") : ui == 3 ? strcpy(#s, "CV") : strcpy(#s, "OUTPUT");
   text_c(kcx, KNY - krr - 22, #s);
-  gfx_setfont(1); col(1.00,0.70,0.35);
+  gfx_setfont(1); col(thc1r,thc1g,thc1b);
   ui == 0 ? sprintf(#s, "%+.1f dB", slider1) : ui == 1 ? sprintf(#s, "%.1f", slider2) : ui == 2 ? sprintf(#s, "%.1f", slider3) :
   ui == 3 ? sprintf(#s, "%.1f", slider4) : sprintf(#s, "%+.1f dB", slider5);
   edit_k == ui ? (
     col(0.03,0.03,0.035); rct(kcx - 42, KNY + krr + 14, 84, 20, 1);
-    col(1.00,0.58,0.12); rct(kcx - 42, KNY + krr + 14, 84, 20, 0);
+    col(thc0r,thc0g,thc0b); rct(kcx - 42, KNY + krr + 14, 84, 20, 0);
     strcpy(#s, #ed); time_precise()*2 % 2 < 1 ? strcat(#s, "_");
-    col(1.00,0.85,0.60);
+    col(thc3r,thc3g,thc3b);
   );
   text_c(kcx, KNY + krr + 24, #s);
   ui += 1;
@@ -324,3 +337,12 @@ edit_k >= 0 ? (
 );
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

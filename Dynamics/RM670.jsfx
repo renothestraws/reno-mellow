@@ -1,8 +1,8 @@
 desc:RM670 - ReNo Mellow 670 (Variable-Mu Tube Stereo Limiter)
 //tags: dynamics compressor limiter tube variable-mu fairchild 670
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version publique
+//@version 1.1
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Limiteur stéréo variable-mu à lampes inspiré du Fairchild 670 : 6 constantes de temps, modes Mid/Side, seuil AC/DC, Vintage.
 //
 // ---------------------------------------------------------------------------
@@ -65,6 +65,7 @@ slider14:1<0,3,1{75%,100%,125%,150%}>-Size
 slider15:0<0,1,1{Off,On}>-Analog
 slider16:0<-12,12,0.1>-Calib (dB)
 slider17:0<0,1,1{Classic,Vintage}>-Character
+slider18:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -319,7 +320,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -330,7 +331,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
 );
 function draw_btn(x,y,w,h,on,s)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -477,6 +478,12 @@ gma = gra + vu_c*(gma - gra); gmb = gma + vu_c*(gmb - gma);
 gna = grb + vu_c*(gna - grb); gnb = gna + vu_c*(gnb - gna);
 
 @gfx 920 480
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider18
+slider18 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+);
 S  = 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 920*S)/2));
 oy = max(0, floor((gfx_h - 480*S)/2));
@@ -495,7 +502,7 @@ gfx_setfont(5, "Times New Roman", max(9, floor(26*S)), 'bi');
 col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
 col(0.10,0.10,0.11);  rct(6,6,908,468,1);
 col(0.06,0.06,0.06);  rct(6,6,908,30,1);
-gfx_setfont(2); col(0.93,0.62,0.22); text_l(16, 21, "RM670");
+gfx_setfont(2); col(thc6r,thc6g,thc6b); text_l(16, 21, "RM670"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM670", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.72,0.69,0.63); text_l(90, 22, "RENO MELLOW  -  VARIABLE-MU TUBE STEREO LIMITER");
 
 // ---- Deux canaux ---------------------------------------------------------------------
@@ -679,3 +686,12 @@ md = mouse_cap & 1;
 !md ? (drag = 0);
 last_md = md;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider18 = slider18 >= 0.5 ? 0 : 1; sliderchange(slider18); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

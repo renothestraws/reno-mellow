@@ -1,0 +1,1270 @@
+desc:RMMultidyn - ReNo Mellow Multiband Dynamics (6-band clean compressor / expander with analyzer)
+//tags: multiband compressor expander dynamics mid-side sidechain analyzer
+//@author ReNo Mellow
+//@version 1.1
+//@changelog Première version publique
+//@about Compresseur / expandeur multibande propre et transparent inspiré du FabFilter Pro-MB : 1 à 6 bandes, crossovers 6 à 48 dB/oct à somme parfaite, compression et expansion vers le bas ou vers le haut, attaque 0-50 ms, release 50-3000 ms + auto, Stereo/Dual/L/R/Mid/Side par bande, side-chain 3/4 ou 5/6 par bande, sortie de chaque bande vers 1/2 à 11/12, analyseur, latence nulle.
+//
+// ---------------------------------------------------------------------------
+// RMMultidyn - compresseur / expandeur multibande propre et transparent,
+// inspiré du FabFilter Pro-MB.
+//
+// - 1 à 6 bandes, crossovers réglables de 6 à 48 dB/oct (Butterworth impairs,
+//   Linkwitz-Riley pairs) ; somme parfaitement plate (passe-tout compensé)
+// - Par bande : Compress / Expand ; Range négatif = vers le bas, positif = vers le haut
+//   (compression vers le haut, expansion vers le haut) ; Threshold, Ratio, Knee,
+//   Attack 0-50 ms, Release 50-3000 ms + Auto Release, Output
+// - Canal par bande : Stereo (lié), Dual (L/R indépendants), Left, Right, Mid, Side
+// - Side-chain par bande : interne, entrée 3/4 ou entrée 5/6 (filtré par la bande)
+// - Sortie par bande : 1/2, 3/4, 5/6, 7/8, 9/10, 11/12 (la somme reste parfaite)
+// - Analyseur : pente +3 dB/oct (bruit rose plat), Peak ou RMS 500 ms, pré en option
+// - Latence nulle uniquement, pas de clipper interne
+//
+// Souris : glisser une ligne de crossover = fréquence ; molette sur une ligne = pente ;
+// glisser le point d'une bande = Range (vertical) / déplacement de la bande (horizontal) ;
+// molette sur une bande = Threshold ; Shift = fin ; double-clic dans une bande = la couper
+// en deux à cet endroit ; Alt-clic = bypass ; clic droit = menu de la bande ;
+// S / M en haut de la bande = solo / mute ; Ctrl (Cmd) maintenu = solo de la bande
+// sous le pointeur ; glisser au clic droit dans le vide = sélection de plusieurs bandes ;
+// Suppr = supprimer (fusion avec la voisine) ; double-clic sur une valeur = saisie clavier.
+// ---------------------------------------------------------------------------
+
+slider1:3<1,6,1>-Bands
+slider2:200<20,20000,1>-Crossover 1 (Hz)
+slider3:2000<20,20000,1>-Crossover 2 (Hz)
+slider4:6000<20,20000,1>-Crossover 3 (Hz)
+slider5:10000<20,20000,1>-Crossover 4 (Hz)
+slider6:15000<20,20000,1>-Crossover 5 (Hz)
+slider7:3<0,7,1{6,12,18,24,30,36,42,48}>-Crossover 1 Slope (dB/oct)
+slider8:3<0,7,1{6,12,18,24,30,36,42,48}>-Crossover 2 Slope (dB/oct)
+slider9:3<0,7,1{6,12,18,24,30,36,42,48}>-Crossover 3 Slope (dB/oct)
+slider10:3<0,7,1{6,12,18,24,30,36,42,48}>-Crossover 4 Slope (dB/oct)
+slider11:3<0,7,1{6,12,18,24,30,36,42,48}>-Crossover 5 Slope (dB/oct)
+slider12:0<-24,24,0.01>-Output (dB)
+slider13:100<0,100,0.1>-Mix (%)
+slider14:4<0,5,1>-Analyzer (0 off 1 peak 2 rms, +3 = pre)
+slider15:2<0,3,1{6 dB,12 dB,24 dB,36 dB}>-Display Range
+slider16:0<0,1,1{Compress,Expand}>-B1 Mode
+slider17:-20<-80,0,0.1>-B1 Threshold (dB)
+slider18:-6<-30,30,0.1>-B1 Range (dB)
+slider19:2<1,100,0.01>-B1 Ratio
+slider20:6<0,30,0.1>-B1 Knee (dB)
+slider21:10<0,50,0.01>-B1 Attack (ms)
+slider22:150<50,3000,1>-B1 Release (ms)
+slider23:0<0,1,1{Off,On}>-B1 Auto Release
+slider24:0<-24,24,0.1>-B1 Output (dB)
+slider25:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B1 Channel
+slider26:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B1 Sidechain
+slider27:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B1 Output Channels
+slider28:0<0,2,1{Active,Bypass,Mute}>-B1 State
+slider29:0<0,1,1{Off,On}>-B1 Solo
+slider30:0<0,1,1{Compress,Expand}>-B2 Mode
+slider31:-20<-80,0,0.1>-B2 Threshold (dB)
+slider32:-6<-30,30,0.1>-B2 Range (dB)
+slider33:2<1,100,0.01>-B2 Ratio
+slider34:6<0,30,0.1>-B2 Knee (dB)
+slider35:10<0,50,0.01>-B2 Attack (ms)
+slider36:150<50,3000,1>-B2 Release (ms)
+slider37:0<0,1,1{Off,On}>-B2 Auto Release
+slider38:0<-24,24,0.1>-B2 Output (dB)
+slider39:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B2 Channel
+slider40:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B2 Sidechain
+slider41:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B2 Output Channels
+slider42:0<0,2,1{Active,Bypass,Mute}>-B2 State
+slider43:0<0,1,1{Off,On}>-B2 Solo
+slider44:0<0,1,1{Compress,Expand}>-B3 Mode
+slider45:-20<-80,0,0.1>-B3 Threshold (dB)
+slider46:-6<-30,30,0.1>-B3 Range (dB)
+slider47:2<1,100,0.01>-B3 Ratio
+slider48:6<0,30,0.1>-B3 Knee (dB)
+slider49:10<0,50,0.01>-B3 Attack (ms)
+slider50:150<50,3000,1>-B3 Release (ms)
+slider51:0<0,1,1{Off,On}>-B3 Auto Release
+slider52:0<-24,24,0.1>-B3 Output (dB)
+slider53:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B3 Channel
+slider54:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B3 Sidechain
+slider55:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B3 Output Channels
+slider56:0<0,2,1{Active,Bypass,Mute}>-B3 State
+slider57:0<0,1,1{Off,On}>-B3 Solo
+slider58:0<0,1,1{Compress,Expand}>-B4 Mode
+slider59:-20<-80,0,0.1>-B4 Threshold (dB)
+slider60:-6<-30,30,0.1>-B4 Range (dB)
+slider61:2<1,100,0.01>-B4 Ratio
+slider62:6<0,30,0.1>-B4 Knee (dB)
+slider63:10<0,50,0.01>-B4 Attack (ms)
+slider64:150<50,3000,1>-B4 Release (ms)
+slider65:0<0,1,1{Off,On}>-B4 Auto Release
+slider66:0<-24,24,0.1>-B4 Output (dB)
+slider67:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B4 Channel
+slider68:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B4 Sidechain
+slider69:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B4 Output Channels
+slider70:0<0,2,1{Active,Bypass,Mute}>-B4 State
+slider71:0<0,1,1{Off,On}>-B4 Solo
+slider72:0<0,1,1{Compress,Expand}>-B5 Mode
+slider73:-20<-80,0,0.1>-B5 Threshold (dB)
+slider74:-6<-30,30,0.1>-B5 Range (dB)
+slider75:2<1,100,0.01>-B5 Ratio
+slider76:6<0,30,0.1>-B5 Knee (dB)
+slider77:10<0,50,0.01>-B5 Attack (ms)
+slider78:150<50,3000,1>-B5 Release (ms)
+slider79:0<0,1,1{Off,On}>-B5 Auto Release
+slider80:0<-24,24,0.1>-B5 Output (dB)
+slider81:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B5 Channel
+slider82:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B5 Sidechain
+slider83:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B5 Output Channels
+slider84:0<0,2,1{Active,Bypass,Mute}>-B5 State
+slider85:0<0,1,1{Off,On}>-B5 Solo
+slider86:0<0,1,1{Compress,Expand}>-B6 Mode
+slider87:-20<-80,0,0.1>-B6 Threshold (dB)
+slider88:-6<-30,30,0.1>-B6 Range (dB)
+slider89:2<1,100,0.01>-B6 Ratio
+slider90:6<0,30,0.1>-B6 Knee (dB)
+slider91:10<0,50,0.01>-B6 Attack (ms)
+slider92:150<50,3000,1>-B6 Release (ms)
+slider93:0<0,1,1{Off,On}>-B6 Auto Release
+slider94:0<-24,24,0.1>-B6 Output (dB)
+slider95:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B6 Channel
+slider96:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B6 Sidechain
+slider97:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B6 Output Channels
+slider98:0<0,2,1{Active,Bypass,Mute}>-B6 State
+slider99:0<0,1,1{Off,On}>-B6 Solo
+slider100:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:Input L
+in_pin:Input R
+in_pin:Sidechain A L (3)
+in_pin:Sidechain A R (4)
+in_pin:Sidechain B L (5)
+in_pin:Sidechain B R (6)
+out_pin:Out 1 L
+out_pin:Out 1 R
+out_pin:Out 3
+out_pin:Out 4
+out_pin:Out 5
+out_pin:Out 6
+out_pin:Out 7
+out_pin:Out 8
+out_pin:Out 9
+out_pin:Out 10
+out_pin:Out 11
+out_pin:Out 12
+
+options:maxmem=1048576
+
+@init
+ext_noinit = 1;
+EPS = 0.000000000001;
+NBM = 6;
+// ---- mémoire -----------------------------------------------------------------------------
+XC  = 10000;   // crossover k : XC + k*80 -> LP (4 sections x 5), HP (+20), passe-tout (+40)
+XNS = 10500;   // nombre de sections LP / HP du crossover k
+XNA = 10510;   // nombre de sections passe-tout
+XSG = 10520;   // signe de la sortie haute (-1 en 12 et 36 dB/oct, Linkwitz-Riley impairs)
+XFQ = 10530;   // fréquence effective
+ST  = 11000;   // états des arbres : t (0 signal, 1 SC 3/4, 2 SC 5/6) : ST + t*400 + k*64 + ch*32 + f*16 + s*2
+APS = 12400;   // états passe-tout : sortie d : APS + d*400 + k*64 + ch*32 + s*2
+REG = 15000;   // régions de l'arbre : REG + t*16 + ch*8 + b
+PRL = 15100; PRR = 15110;   // régions traitées (gauche / droite)
+BP  = 15200;   // paramètres par bande : BP + b*32
+ENV = 15500;   // détecteur crête (b*2 + j)
+HLD = 15520;   // compteur de maintien
+GS  = 15540;   // gain lissé (dB)
+GSL = 15560;   // gain lent (auto release)
+GDB = 15580;   // gain affiché (dB)
+LVD = 15600;   // niveau du détecteur affiché (dB)
+XK  = 15700;   // cache des réglages des crossovers
+SMB = 15800;   // solo (par bande, interface + sliders)
+RBR = 20000; RBI = 33000;   // réponses complexes des bandes par colonne : RBR + b*COLS + i
+T1R = 46000; T1I = 48100;   // somme de toutes les régions (passe-tout)
+FFTB = 65536;  FFTN = 8192; // tampon FFT complexe (aligné sur 65536)
+WIN  = 82000;
+ABPOST = 91000; ABPRE = 108000; ABN = 16384; ABM = 16383;
+COLS = 2048;
+SPO  = 125000; SPP = 127100;
+RMSR = 130000; RMSN = 64;
+RMSRP = 262000;
+RMST = 394000;
+
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function clampf(x, lo, hi) ( x < lo ? lo : x > hi ? hi : x; );
+
+// ---- conception des crossovers (transformée bilinéaire : LP + HP = passe-tout exact) ------
+// section : b0 b1 b2 a1 a2 ; q < 0 = 1er ordre
+function put5(c, b0, b1, b2, a1, a2) ( c[0] = b0; c[1] = b1; c[2] = b2; c[3] = a1; c[4] = a2; );
+function xsec(c, kind, q, kw) local(n, a1, a2)
+(
+  q < 0 ? (
+    n = 1/(1 + kw); a1 = (kw - 1)*n;
+    kind == 0 ? put5(c, kw*n, kw*n, 0, a1, 0) : kind == 1 ? put5(c, n, -n, 0, a1, 0) : put5(c, a1, 1, 0, a1, 0);
+  ) : (
+    n = 1/(1 + kw/q + kw*kw); a1 = 2*(kw*kw - 1)*n; a2 = (1 - kw/q + kw*kw)*n;
+    kind == 0 ? put5(c, kw*kw*n, 2*kw*kw*n, kw*kw*n, a1, a2) : kind == 1 ? put5(c, n, -2*n, n, a1, a2) : put5(c, a2, a1, 1, a1, a2);
+  );
+);
+// Q des sections Butterworth d'ordre n (section i), -1 = 1er ordre
+function bwq(n, i) ( n % 2 ? ( i == 0 ? -1 : 1/(2*cos(i*$pi/n)) ) : 1/(2*cos((2*i + 1)*$pi/(2*n))); );
+function design_xo(k, f, sl) local(kw, c, n, m, i, ns, q)
+(
+  // sl 0..7 = 6..48 dB/oct
+  kw = tan($pi*clampf(f, 10, 0.45*srate)/srate); c = XC + k*80;
+  n = sl + 1; ns = 0;
+  n % 2 ? (
+    // Butterworth impair (6, 18, 30, 42)
+    m = floor(n/2) + 1;
+    i = 0; loop(m, q = bwq(n, i); xsec(c + ns*5, 0, q, kw); xsec(c + 20 + ns*5, 1, q, kw); ns += 1; i += 1;);
+    XSG[k] = 1;
+  ) : (
+    // Linkwitz-Riley (12, 24, 36, 48) = Butterworth n/2 au carré
+    m = n/2;
+    loop(2, i = 0; loop(floor(m/2) + (m % 2), q = bwq(m, i); xsec(c + ns*5, 0, q, kw); xsec(c + 20 + ns*5, 1, q, kw); ns += 1; i += 1;););
+    XSG[k] = (m % 2) ? -1 : 1;
+  );
+  XNS[k] = ns;
+  // passe-tout de compensation (= LP + signe*HP)
+  c = XC + k*80 + 40;
+  n == 1 ? ( XNA[k] = 0; ) :
+  n == 2 ? ( xsec(c, 2, -1, kw); XNA[k] = 1; ) :
+  n == 3 ? ( xsec(c, 2, 1, kw); XNA[k] = 1; ) :
+  n == 4 ? ( xsec(c, 2, 0.70710678, kw); XNA[k] = 1; ) :
+  n == 5 ? ( xsec(c, 2, 0.61803399, kw); XNA[k] = 1; ) :
+  n == 6 ? ( xsec(c, 2, -1, kw); xsec(c + 5, 2, 1, kw); XNA[k] = 2; ) :
+  n == 7 ? ( xsec(c, 2, 2.2469796, kw); xsec(c + 5, 2, 0.55495813, kw); XNA[k] = 2; ) :
+           ( xsec(c, 2, 1.30656296, kw); xsec(c + 5, 2, 0.5411961, kw); XNA[k] = 2; );
+  XFQ[k] = f;
+);
+// sections en cascade (TDF-II)
+function runsec(x, c, z, n) local(y)
+(
+  loop(n,
+    y = c[0]*x + z[0];
+    z[0] = c[1]*x - c[3]*y + z[1];
+    z[1] = c[2]*x - c[4]*y;
+    x = y; c += 5; z += 2;
+  );
+  x;
+);
+// arbre de crossovers (du haut vers le bas) : régions dans REG + t*16 + ch*8
+function tree(x, t, ch) local(k, r, h, z, d)
+(
+  r = x; k = NX - 1; d = REG + t*16 + ch*8;
+  loop(NX,
+    z = ST + t*400 + k*64 + ch*32;
+    h = runsec(r, XC + k*80 + 20, z + 16, XNS[k]);
+    r = runsec(r, XC + k*80, z, XNS[k]);
+    d[k + 1] = XSG[k]*h;
+    k -= 1;
+  );
+  d[0] = r;
+);
+// somme alignée en phase des régions traitées pour la sortie d (canal ch)
+function accum(d, ch, src) local(b, s)
+(
+  s = 0; b = NBD - 1;
+  loop(NBD,
+    BP[b*32 + 11] == d ? ( s += src[b]; );
+    b >= 2 ? ( s = runsec(s, XC + (b - 2)*80 + 40, APS + d*400 + (b - 2)*64 + ch*32, XNA[b - 2]); );
+    b -= 1;
+  );
+  s;
+);
+// courbe statique : gain (dB) pour un niveau l (dB)
+function soft(v, w) ( w < 0.01 ? max(v, 0) : v <= -0.5*w ? 0 : v >= 0.5*w ? v : sqr(v + 0.5*w)/(2*w); );
+function gcomp(p, l) local(g, rg)
+(
+  rg = p[3];
+  p[0] < 0.5 ? (
+    rg < 0 ? ( g = max(-soft(l - p[1], p[4])*p[2], rg); ) : ( g = min(soft(p[1] - l, p[4])*p[2], rg); );
+  ) : (
+    rg < 0 ? ( g = max(-soft(p[1] - l, p[4])*p[2], rg); ) : ( g = min(soft(l - p[1], p[4])*p[2], rg); );
+  );
+  g;
+);
+// détecteur + lissage : bande b, voie j, niveau linéaire x ; retourne le gain en dB
+function dyn(b, j, x) local(p, i, e, l, gt, cur, sl, att, co, tr)
+(
+  p = BP + b*32; i = b*2 + j;
+  e = ENV[i];
+  x >= e ? ( e = x; HLD[i] = p[13]; ) : HLD[i] > 0 ? ( HLD[i] -= 1; ) : ( e *= p[14]; );
+  ENV[i] = e;
+  l = lin2db(e); LVD[i] = l;
+  gt = gcomp(p, l);
+  cur = GS[i];
+  // attaque = sens provoqué par une hausse du niveau
+  att = p[0] < 0.5 ? gt < cur : gt > cur;
+  att ? ( co = p[5]; ) : (
+    p[7] > 0.5 ? (
+      sl = GSL[i];
+      tr = p[6]*(0.5 + 2.5*min(abs(sl)/(abs(cur) + 0.1), 1));
+      co = exp(-1/(tr*srate));
+    ) : ( co = p[8]; );
+  );
+  cur = gt + (cur - gt)*co;
+  GS[i] = cur;
+  GSL[i] = cur + (GSL[i] - cur)*slow_co;
+  cur;
+);
+
+// ---- état initial ----------------------------------------------------------------------
+memset(ST, 0, 1200); memset(APS, 0, 2400);
+memset(ENV, 0, 200);
+memset(XK, -1, 20);
+memset(SMB, 0, 8);
+NX = 0; NBD = 1; dsr = 0; solo_m = -1;
+pkl = pkr = 0; abw = 0; g_sm = 1;
+
+// ---- Outils graphiques (dans @init : fonctions définies avant usage) -------------------
+function col(r, g, b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function cola(r, g, b, a) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = a; );
+function bcol(b, a) local(h, r, g, bl)
+(
+  h = b == 0 ? 0.83 : b == 1 ? 0.58 : b == 2 ? 0.33 : b == 3 ? 0.13 : b == 4 ? 0.95 : 0.50;
+  r = clampf(abs(h*6 - 3) - 1, 0, 1); g = clampf(2 - abs(h*6 - 2), 0, 1); bl = clampf(2 - abs(h*6 - 4), 0, 1);
+  gfx_r = 0.35 + 0.65*r; gfx_g = 0.35 + 0.65*g; gfx_b = 0.35 + 0.65*bl; gfx_a = a;
+);
+function tx_c(x, y, str) local(w, h) ( gfx_measurestr(str, w, h); gfx_x = x - w*0.5; gfx_y = y - h*0.5; gfx_drawstr(str); );
+function tx_l(x, y, str) local(w, h) ( gfx_measurestr(str, w, h); gfx_x = x; gfx_y = y - h*0.5; gfx_drawstr(str); );
+function tx_r(x, y, str) local(w, h) ( gfx_measurestr(str, w, h); gfx_x = x - w; gfx_y = y - h*0.5; gfx_drawstr(str); );
+function inr(x, y, w, h) ( mouse_x >= x && mouse_x < x + w && mouse_y >= y && mouse_y < y + h; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx - 1)); ); );
+function btn(x, y, w, h, on, str)
+(
+  on ? col(thc0r,thc0g,thc0b) : col(0.17,0.18,0.21);
+  gfx_rect(x, y, w, h, 1);
+  col(0.05,0.05,0.06); gfx_rect(x, y, w, h, 0);
+  on ? col(thc5r,thc5g,thc5b) : col(0.75,0.77,0.80);
+  tx_c(x + w*0.5, y + h*0.5, str);
+);
+// axes
+function xf(f) ( DW*log(max(f, 10)/10)/log(3000); );
+function fx(x) ( 10*pow(3000, x/DW); );
+function yg(g) ( PH*0.5 - g/RNG*PH*0.44; );
+function ya(d) ( -d/90*PH; );
+function fmt_f(f) ( f >= 1000 ? sprintf(#fs, "%.2f kHz", f/1000) : sprintf(#fs, "%.0f Hz", f); );
+// paramètres de bande
+function bsl(b, o) ( 16 + b*14 + o; );
+function bpar(b, o) ( slider(16 + b*14 + o); );
+function bint(b, o) ( floor(slider(16 + b*14 + o) + 0.5); );
+function slope_db(s) ( 6*(floor(s + 0.5) + 1); );
+// bords de bande (fréquences)
+function edge_lo(b) ( b == 0 ? 10 : slider(1 + b); );
+function edge_hi(b) ( b >= GN - 1 ? 30000 : slider(2 + b); );
+// boutons rotatifs du panneau : 1 thr, 2 range, 3 ratio, 4 knee, 5 att, 6 rel, 7 output
+function koff(i) ( i <= 6 ? i : 8; );
+function kfr(i, v)
+(
+  i == 1 ? (v + 80)/80 : i == 2 ? (v + 30)/60 : i == 3 ? log(max(v, 1))/log(100) : i == 4 ? v/30 :
+  i == 5 ? sqrt(max(v, 0)/50) : i == 6 ? log(max(v, 50)/50)/log(60) : (v + 24)/48;
+);
+function kval(i, f) local(v)
+(
+  f = clampf(f, 0, 1);
+  i == 1 ? ( v = floor((-80 + 80*f)*10 + 0.5)/10; ) :
+  i == 2 ? ( v = floor((-30 + 60*f)*10 + 0.5)/10; ) :
+  i == 3 ? ( v = floor(pow(100, f)*100 + 0.5)/100; ) :
+  i == 4 ? ( v = floor(30*f*10 + 0.5)/10; ) :
+  i == 5 ? ( v = floor(50*f*f*100 + 0.5)/100; ) :
+  i == 6 ? ( v = floor(50*pow(60, f) + 0.5); ) :
+           ( v = floor((-24 + 48*f)*10 + 0.5)/10; );
+  v;
+);
+function kdef(i) ( i == 1 ? -20 : i == 2 ? -6 : i == 3 ? 2 : i == 4 ? 6 : i == 5 ? 10 : i == 6 ? 150 : 0; );
+function kfmt(i, v)
+(
+  i == 1 ? sprintf(#fs, "%.1f dB", v) : i == 2 ? sprintf(#fs, "%+.1f dB", v) :
+  i == 3 ? ( v >= 99.99 ? strcpy(#fs, "inf : 1") : sprintf(#fs, "%.2f : 1", v); ) :
+  i == 4 ? sprintf(#fs, "%.1f dB", v) : i == 5 ? sprintf(#fs, "%.2f ms", v) :
+  i == 6 ? sprintf(#fs, "%d ms", v) : sprintf(#fs, "%+.1f dB", v);
+);
+function kname(i)
+(
+  i == 1 ? strcpy(#kn, "THRESHOLD") : i == 2 ? strcpy(#kn, "RANGE") : i == 3 ? strcpy(#kn, "RATIO") :
+  i == 4 ? strcpy(#kn, "KNEE") : i == 5 ? strcpy(#kn, "ATTACK") : i == 6 ? strcpy(#kn, "RELEASE") : strcpy(#kn, "OUTPUT");
+);
+function ch_name(c)
+(
+  c == 0 ? strcpy(#cn, "STEREO") : c == 1 ? strcpy(#cn, "DUAL L/R") : c == 2 ? strcpy(#cn, "LEFT") :
+  c == 3 ? strcpy(#cn, "RIGHT") : c == 4 ? strcpy(#cn, "MID") : strcpy(#cn, "SIDE");
+);
+function sc_name(c) ( c == 0 ? strcpy(#scn, "SC: INTERNAL") : c == 1 ? strcpy(#scn, "SC: IN 3/4") : strcpy(#scn, "SC: IN 5/6"); );
+function out_name(d) ( sprintf(#on, "OUT %d/%d", 2*d + 1, 2*d + 2); );
+// éléments de menu : "!" devant l'élément actif
+function mk(on, str) ( on ? strcat(#m, "!"); strcat(#m, str); );
+// petit bouton rotatif
+function pknob(cx, cy, r, frac, fz) local(a1, a2, i, an)
+(
+  col(0.06,0.06,0.07);
+  i = 0; loop(max(1, floor(r*0.18)), gfx_arc(cx, cy, r + i, -0.75*$pi, 0.75*$pi, 1); i += 1;);
+  col(thc0r,thc0g,thc0b);
+  a1 = -0.75*$pi + 1.5*$pi*min(frac, fz); a2 = -0.75*$pi + 1.5*$pi*max(frac, fz);
+  i = 0; loop(max(1, floor(r*0.18)), gfx_arc(cx, cy, r + i, a1, a2, 1); i += 1;);
+  col(0.24,0.25,0.28); gfx_circle(cx, cy, r*0.78, 1, 1);
+  col(0.32,0.33,0.37); gfx_circle(cx, cy, r*0.78, 0, 1);
+  an = -0.75*$pi + 1.5*$pi*frac;
+  col(0.95,0.95,0.97);
+  gfx_line(cx + sin(an)*r*0.25, cy - cos(an)*r*0.25, cx + sin(an)*r*0.72, cy - cos(an)*r*0.72, 1);
+);
+// lecture d'une saisie : nombre, suffixe k accepté
+function parse_val(isfreq) local(v, c, n)
+(
+  v = 0; n = strlen(#ed);
+  match("%f", #ed, v) ? (
+    c = n > 0 ? str_getchar(#ed, n - 1) : 0;
+    (isfreq && (c == 'k' || c == 'K')) ? ( v *= 1000; );
+    ed_ok = 1;
+  ) : ( ed_ok = 0; );
+  v;
+);
+// copie des réglages d'une bande vers une autre
+function copy_band(src, dst) local(o) ( o = 0; loop(14, set_sl(bsl(dst, o), bpar(src, o)); o += 1;); );
+// couper la bande b en deux à la fréquence f
+function split_band(b, f) local(j, k, lo, hi)
+(
+  (GN < 6) ? (
+    lo = edge_lo(b)*1.06; hi = edge_hi(b)/1.06; f = clampf(f, max(lo, 20), min(hi, 20000));
+    (f > max(lo, 20) && f < min(hi, 20000)) ? (
+      j = GN - 1; loop(GN - 1 - b, copy_band(j, j + 1); j -= 1;);
+      copy_band(b, b + 1); set_sl(bsl(b + 1, 13), 0);
+      k = GN - 2; loop(GN - 1 - b, set_sl(2 + k + 1, slider(2 + k)); set_sl(7 + k + 1, slider(7 + k)); k -= 1;);
+      set_sl(2 + b, floor(f + 0.5)); set_sl(7 + b, b < GN - 1 ? slider(7 + b + 1) : 3);
+      set_sl(1, GN + 1); GN += 1; 
+    );
+  );
+);
+// supprimer la bande b (fusion avec la voisine)
+function del_band(b) local(j, k)
+(
+  GN > 1 ? (
+    j = b; loop(GN - 1 - b, copy_band(j + 1, j); j += 1;);
+    b < GN - 1 ? ( k = b; loop(GN - 2 - b, set_sl(2 + k, slider(3 + k)); set_sl(7 + k, slider(8 + k)); k += 1;); );
+    set_sl(1, GN - 1); GN -= 1; 
+  );
+);
+// ---- réponse des bandes (complexe, par colonne), recalculée quand les crossovers changent ----
+function hsec(c, n) local(nr, ni, dr, di, d2, tr)
+(
+  h_r = 1; h_i = 0;
+  loop(n,
+    nr = c[0] + c[1]*w_c1 + c[2]*w_c2; ni = -(c[1]*w_s1 + c[2]*w_s2);
+    dr = 1 + c[3]*w_c1 + c[4]*w_c2;    di = -(c[3]*w_s1 + c[4]*w_s2);
+    d2 = max(dr*dr + di*di, EPS);
+    tr = (nr*dr + ni*di)/d2; ni = (ni*dr - nr*di)/d2; nr = tr;
+    tr = h_r*nr - h_i*ni; h_i = h_r*ni + h_i*nr; h_r = tr;
+    c += 5;
+  );
+);
+XT = 16000;   // temporaire : par crossover k : LP (r,i) HP (r,i) AP (r,i)
+function calc_resp() local(i, f, w, k, b, rr, ri, tr, t)
+(
+  i = 0;
+  loop(NC,
+    f = fx((i + 0.5)*CW); w = 2*$pi*min(f, 0.4999*srate)/srate;
+    w_c1 = cos(w); w_s1 = sin(w); w_c2 = cos(2*w); w_s2 = sin(2*w);
+    k = 0;
+    loop(NX,
+      t = XT + k*6;
+      hsec(XC + k*80, XNS[k]); t[0] = h_r; t[1] = h_i;
+      hsec(XC + k*80 + 20, XNS[k]); t[2] = h_r*XSG[k]; t[3] = h_i*XSG[k];
+      hsec(XC + k*80 + 40, XNA[k]); t[4] = h_r; t[5] = h_i;
+      k += 1;
+    );
+    T1R[i] = T1I[i] = 0;
+    b = 0;
+    loop(NBD,
+      rr = 1; ri = 0;
+      k = 0;
+      loop(NX,
+        t = XT + k*6;
+        (k == b - 1) ? ( tr = rr*t[2] - ri*t[3]; ri = rr*t[3] + ri*t[2]; rr = tr; ) :
+        (k >= b) ? ( tr = rr*t[0] - ri*t[1]; ri = rr*t[1] + ri*t[0]; rr = tr; ) :
+        ( tr = rr*t[4] - ri*t[5]; ri = rr*t[5] + ri*t[4]; rr = tr; );
+        k += 1;
+      );
+      RBR[b*COLS + i] = rr; RBI[b*COLS + i] = ri;
+      T1R[i] += rr; T1I[i] += ri;
+      b += 1;
+    );
+    i += 1;
+  );
+  rs_ver = xo_ver; rs_nc = NC; rs_dw = DW; rs_n = NBD;
+);
+// gain linéaire affiché d'une bande (dynamique actuelle)
+function band_gdisp(b) local(p, cm, gd)
+(
+  p = BP + b*32; cm = p[9];
+  gd = cm == 1 ? 0.5*(GDB[b*2] + GDB[b*2 + 1]) : cm == 3 ? GDB[b*2 + 1] : GDB[b*2];
+  p[12] == 2 ? 0 : p[12] == 1 ? 1 : 1 - mixv + mixv*db2lin(gd)*p[15];
+);
+// spectre : FFT des FFTN derniers échantillons du tampon src, moyenne de puissance par colonne
+function spectrum(src, dst, rmsring) local(i, k, j, re, im, sc_, ka, kb, k0, k1, p, n, f, fa, fb, fr, pw, t, nf, avg)
+(
+  i = 0; k = (abw - FFTN) & ABM;
+  loop(FFTN, FFTB[i*2] = src[k]*WIN[i]; FFTB[i*2 + 1] = 0; k = (k + 1) & ABM; i += 1;);
+  fft(FFTB, FFTN); fft_permute(FFTB, FFTN);
+  sc_ = sqr(2/wsum);
+  i = 1;
+  loop(FFTN/2 - 1,
+    re = FFTB[i*2]; im = FFTB[i*2 + 1];
+    FFTB[i] = (re*re + im*im)*sc_*(i*srate/FFTN/1000);
+    i += 1;
+  );
+  FFTB[0] = FFTB[1];
+  fr = srate/FFTN;
+  i = 0;
+  loop(NC,
+    fa = fx(i*CW); fb = fx((i + 1)*CW); f = sqrt(fa*fb);
+    ka = fa/fr; kb = fb/fr;
+    fa >= 0.5*srate ? ( p = EPS; ) :
+    kb - ka < 1 ? (
+      t = f/fr; k0 = floor(t); k1 = k0 + 1;
+      k1 < FFTN/2 ? ( p = FFTB[k0] + (FFTB[k1] - FFTB[k0])*(t - k0); ) : ( p = EPS; );
+    ) : (
+      k0 = max(1, floor(ka + 0.5)); k1 = min(FFTN/2 - 1, floor(kb + 0.5)); k0 = min(k0, k1); p = 0; n = 0;
+      j = k0; loop(max(1, k1 - k0 + 1), p += FFTB[j]; n += 1; j += 1;);
+      p /= max(n, 1);
+    );
+    an_view == 2 ? (
+      rmsring[rms_w*COLS + i] = p;
+      avg = 0; nf = 0; j = 0;
+      loop(RMSN, (now_t - RMST[j] <= 0.5) ? ( avg += rmsring[j*COLS + i]; nf += 1; ); j += 1;);
+      pw = 4.342944819*log(max(avg/max(nf, 1), EPS));
+      dst[i] = max(pw, dst[i] - 6*dt_);
+    ) : (
+      pw = 4.342944819*log(max(p, EPS));
+      dst[i] = max(pw, dst[i] - 48*dt_);
+    );
+    i += 1;
+  );
+);
+
+// état de l'interface
+DOTX = 17000; DOTY = 17010; SELM = 17020; SV = 17100;
+memset(SELM, 0, 8); mq_on = 0;
+sel = 0; hov = -1; hovx = -1; hovb = -1; edit_k = -1; drag = -1; xdrag = -1; pdrag = 0;
+xo_ver = 1; rs_ver = 0;
+memset(SPO, -150, COLS); memset(SPP, -150, COLS);
+memset(RMST, -100, RMSN); rms_w = 0;
+last_t = time_precise();
+// fenêtre Blackman-Harris 4 termes (analyseur)
+wsum = 0; i = 0;
+loop(FFTN,
+  WIN[i] = 0.35875 - 0.48829*cos(2*$pi*i/(FFTN - 1)) + 0.14128*cos(4*$pi*i/(FFTN - 1)) - 0.01168*cos(6*$pi*i/(FFTN - 1));
+  wsum += WIN[i]; i += 1;
+);
+memset(ABPOST, 0, ABN); memset(ABPRE, 0, ABN);
+
+@slider
+// (réglages relus à chaque bloc dans @block)
+
+@block
+NBD = floor(clampf(slider1, 1, 6) + 0.5); NX = NBD - 1;
+// crossovers : fréquences forcées croissantes
+chg = 0; rst = 0;
+dsr != srate ? ( dsr = srate; memset(XK, -1, 20); rst = 1; );
+NBD != XK[19] ? ( XK[19] = NBD; rst = 1; chg = 1; );
+k = 0; pf = 10;
+loop(NX,
+  f = max(clampf(slider(2 + k), 20, 20000), pf*1.02); pf = f;
+  s = floor(clampf(slider(7 + k), 0, 7) + 0.5);
+  (XK[k] != f || XK[10 + k] != s) ? (
+    XK[10 + k] != s ? ( rst = 1; );
+    XK[k] = f; XK[10 + k] = s;
+    design_xo(k, f, s); chg = 1;
+  );
+  k += 1;
+);
+rst ? ( memset(ST, 0, 1200); memset(APS, 0, 2400); );
+chg ? ( xo_ver += 1; );
+slow_co = exp(-1/(1.0*srate));
+// solo : sliders ou momentané (interface)
+any_solo = solo_m >= 0;
+b = 0; loop(NBD, slider(16 + b*14 + 13) >= 0.5 ? ( any_solo = 1; ); b += 1;);
+usc1 = usc2 = 0; dmask = 1;
+b = 0;
+loop(6,
+  p = BP + b*32; sb = 16 + b*14;
+  p[0] = slider(sb) >= 0.5;
+  p[1] = slider(sb + 1);
+  r = clampf(slider(sb + 3), 1, 100);
+  p[2] = p[0] < 0.5 ? ( r >= 99.99 ? 1 : 1 - 1/r ) : r - 1;
+  p[3] = clampf(slider(sb + 2), -30, 30);
+  p[4] = clampf(slider(sb + 4), 0, 30);
+  a = clampf(slider(sb + 5), 0, 50);
+  p[5] = a < 0.01 ? 0 : exp(-1/(a*0.001*srate));
+  p[6] = clampf(slider(sb + 6), 50, 3000)*0.001;
+  p[7] = slider(sb + 7) >= 0.5;
+  p[8] = exp(-1/(p[6]*srate));
+  p[9] = floor(clampf(slider(sb + 9), 0, 5) + 0.5);
+  p[10] = floor(clampf(slider(sb + 10), 0, 2) + 0.5);
+  st_ = floor(clampf(slider(sb + 12), 0, 2) + 0.5);
+  p[12] = st_;
+  // en solo : tout va sur 1/2, bandes non solo coupées
+  so_ = (solo_m == b) || (solo_m < 0 && slider(sb + 13) >= 0.5);
+  any_solo ? ( p[11] = 0; p[16] = so_ ? 1 : 0; ) : ( p[11] = floor(clampf(slider(sb + 11), 0, 5) + 0.5); p[16] = st_ == 2 ? 0 : 1; );
+  // maintien du détecteur : 1,25 période de la fréquence basse de la bande (max 50 ms)
+  fl = b == 0 ? 25 : XK[b - 1];
+  p[13] = floor(min(1.25*srate/max(fl, 20), 0.05*srate));
+  p[14] = exp(-1/max(p[13], 1));
+  p[15] = db2lin(clampf(slider(sb + 8), -24, 24));
+  b < NBD ? (
+    dmask = dmask | 2^p[11];
+    (p[12] == 0 && p[10] == 1) ? ( usc1 = 1; );
+    (p[12] == 0 && p[10] == 2) ? ( usc2 = 1; );
+  );
+  b += 1;
+);
+g_tgt = db2lin(slider12);
+g_co = exp(-1/(0.02*srate));
+mixv = clampf(slider13, 0, 100)*0.01;
+an_mode = floor(slider14 + 0.5) % 3;
+
+@sample
+a_inL = spl0; a_inR = spl1;
+tree(a_inL, 0, 0); tree(a_inR, 0, 1);
+usc1 ? ( tree(spl2, 1, 0); tree(spl3, 1, 1); );
+usc2 ? ( tree(spl4, 2, 0); tree(spl5, 2, 1); );
+b = 0;
+loop(NBD,
+  p = BP + b*32;
+  rl = REG[b]; rr = REG[8 + b];
+  p[12] == 0 ? (
+    // signal de détection : la bande elle-même ou la même bande du side-chain
+    sd = REG + p[10]*16; d_l = sd[b]; d_r = sd[8 + b];
+    cm = p[9];
+    cm == 0 ? ( g0 = g1 = dyn(b, 0, max(abs(d_l), abs(d_r))); ) :
+    cm == 1 ? ( g0 = dyn(b, 0, abs(d_l)); g1 = dyn(b, 1, abs(d_r)); ) :
+    cm == 2 ? ( g0 = dyn(b, 0, abs(d_l)); g1 = 0; ) :
+    cm == 3 ? ( g1 = dyn(b, 0, abs(d_r)); g0 = 0; ) :
+    cm == 4 ? ( g0 = dyn(b, 0, abs(d_l + d_r)*0.5); g1 = 0; ) :
+              ( g0 = dyn(b, 0, abs(d_l - d_r)*0.5); g1 = 0; );
+    GDB[b*2] = g0; GDB[b*2 + 1] = g1;
+    // gain total de la voie traitée : dynamique x output, mélangé (mix)
+    cm == 3 ? ( k0 = 1; k1 = 1 - mixv + mixv*db2lin(g1)*p[15]; ) :
+    cm >= 2 ? ( k0 = 1 - mixv + mixv*db2lin(g0)*p[15]; k1 = 1; ) :
+    ( k0 = 1 - mixv + mixv*db2lin(g0)*p[15]; k1 = 1 - mixv + mixv*db2lin(g1)*p[15]; );
+    cm >= 4 ? (
+      xm = (rl + rr)*0.5; xs = (rl - rr)*0.5;
+      cm == 4 ? ( xm *= k0; ) : ( xs *= k0; );
+      rl = xm + xs; rr = xm - xs;
+    ) : ( rl *= k0; rr *= k1; );
+  ) : ( GDB[b*2] = GDB[b*2 + 1] = 0; LVD[b*2] = LVD[b*2 + 1] = -150; );
+  PRL[b] = rl*p[16]; PRR[b] = rr*p[16];
+  b += 1;
+);
+g_sm = g_tgt + (g_sm - g_tgt)*g_co;
+spl0 = accum(0, 0, PRL)*g_sm;
+spl1 = accum(0, 1, PRR)*g_sm;
+dmask > 1 ? (
+  d = 1;
+  loop(5,
+    dmask & 2^d ? ( spl(2*d) = accum(d, 0, PRL)*g_sm; spl(2*d + 1) = accum(d, 1, PRR)*g_sm; );
+    d += 1;
+  );
+);
+an_mode > 0 ? (
+  ABPRE[abw] = (a_inL + a_inR)*0.5;
+  ABPOST[abw] = (spl0 + spl1)*0.5;
+  abw = (abw + 1) & ABM;
+);
+pkl = max(abs(spl0), pkl*0.99985);
+pkr = max(abs(spl1), pkr*0.99985);
+@gfx 1100 620
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider100
+slider100 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+  thc10r = 0.62; thc10g = 0.92; thc10b = 0.86;
+  thc11r = 0.5; thc11g = 0.9; thc11b = 0.82;
+  thc12r = 0.55; thc12g = 0.86; thc12b = 0.8;
+  thc13r = 0.85; thc13g = 0.97; thc13b = 0.94;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+  thc10r = 1.0; thc10g = 0.8; thc10b = 0.4;
+  thc11r = 1.0; thc11g = 0.8; thc11b = 0.3;
+  thc12r = 0.95; thc12g = 0.8; thc12b = 0.4;
+  thc13r = 1.0; thc13g = 0.9; thc13b = 0.7;
+);
+// ---- Mise en page (fenêtre redimensionnable) ---------------------------------------
+SC = clampf(min(gfx_w/1100, gfx_h/620), 0.6, 2.4);
+BB = floor(42*SC); MW = floor(40*SC); FSH = floor(18*SC);
+DW = max(200, gfx_w - MW); DH = max(150, gfx_h - BB); PH = DH - FSH;
+RNG = slider15 < 0.5 ? 6 : slider15 < 1.5 ? 12 : slider15 < 2.5 ? 24 : 36;
+NC = min(COLS, max(64, floor(DW/2))); CW = DW/NC;
+GN = floor(clampf(slider1, 1, 6) + 0.5);
+now_t = time_precise(); dt_ = clampf(now_t - last_t, 0, 0.25); last_t = now_t;
+an_view = floor(slider14 + 0.5) % 3; an_pre = floor(slider14 + 0.5) >= 3;
+gfx_setfont(1, "Arial", max(8, floor(12*SC)));
+gfx_setfont(2, "Arial", max(8, floor(12*SC)), 'b');
+gfx_setfont(3, "Arial", max(9, floor(15*SC)), 'b');
+gfx_setfont(4, "Arial", max(7, floor(10*SC)));
+gfx_setfont(5, "Arial", max(10, floor(19*SC)), 'b');
+(rs_ver != xo_ver || rs_nc != NC || rs_dw != DW || rs_n != NBD) ? calc_resp();
+PNW = 960*SC; PNH = 100*SC; PNX = floor((DW - PNW)/2); PNY = floor(PH - PNH - 8*SC);
+sel >= GN ? ( sel = GN - 1; );
+ub = 0; loop(6, ub >= GN ? ( SELM[ub] = 0; ); ub += 1;);
+SELM[sel] = 1;
+nsel = 0; ub = 0; loop(GN, nsel += SELM[ub] ? 1 : 0; ub += 1;);
+in_panel = inr(PNX, PNY, PNW, PNH);
+in_disp = mouse_x >= 0 && mouse_x < DW && mouse_y >= 0 && mouse_y < PH && !in_panel;
+XGAP = DW*log(1.06)/log(3000);
+
+// ---- Fond, zones des bandes, grille -------------------------------------------------------
+col(0.07,0.075,0.09); gfx_rect(0, 0, gfx_w, gfx_h, 1);
+col(0.085,0.09,0.11); gfx_rect(0, 0, DW, PH, 1);
+ub = 0;
+loop(GN,
+  ux0 = ub == 0 ? 0 : xf(edge_lo(ub)); ux1 = ub == GN - 1 ? DW : xf(edge_hi(ub));
+  bcol(ub, ub == sel ? 0.07 : 0.025); gfx_rect(ux0, 0, ux1 - ux0, PH, 1);
+  ub += 1;
+);
+uf = 10;
+loop(4,
+  ui = 1;
+  loop(9,
+    ufr = uf*ui; ux = xf(ufr);
+    (ufr >= 20 && ufr <= 20000) ? (
+      (ui == 1 || ui == 2 || ui == 5) ? cola(0.17,0.18,0.21,0.8) : cola(0.12,0.125,0.15,0.8);
+      gfx_line(ux, 0, ux, PH, 1);
+      (ui == 1 || ui == 2 || ui == 5) ? (
+        gfx_setfont(4); col(0.45,0.48,0.54);
+        ufr >= 1000 ? sprintf(#s, "%dk", ufr/1000) : sprintf(#s, "%d", ufr);
+        tx_c(ux, PH + FSH*0.5, #s);
+      );
+    );
+    ui += 1;
+  );
+  uf *= 10;
+);
+ui = -2;
+loop(5,
+  ug = ui*RNG/2; uy = yg(ug);
+  ui == 0 ? col(0.22,0.23,0.27) : col(0.14,0.15,0.18);
+  gfx_line(0, uy, DW, uy, 1);
+  gfx_setfont(4); col(thc12r,thc12g,thc12b);
+  ui == 0 ? strcpy(#s, "0") : sprintf(#s, "%+g", ug);
+  tx_l(4*SC, uy - 7*SC, #s);
+  ui += 1;
+);
+an_view > 0 ? (
+  gfx_setfont(4); col(0.36,0.39,0.45);
+  ui = 1; loop(5, uy = ya(-ui*15); sprintf(#s, "-%d", ui*15); tx_r(DW - 4*SC, uy, #s); ui += 1;);
+);
+
+// ---- Analyseur -----------------------------------------------------------------------
+an_view > 0 ? (
+  RMST[rms_w] = now_t;
+  spectrum(ABPOST, SPO, RMSR);
+  an_pre ? spectrum(ABPRE, SPP, RMSRP);
+  rms_w = (rms_w + 1) % RMSN;
+  an_pre ? (
+    cola(0.40,0.44,0.52,0.55); ui = 0;
+    loop(NC, ux = (ui + 0.5)*CW; uy = clampf(ya(SPP[ui]), 0, PH); ui > 0 ? gfx_line(upx, upy, ux, uy, 1); upx = ux; upy = uy; ui += 1;);
+  );
+  ui = 0;
+  loop(NC,
+    ux = (ui + 0.5)*CW; uy = clampf(ya(SPO[ui]), 0, PH);
+    cola(0.40,0.55,0.75,0.16); gfx_line(ux, uy, ux, PH, 1);
+    ui > 0 ? ( cola(0.62,0.74,0.90,0.75); gfx_line(upx, upy, ux, uy, 1); );
+    upx = ux; upy = uy; ui += 1;
+  );
+);
+
+// ---- Plages dynamiques des bandes (de Output à Output + Range) -------------------------------
+NBD == GN ? (
+  ub = 0;
+  loop(GN,
+    up = BP + ub*32;
+    (up[12] == 0 && abs(up[3]) > 0.05) ? (
+      ugm = 1 - mixv + mixv*up[15]; ugr = 1 - mixv + mixv*up[15]*db2lin(up[3]);
+      bcol(ub, ub == sel ? 0.42 : ub == hovb ? 0.32 : 0.22);
+      ui = 0;
+      loop(NC,
+        urr = RBR[ub*COLS + ui]; uri = RBI[ub*COLS + ui];
+        (urr*urr + uri*uri) > 0.001 ? (
+          ux = (ui + 0.5)*CW;
+          uy0 = yg(10*log10(max(sqr(T1R[ui] + (ugm - 1)*urr) + sqr(T1I[ui] + (ugm - 1)*uri), EPS)));
+          uy1 = yg(10*log10(max(sqr(T1R[ui] + (ugr - 1)*urr) + sqr(T1I[ui] + (ugr - 1)*uri), EPS)));
+          uy0 = clampf(uy0, -2, PH + 2); uy1 = clampf(uy1, -2, PH + 2); gfx_rect(ui*CW, min(uy0, uy1), ceil(CW), max(1, abs(uy1 - uy0)), 1);
+        );
+        ui += 1;
+      );
+    );
+    ub += 1;
+  );
+  // courbe dynamique totale (gains actuels)
+  ub = 0; loop(GN, SV[60 + ub] = band_gdisp(ub); ub += 1;);
+  cola(thc11r,thc11g,thc11b,1);
+  ui = 0;
+  loop(NC,
+    utr = utii = 0; ub = 0;
+    loop(GN, utr += SV[60 + ub]*RBR[ub*COLS + ui]; utii += SV[60 + ub]*RBI[ub*COLS + ui]; ub += 1;);
+    ux = (ui + 0.5)*CW; uy = clampf(yg(10*log10(max(utr*utr + utii*utii, EPS))), -2, PH + 2);
+    ui > 0 ? ( gfx_line(upx, upy, ux, uy, 1); gfx_line(upx, upy + 1, ux, uy + 1, 1); );
+    upx = ux; upy = uy; ui += 1;
+  );
+);
+
+// ---- Survol : point, crossover, bande -------------------------------------------------------
+DR = 8*SC;
+hov = -1; hovx = -1; hovb = -1;
+ub = 0;
+loop(GN,
+  ux0 = xf(max(edge_lo(ub), 20)); ux1 = xf(min(edge_hi(ub), 20000));
+  ux = (ux0 + ux1)*0.5; uy = clampf(yg(bpar(ub, 2)), 8*SC, PH - 8*SC);
+  (ux > PNX - DR && ux < PNX + PNW + DR) ? ( uy = min(uy, PNY - DR - 4*SC); );
+  DOTX[ub] = ux; DOTY[ub] = uy;
+  in_disp ? (
+    (sqr(mouse_x - ux) + sqr(mouse_y - uy) < sqr(DR*1.8)) ? ( hov = ub; );
+    ul = ub == 0 ? 0 : xf(edge_lo(ub)); ur = ub == GN - 1 ? DW : xf(edge_hi(ub));
+    (mouse_x >= ul && mouse_x < ur) ? ( hovb = ub; );
+  );
+  ub += 1;
+);
+(in_disp && hov < 0) ? (
+  uk = 0; loop(GN - 1, abs(mouse_x - xf(slider(2 + uk))) < 5*SC ? ( hovx = uk; ); uk += 1;);
+);
+drag >= 0 ? ( hovb = drag; );
+xdrag >= 0 ? ( hovx = xdrag; );
+
+// ---- Lignes de crossover --------------------------------------------------------------------
+uk = 0;
+loop(GN - 1,
+  ux = floor(xf(slider(2 + uk)));
+  uk == hovx ? cola(thc10r,thc10g,thc10b,0.95) : cola(0.75,0.77,0.82,0.45);
+  uy = 0; loop(floor(PH/(6*SC)), gfx_line(ux, uy, ux, uy + 3*SC, 1); uy += 6*SC;);
+  uk == hovx ? gfx_line(ux + 1, 0, ux + 1, PH, 1);
+  // pente
+  gfx_setfont(4);
+  ux0 = ux - 15*SC; uy0 = 6*SC;
+  uk == hovx ? col(thc0r,thc0g,thc0b) : col(0.17,0.18,0.21); gfx_rect(ux0, uy0, 30*SC, 15*SC, 1);
+  col(0.05,0.05,0.06); gfx_rect(ux0, uy0, 30*SC, 15*SC, 0);
+  uk == hovx ? col(thc5r,thc5g,thc5b) : col(0.75,0.77,0.80);
+  sprintf(#s, "%d", slope_db(slider(7 + uk))); tx_c(ux, uy0 + 7.5*SC, #s);
+  uk += 1;
+);
+
+// ---- Points des bandes ---------------------------------------------------------------------
+ub = 0;
+loop(GN,
+  ux = DOTX[ub]; uy = DOTY[ub];
+  // gain actuel : trait horizontal
+  (NBD == GN && bint(ub, 12) == 0 && abs(bpar(ub, 2)) > 0.05) ? (
+    ugd = bint(ub, 9) == 3 ? GDB[ub*2 + 1] : bint(ub, 9) == 1 ? 0.5*(GDB[ub*2] + GDB[ub*2 + 1]) : GDB[ub*2];
+    bcol(ub, 1); uy1 = clampf(yg(ugd), 2, PH - 2);
+    gfx_rect(ux - 22*SC, uy1 - 1.5*SC, 44*SC, 3*SC, 1);
+  );
+  bint(ub, 12) > 0 ? bcol(ub, 0.35) : bcol(ub, 1);
+  gfx_circle(ux, uy, DR, 1, 1);
+  ub == sel ? ( col(1,1,1); gfx_circle(ux, uy, DR + 2, 0, 1); gfx_circle(ux, uy, DR + 3, 0, 1); ) :
+  SELM[ub] ? ( cola(1,1,1,0.85); gfx_circle(ux, uy, DR + 2, 0, 1); );
+  ub == hov && ub != sel ? ( cola(1,1,1,0.6); gfx_circle(ux, uy, DR + 2, 0, 1); );
+  gfx_setfont(2); col(0.05,0.05,0.07); sprintf(#s, "%d", ub + 1); tx_c(ux, uy, #s);
+  // S / M en haut de la bande (survol) ou allumés
+  (ub == hovb || bint(ub, 13) || bint(ub, 12) == 2) ? (
+    gfx_setfont(4);
+    ux0 = ux - 17*SC; uy0 = 6*SC;
+    bint(ub, 13) ? col(thc11r,thc11g,thc11b) : col(0.17,0.18,0.21); gfx_rect(ux0, uy0, 16*SC, 15*SC, 1);
+    bint(ub, 13) ? col(thc5r,thc5g,thc5b) : col(0.75,0.77,0.80); tx_c(ux0 + 8*SC, uy0 + 7.5*SC, "S");
+    bint(ub, 12) == 2 ? col(1.0,0.30,0.25) : col(0.17,0.18,0.21); gfx_rect(ux0 + 18*SC, uy0, 16*SC, 15*SC, 1);
+    bint(ub, 12) == 2 ? col(0.10,0.02,0.02) : col(0.75,0.77,0.80); tx_c(ux0 + 26*SC, uy0 + 7.5*SC, "M");
+  );
+  ub += 1;
+);
+// infos de survol
+(hovx >= 0 && drag < 0) ? (
+  fmt_f(slider(2 + hovx)); sprintf(#s, "%s  %d dB/oct", #fs, slope_db(slider(7 + hovx)));
+  gfx_setfont(1); gfx_measurestr(#s, uw, uh);
+  ux = clampf(xf(slider(2 + hovx)) + 8*SC, 4, DW - uw - 12*SC); uy = 30*SC;
+  cola(0.03,0.03,0.04,0.85); gfx_rect(ux - 5*SC, uy - 3*SC, uw + 10*SC, uh + 6*SC, 1);
+  col(thc10r,thc10g,thc10b); gfx_x = ux; gfx_y = uy; gfx_drawstr(#s);
+) : (hov >= 0 || (drag >= 0)) ? (
+  uk = drag >= 0 ? drag : hov;
+  kfmt(1, bpar(uk, 1)); strcpy(#s1, #fs); kfmt(2, bpar(uk, 2)); strcpy(#s2, #fs);
+  bint(uk, 0) ? strcpy(#s3, "EXPAND") : strcpy(#s3, "COMPRESS");
+  sprintf(#s, "%d  %s  THR %s  RANGE %s", uk + 1, #s3, #s1, #s2);
+  gfx_setfont(1); gfx_measurestr(#s, uw, uh);
+  ux = clampf(DOTX[uk] - uw*0.5, 4, DW - uw - 8); uy = DOTY[uk] - DR - uh - 10*SC; uy < 24*SC ? ( uy = DOTY[uk] + DR + 6*SC; );
+  cola(0.03,0.03,0.04,0.85); gfx_rect(ux - 6*SC, uy - 3*SC, uw + 12*SC, uh + 6*SC, 1);
+  bcol(uk, 1); gfx_x = ux; gfx_y = uy; gfx_drawstr(#s);
+);
+(in_disp && hov < 0 && hovx < 0) ? (
+  fmt_f(fx(mouse_x)); gfx_setfont(4); col(thc12r,thc12g,thc12b);
+  tx_c(clampf(mouse_x, 30*SC, DW - 30*SC), PH + FSH*0.5, #fs);
+);
+any_solo ? (
+  gfx_setfont(2); col(thc11r,thc11g,thc11b); tx_c(DW*0.5, 32*SC, "SOLO");
+);
+
+// ---- Mètres de sortie --------------------------------------------------------------------------
+col(0.05,0.05,0.06); gfx_rect(DW, 0, MW, DH, 1);
+ui = 0;
+loop(2,
+  udb = lin2db(ui == 0 ? pkl : pkr); ufr = clampf((udb + 60)/66, 0, 1);
+  ux = DW + 6*SC + ui*14*SC;
+  col(0.13,0.14,0.16); gfx_rect(ux, 10*SC, 10*SC, PH - 20*SC, 1);
+  uh = (PH - 20*SC)*ufr;
+  udb > 0 ? col(1.0,0.25,0.18) : udb > -6 ? col(thc0r,thc0g,thc0b) : col(0.30,0.75,0.40);
+  gfx_rect(ux, 10*SC + (PH - 20*SC) - uh, 10*SC, uh, 1);
+  ui += 1;
+);
+cola(1,1,1,0.5); uy = 10*SC + (PH - 20*SC)*(1 - 60/66); gfx_line(DW + 4*SC, uy, DW + MW - 4*SC, uy, 1);
+gfx_setfont(4); col(0.45,0.48,0.54); tx_c(DW + MW*0.5, PH + FSH*0.5, "OUT");
+
+// ---- Panneau de la bande sélectionnée -------------------------------------------------------
+ub = sel;
+cola(0.04,0.045,0.055,0.94); gfx_rect(PNX, PNY, PNW, PNH, 1);
+bcol(sel, 1); gfx_rect(PNX, PNY, 5*SC, PNH, 1);
+col(0.20,0.21,0.25); gfx_rect(PNX, PNY, PNW, PNH, 0);
+gfx_setfont(3); bcol(sel, 1); nsel > 1 ? sprintf(#s, "BAND %d +%d", sel + 1, nsel - 1) : sprintf(#s, "BAND %d", sel + 1);
+tx_l(PNX + 14*SC, PNY + 21*SC, #s);
+gfx_setfont(2);
+btn(PNX + 12*SC, PNY + 39*SC, 36*SC, 22*SC, 0, "<"); btn(PNX + 52*SC, PNY + 39*SC, 36*SC, 22*SC, 0, ">");
+btn(PNX + 92*SC, PNY + 39*SC, 76*SC, 22*SC, 0, "SPLIT");
+btn(PNX + 12*SC, PNY + 68*SC, 76*SC, 22*SC, bint(sel, 12) == 1, "BYPASS");
+btn(PNX + 92*SC, PNY + 68*SC, 76*SC, 22*SC, 0, "DELETE");
+// mètres : niveau du détecteur (avec seuil) et gain
+ux = PNX + 178*SC; uy0 = PNY + 12*SC; uh = PNH - 24*SC;
+col(0.12,0.13,0.15); gfx_rect(ux, uy0, 7*SC, uh, 1); gfx_rect(ux + 11*SC, uy0, 7*SC, uh, 1);
+ulv = max(LVD[sel*2], bint(sel, 9) == 1 ? LVD[sel*2 + 1] : -150); ufr = clampf((ulv + 80)/80, 0, 1);
+col(0.30,0.75,0.40); gfx_rect(ux, uy0 + uh*(1 - ufr), 7*SC, uh*ufr, 1);
+col(thc11r,thc11g,thc11b); uy = uy0 + uh*(1 - clampf((bpar(sel, 1) + 80)/80, 0, 1)); gfx_rect(ux - 2*SC, uy - 1, 11*SC, 2, 1);
+ugd = bint(sel, 9) == 3 ? GDB[sel*2 + 1] : bint(sel, 9) == 1 ? min(GDB[sel*2], GDB[sel*2 + 1]) : GDB[sel*2];
+uy = uy0 + uh*0.5; uy1 = uy0 + uh*(0.5 - clampf(ugd/30, -1, 1)*0.5);
+ugd < 0 ? col(thc0r,thc0g,thc0b) : col(0.45,0.80,1.00); gfx_rect(ux + 11*SC, min(uy, uy1), 7*SC, max(1, abs(uy1 - uy)), 1);
+cola(1,1,1,0.4); gfx_line(ux + 10*SC, uy, ux + 19*SC, uy, 1);
+// boutons rotatifs
+ui = 1;
+loop(7,
+  ux = PNX + (236 + (ui - 1)*70)*SC; uy = PNY + 48*SC;
+  uv = bpar(sel, koff(ui));
+  pknob(ux, uy, 19*SC, kfr(ui, uv), (ui == 2 || ui == 7) ? 0.5 : 0);
+  gfx_setfont(4); col(0.55,0.58,0.64); kname(ui); tx_c(ux, PNY + 12*SC, #kn);
+  gfx_setfont(1); col(thc10r,thc10g,thc10b);
+  kfmt(ui, uv);
+  (ui == 6 && bint(sel, 7)) ? ( strcat(#fs, " A"); );
+  edit_k == ui ? (
+    col(0.02,0.02,0.03); gfx_rect(ux - 33*SC, PNY + 78*SC, 66*SC, 17*SC, 1);
+    col(thc0r,thc0g,thc0b); gfx_rect(ux - 33*SC, PNY + 78*SC, 66*SC, 17*SC, 0);
+    strcpy(#fs, #ed); now_t*2 % 2 < 1 ? strcat(#fs, "_"); col(thc13r,thc13g,thc13b);
+  );
+  tx_c(ux, PNY + 86*SC, #fs);
+  ui += 1;
+);
+gfx_setfont(2);
+btn(PNX + 700*SC, PNY + 10*SC, 59*SC, 22*SC, bint(sel, 0) == 0, "COMP");
+btn(PNX + 761*SC, PNY + 10*SC, 59*SC, 22*SC, bint(sel, 0) == 1, "EXPAND");
+btn(PNX + 700*SC, PNY + 39*SC, 120*SC, 22*SC, bint(sel, 7), "AUTO RELEASE");
+btn(PNX + 700*SC, PNY + 68*SC, 59*SC, 22*SC, bint(sel, 13), "SOLO");
+btn(PNX + 761*SC, PNY + 68*SC, 59*SC, 22*SC, bint(sel, 12) == 2, "MUTE");
+ch_name(bint(sel, 9)); btn(PNX + 828*SC, PNY + 10*SC, 120*SC, 22*SC, bint(sel, 9) > 0, #cn);
+sc_name(bint(sel, 10)); btn(PNX + 828*SC, PNY + 39*SC, 120*SC, 22*SC, bint(sel, 10) > 0, #scn);
+out_name(bint(sel, 11)); btn(PNX + 828*SC, PNY + 68*SC, 120*SC, 22*SC, bint(sel, 11) > 0, #on);
+
+// ---- Barre du bas --------------------------------------------------------------------------
+BY = DH;
+col(0.045,0.048,0.058); gfx_rect(0, BY, gfx_w, BB, 1);
+col(thc0r,thc0g,thc0b); gfx_rect(0, BY, gfx_w, 2, 1);
+gfx_setfont(5); col(thc0r,thc0g,thc0b); tx_l(12*SC, BY + BB*0.5, "RMMultidyn"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RMMultidyn", th_w, th_h); th_x0 = th_x1 - th_w;
+gfx_setfont(4); col(0.55,0.58,0.64); tx_l(136*SC, BY + BB*0.5 + 2*SC, "ReNo Mellow");
+gfx_setfont(4); col(0.55,0.58,0.64); tx_l(214*SC, BY + BB*0.5, "ANALYZER");
+gfx_setfont(2);
+BH = 24*SC; BT = BY + (BB - BH)*0.5;
+btn(274*SC, BT, 46*SC, BH, an_view == 0, "OFF");
+btn(324*SC, BT, 52*SC, BH, an_view == 1, "PEAK");
+btn(380*SC, BT, 52*SC, BH, an_view == 2, "RMS");
+btn(440*SC, BT, 46*SC, BH, an_pre, "PRE");
+gfx_setfont(4); col(0.55,0.58,0.64); tx_l(504*SC, BY + BB*0.5, "RANGE");
+gfx_setfont(2);
+btn(550*SC, BT, 36*SC, BH, RNG == 6, "6");
+btn(590*SC, BT, 36*SC, BH, RNG == 12, "12");
+btn(630*SC, BT, 36*SC, BH, RNG == 24, "24");
+btn(670*SC, BT, 36*SC, BH, RNG == 36, "36");
+gfx_setfont(4); col(0.55,0.58,0.64); tx_l(gfx_w - 346*SC, BY + BB*0.5, "MIX");
+MX = gfx_w - 318*SC; MXW = 92*SC;
+col(0.02,0.02,0.03); gfx_rect(MX, BT, MXW, BH, 1); col(0.20,0.21,0.25); gfx_rect(MX, BT, MXW, BH, 0);
+gfx_setfont(2); col(thc10r,thc10g,thc10b);
+sprintf(#s, "%.0f %%", slider13);
+edit_k == 9 ? ( strcpy(#s, #ed); now_t*2 % 2 < 1 ? strcat(#s, "_"); col(thc13r,thc13g,thc13b); );
+tx_c(MX + MXW*0.5, BT + BH*0.5, #s);
+col(thc0r,thc0g,thc0b); gfx_rect(MX, BT + BH - 3*SC, MXW*clampf(slider13/100, 0, 1), 3*SC, 1);
+gfx_setfont(4); col(0.55,0.58,0.64); tx_l(gfx_w - 186*SC, BY + BB*0.5, "OUTPUT");
+OX = gfx_w - 130*SC; OW = 118*SC;
+col(0.02,0.02,0.03); gfx_rect(OX, BT, OW, BH, 1); col(0.20,0.21,0.25); gfx_rect(OX, BT, OW, BH, 0);
+gfx_setfont(2); col(thc10r,thc10g,thc10b);
+sprintf(#s, "%+.2f dB", slider12);
+edit_k == 8 ? ( strcpy(#s, #ed); now_t*2 % 2 < 1 ? strcat(#s, "_"); col(thc13r,thc13g,thc13b); );
+tx_c(OX + OW*0.5, BT + BH*0.5, #s);
+(slider12 < -0.005 || slider12 > 0.005) ? ( ufr = clampf((slider12 + 24)/48, 0, 1); col(thc0r,thc0g,thc0b); gfx_rect(OX + OW*0.5, BT + BH - 3*SC, (ufr - 0.5)*OW, 3*SC, 1); );
+// saisie de la fréquence d'un crossover
+edit_k == 10 ? (
+  ux = xf(slider(2 + edit_x)); uy = 54*SC;
+  col(0.02,0.02,0.03); gfx_rect(ux - 45*SC, uy, 90*SC, 18*SC, 1);
+  col(thc0r,thc0g,thc0b); gfx_rect(ux - 45*SC, uy, 90*SC, 18*SC, 0);
+  strcpy(#s, #ed); now_t*2 % 2 < 1 ? strcat(#s, "_");
+  gfx_setfont(1); col(thc13r,thc13g,thc13b); tx_c(ux, uy + 9*SC, #s);
+);
+
+// ---- Souris -----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1; mb2 = mouse_cap & 2;
+ushift = mouse_cap & 8; ualt = mouse_cap & 16; uctrl = mouse_cap & 4;
+(mb1 && !last_mb1) ? (
+  udbl = (now_t - lc_t < 0.32) && abs(mouse_x - lc_x) < 6 && abs(mouse_y - lc_y) < 6;
+  lc_t = now_t; lc_x = mouse_x; lc_y = mouse_y;
+  drag = -1; xdrag = -1; pdrag = 0;
+  edit_k >= 0 ? ( edit_k = -1; );
+  in_panel ? (
+    inr(PNX + 12*SC, PNY + 39*SC, 36*SC, 22*SC) ? ( memset(SELM, 0, 8); sel = (sel + GN - 1) % GN; ) :
+    inr(PNX + 52*SC, PNY + 39*SC, 36*SC, 22*SC) ? ( memset(SELM, 0, 8); sel = (sel + 1) % GN; ) :
+    inr(PNX + 92*SC, PNY + 39*SC, 76*SC, 22*SC) ? ( split_band(sel, sqrt(max(edge_lo(sel), 20)*min(edge_hi(sel), 20000))); memset(SELM, 0, 8); ) :
+    inr(PNX + 12*SC, PNY + 68*SC, 76*SC, 22*SC) ? ( uv = bint(sel, 12) == 1 ? 0 : 1; ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 12), uv); ub += 1;); ) :
+    inr(PNX + 92*SC, PNY + 68*SC, 76*SC, 22*SC) ? ( del_band(sel); memset(SELM, 0, 8); sel = max(0, min(sel, GN - 1)); ) :
+    inr(PNX + 700*SC, PNY + 10*SC, 59*SC, 22*SC) ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 0), 0); ub += 1;); ) :
+    inr(PNX + 761*SC, PNY + 10*SC, 59*SC, 22*SC) ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 0), 1); ub += 1;); ) :
+    inr(PNX + 700*SC, PNY + 39*SC, 120*SC, 22*SC) ? ( uv = bint(sel, 7) ? 0 : 1; ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 7), uv); ub += 1;); ) :
+    inr(PNX + 700*SC, PNY + 68*SC, 59*SC, 22*SC) ? ( uv = bint(sel, 13) ? 0 : 1; ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 13), uv); ub += 1;); ) :
+    inr(PNX + 761*SC, PNY + 68*SC, 59*SC, 22*SC) ? ( uv = bint(sel, 12) == 2 ? 0 : 2; ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 12), uv); ub += 1;); ) :
+    inr(PNX + 828*SC, PNY + 10*SC, 120*SC, 22*SC) ? ( menu_k = 1; ) :
+    inr(PNX + 828*SC, PNY + 39*SC, 120*SC, 22*SC) ? ( menu_k = 2; ) :
+    inr(PNX + 828*SC, PNY + 68*SC, 120*SC, 22*SC) ? ( menu_k = 3; ) : (
+      ui = 1;
+      loop(7,
+        ux = PNX + (236 + (ui - 1)*70)*SC;
+        (mouse_x > ux - 34*SC && mouse_x < ux + 34*SC && mouse_x > PNX + 200*SC && mouse_x < PNX + 692*SC) ? (
+          uctrl ? (
+            ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, koff(ui)), kdef(ui)); ub += 1;);
+          ) : udbl ? ( edit_k = ui; strcpy(#ed, ""); ) : (
+            pdrag = ui; pd_y = mouse_y;
+            ub = 0; loop(GN, SV[ub] = kfr(ui, bpar(ub, koff(ui))); ub += 1;);
+          );
+        );
+        ui += 1;
+      );
+    );
+  ) : (mouse_y >= BY) ? (
+    inr(274*SC, BT, 46*SC, BH) ? set_sl(14, 0 + an_pre*3) :
+    inr(324*SC, BT, 52*SC, BH) ? set_sl(14, 1 + an_pre*3) :
+    inr(380*SC, BT, 52*SC, BH) ? set_sl(14, 2 + an_pre*3) :
+    inr(440*SC, BT, 46*SC, BH) ? set_sl(14, an_view + (an_pre ? 0 : 3)) :
+    inr(550*SC, BT, 36*SC, BH) ? set_sl(15, 0) :
+    inr(590*SC, BT, 36*SC, BH) ? set_sl(15, 1) :
+    inr(630*SC, BT, 36*SC, BH) ? set_sl(15, 2) :
+    inr(670*SC, BT, 36*SC, BH) ? set_sl(15, 3) :
+    inr(MX, BT, MXW, BH) ? (
+      uctrl ? set_sl(13, 100) : udbl ? ( edit_k = 9; strcpy(#ed, ""); ) : ( pdrag = 9; pd_v = slider13; pd_y = mouse_y; );
+    ) :
+    inr(OX, BT, OW, BH) ? (
+      uctrl ? set_sl(12, 0) : udbl ? ( edit_k = 8; strcpy(#ed, ""); ) : ( pdrag = 8; pd_v = slider12; pd_y = mouse_y; );
+    );
+  ) : in_disp ? (
+    // S / M en haut de la bande survolée
+    uhit = 0;
+    hovb >= 0 ? (
+      ux0 = DOTX[hovb] - 17*SC; uy0 = 6*SC;
+      inr(ux0, uy0, 16*SC, 15*SC) ? ( set_sl(bsl(hovb, 13), bint(hovb, 13) ? 0 : 1); uhit = 1; ) :
+      inr(ux0 + 18*SC, uy0, 16*SC, 15*SC) ? ( set_sl(bsl(hovb, 12), bint(hovb, 12) == 2 ? 0 : 2); uhit = 1; );
+    );
+    // étiquette de pente d'un crossover
+    uk = 0;
+    loop(GN - 1,
+      (!uhit && inr(xf(slider(2 + uk)) - 15*SC, 6*SC, 30*SC, 15*SC)) ? ( menu_k = 10; menu_x = uk; uhit = 1; );
+      uk += 1;
+    );
+    !uhit ? (
+      hov >= 0 ? (
+        ualt ? ( set_sl(bsl(hov, 12), bint(hov, 12) == 1 ? 0 : 1); ) : (
+          !SELM[hov] ? ( memset(SELM, 0, 8); );
+          SELM[hov] = 1; sel = hov;
+          udbl ? ( edit_k = 2; strcpy(#ed, ""); ) : (
+            drag = hov; dg_x = mouse_x; dg_y = mouse_y;
+            ub = 0; loop(GN, SV[ub] = bpar(ub, 2); ub += 1;);
+            SV[20] = hov > 0 ? slider(1 + hov) : 0; SV[21] = hov < GN - 1 ? slider(2 + hov) : 0;
+          );
+        );
+      ) : hovx >= 0 ? (
+        udbl ? ( edit_k = 10; edit_x = hovx; strcpy(#ed, ""); ) : ( xdrag = hovx; dg_x = mouse_x; SV[22] = slider(2 + hovx); );
+      ) : hovb >= 0 ? (
+        ualt ? ( set_sl(bsl(hovb, 12), bint(hovb, 12) == 1 ? 0 : 1); ) :
+        udbl ? ( split_band(hovb, fx(mouse_x)); memset(SELM, 0, 8); sel = min(hovb + 1, GN - 1); lc_t = 0; ) :
+        ( memset(SELM, 0, 8); sel = hovb; );
+      );
+    );
+  );
+);
+// glisser le point d'une bande : Range (toute la sélection) et position (bande saisie)
+(mb1 && drag >= 0) ? (
+  ufine = ushift ? 0.2 : 1;
+  udx = (mouse_x - dg_x)*ufine; udy = (mouse_y - dg_y)*ufine;
+  ub = 0;
+  loop(GN,
+    SELM[ub] ? set_sl(bsl(ub, 2), floor(clampf(SV[ub] - udy*RNG/(PH*0.44), -30, 30)*10 + 0.5)/10);
+    ub += 1;
+  );
+  abs(mouse_x - dg_x) > 3 ? (
+    udmin = -1000000; udmax = 1000000;
+    drag > 0 ? ( udmin = max(udmin, (drag > 1 ? xf(slider(drag)) + XGAP : xf(20)) - xf(SV[20])); udmax = min(udmax, xf(20000) - xf(SV[20])); );
+    drag < GN - 1 ? ( udmax = min(udmax, (drag < GN - 2 ? xf(slider(3 + drag)) - XGAP : xf(20000)) - xf(SV[21])); udmin = max(udmin, xf(20) - xf(SV[21])); );
+    udx = clampf(udx, udmin, udmax);
+    drag > 0 ? set_sl(1 + drag, floor(fx(xf(SV[20]) + udx) + 0.5));
+    drag < GN - 1 ? set_sl(2 + drag, floor(fx(xf(SV[21]) + udx) + 0.5));
+  );
+);
+// glisser une ligne de crossover
+(mb1 && xdrag >= 0) ? (
+  ufine = ushift ? 0.2 : 1;
+  ulo = xdrag > 0 ? slider(1 + xdrag)*1.06 : 20; uhi = xdrag < GN - 2 ? slider(3 + xdrag)/1.06 : 20000;
+  set_sl(2 + xdrag, floor(clampf(fx(xf(SV[22]) + (mouse_x - dg_x)*ufine), max(ulo, 20), min(uhi, 20000)) + 0.5));
+);
+// glisser un bouton du panneau, le mix ou la sortie
+(mb1 && pdrag > 0) ? (
+  ufine = ushift ? 0.15 : 1; udy = (pd_y - mouse_y)*ufine;
+  pdrag <= 7 ? (
+    ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, koff(pdrag)), kval(pdrag, SV[ub] + udy*0.004)); ub += 1;);
+  ) :
+  pdrag == 8 ? set_sl(12, floor(clampf(pd_v + udy*0.1, -24, 24)*100 + 0.5)/100) :
+  pdrag == 9 ? set_sl(13, floor(clampf(pd_v + udy*0.4, 0, 100)*10 + 0.5)/10);
+);
+!mb1 ? ( drag = -1; xdrag = -1; pdrag = 0; );
+// molette : pente sur une ligne de crossover, Threshold sur une bande
+mouse_wheel != 0 ? (
+  hovx >= 0 ? (
+    set_sl(7 + hovx, clampf(floor(slider(7 + hovx) + 0.5) + (mouse_wheel > 0 ? 1 : -1), 0, 7));
+  ) : (in_disp && hovb >= 0) ? (
+    uv = mouse_wheel/120*(ushift ? 0.2 : 1);
+    ub = 0;
+    loop(GN,
+      ((SELM[hovb] && SELM[ub]) || ub == hovb) ? set_sl(bsl(ub, 1), floor(clampf(bpar(ub, 1) + uv, -80, 0)*10 + 0.5)/10);
+      ub += 1;
+    );
+  ) : (in_panel) ? (
+    // molette sur un bouton du panneau
+    ui = 1;
+    loop(7,
+      ux = PNX + (236 + (ui - 1)*70)*SC;
+      (mouse_x > ux - 34*SC && mouse_x < ux + 34*SC) ? (
+        ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, koff(ui)), kval(ui, kfr(ui, bpar(ub, koff(ui))) + mouse_wheel/120*(ushift ? 0.002 : 0.01))); ub += 1;);
+      );
+      ui += 1;
+    );
+  );
+  mouse_wheel = 0;
+);
+// clic droit : rectangle de sélection (glisser) ou menu de la bande (clic simple)
+(mb2 && !last_mb2 && in_disp) ? ( mq_on = 1; mq_x = mouse_x; mq_y = mouse_y; mq_b = hov >= 0 ? hov : hovb; mq_xo = hovx; );
+mq_on ? (
+  mb2 ? (
+    (abs(mouse_x - mq_x) > 3 || abs(mouse_y - mq_y) > 3) ? (
+      cola(thc10r,thc10g,thc10b,0.10); gfx_rect(min(mq_x, mouse_x), min(mq_y, mouse_y), abs(mouse_x - mq_x), abs(mouse_y - mq_y), 1);
+      cola(thc10r,thc10g,thc10b,0.80); gfx_rect(min(mq_x, mouse_x), min(mq_y, mouse_y), abs(mouse_x - mq_x), abs(mouse_y - mq_y), 0);
+    );
+  ) : (
+    (abs(mouse_x - mq_x) > 3 || abs(mouse_y - mq_y) > 3) ? (
+      !ushift ? ( memset(SELM, 0, 8); usf = -1; ) : ( usf = sel; );
+      ub = 0;
+      loop(GN,
+        (DOTX[ub] >= min(mq_x, mouse_x) && DOTX[ub] <= max(mq_x, mouse_x) && DOTY[ub] >= min(mq_y, mouse_y) && DOTY[ub] <= max(mq_y, mouse_y)) ? (
+          SELM[ub] = 1; usf < 0 ? ( usf = ub; );
+        );
+        ub += 1;
+      );
+      usf >= 0 ? ( sel = usf; );
+    ) : mq_xo >= 0 ? ( menu_k = 10; menu_x = mq_xo; ) : mq_b >= 0 ? (
+      !SELM[mq_b] ? ( memset(SELM, 0, 8); ); SELM[mq_b] = 1; sel = mq_b; menu_k = 9; mn_f = fx(mq_x);
+    );
+    mq_on = 0;
+  );
+);
+menu_k > 0 ? (
+  gfx_x = mouse_x; gfx_y = mouse_y;
+  u0 = bint(sel, 0); u9 = bint(sel, 9); u10 = bint(sel, 10); u11 = bint(sel, 11);
+  menu_k == 1 ? (
+    strcpy(#m, ""); mk(u9 == 0, "Stereo (linked)|"); mk(u9 == 1, "Dual (L/R unlinked)|"); mk(u9 == 2, "Left|"); mk(u9 == 3, "Right|"); mk(u9 == 4, "Mid|"); mk(u9 == 5, "Side");
+    um = gfx_showmenu(#m);
+    um > 0 ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 9), um - 1); ub += 1;); );
+  ) : menu_k == 2 ? (
+    strcpy(#m, ""); mk(u10 == 0, "Internal|"); mk(u10 == 1, "Sidechain input 3/4|"); mk(u10 == 2, "Sidechain input 5/6");
+    um = gfx_showmenu(#m);
+    um > 0 ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 10), um - 1); ub += 1;); );
+  ) : menu_k == 3 ? (
+    strcpy(#m, ""); uk = 0;
+    loop(6, sprintf(#mi, "Output %d/%d", 2*uk + 1, 2*uk + 2); uk < 5 ? strcat(#mi, "|"); mk(u11 == uk, #mi); uk += 1;);
+    um = gfx_showmenu(#m);
+    um > 0 ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 11), um - 1); ub += 1;); );
+  ) : menu_k == 10 ? (
+    us = floor(slider(7 + menu_x) + 0.5);
+    strcpy(#m, ""); uk = 0;
+    loop(8, sprintf(#mi, "%d dB/oct", 6*(uk + 1)); uk < 7 ? strcat(#mi, "|"); mk(us == uk, #mi); uk += 1;);
+    um = gfx_showmenu(#m);
+    um > 0 ? set_sl(7 + menu_x, um - 1);
+  ) : (
+    strcpy(#m, ">Mode|"); mk(u0 == 0, "Compress|"); mk(u0 == 1, "<Expand|");
+    strcat(#m, ">Channel|"); mk(u9 == 0, "Stereo (linked)|"); mk(u9 == 1, "Dual (L/R unlinked)|"); mk(u9 == 2, "Left|"); mk(u9 == 3, "Right|"); mk(u9 == 4, "Mid|"); mk(u9 == 5, "<Side|");
+    strcat(#m, ">Sidechain|"); mk(u10 == 0, "Internal|"); mk(u10 == 1, "Input 3/4|"); mk(u10 == 2, "<Input 5/6|");
+    strcat(#m, ">Output|"); uk = 0; loop(6, sprintf(#mi, "%d/%d|", 2*uk + 1, 2*uk + 2); uk == 5 ? strcpy(#mi, "<11/12|"); mk(u11 == uk, #mi); uk += 1;);
+    strcat(#m, "|"); mk(bint(sel, 7), "Auto Release|"); mk(bint(sel, 12) == 1, "Bypass|"); mk(bint(sel, 12) == 2, "Mute|"); mk(bint(sel, 13), "Solo|");
+    strcat(#m, "|"); GN < 6 ? strcat(#m, "Split band here|") : strcat(#m, "#Split band here|");
+    GN > 1 ? strcat(#m, "Delete band") : strcat(#m, "#Delete band");
+    u7n = bint(sel, 7) ? 0 : 1; u12b = bint(sel, 12) == 1 ? 0 : 1; u12m = bint(sel, 12) == 2 ? 0 : 2; u13n = bint(sel, 13) ? 0 : 1;
+    um = gfx_showmenu(#m);
+    ub = 0;
+    loop(GN,
+      SELM[ub] ? (
+        (um >= 1 && um <= 2) ? set_sl(bsl(ub, 0), um - 1) :
+        (um >= 3 && um <= 8) ? set_sl(bsl(ub, 9), um - 3) :
+        (um >= 9 && um <= 11) ? set_sl(bsl(ub, 10), um - 9) :
+        (um >= 12 && um <= 17) ? set_sl(bsl(ub, 11), um - 12) :
+        um == 18 ? set_sl(bsl(ub, 7), u7n) :
+        um == 19 ? set_sl(bsl(ub, 12), u12b) :
+        um == 20 ? set_sl(bsl(ub, 12), u12m) :
+        um == 21 ? set_sl(bsl(ub, 13), u13n);
+      );
+      ub += 1;
+    );
+    um == 22 ? ( split_band(sel, mn_f); memset(SELM, 0, 8); ) :
+    um == 23 ? ( del_band(sel); memset(SELM, 0, 8); sel = max(0, min(sel, GN - 1)); );
+  );
+  menu_k = 0;
+);
+// clavier
+uc = gfx_getchar();
+edit_k >= 0 ? (
+  while (uc > 0) (
+    ((uc >= '0' && uc <= '9') || uc == '.' || uc == '-' || uc == '+' || uc == 'k' || uc == 'K') ? ( strlen(#ed) < 10 ? ( sprintf(#c1, "%c", uc); strcat(#ed, #c1); ); ) :
+    uc == 8 ? ( strlen(#ed) > 0 ? strcpy_substr(#ed, #ed, 0, strlen(#ed) - 1); ) :
+    (uc == 13 || uc == 9) ? (
+      uv = parse_val(edit_k == 10);
+      ed_ok ? (
+        edit_k <= 7 ? (
+          ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, koff(edit_k)), kval(edit_k, kfr(edit_k, uv))); ub += 1;);
+        ) :
+        edit_k == 8 ? set_sl(12, clampf(uv, -24, 24)) :
+        edit_k == 9 ? set_sl(13, clampf(uv, 0, 100)) : (
+          ulo = edit_x > 0 ? slider(1 + edit_x)*1.06 : 20; uhi = edit_x < GN - 2 ? slider(3 + edit_x)/1.06 : 20000;
+          set_sl(2 + edit_x, floor(clampf(uv, max(ulo, 20), min(uhi, 20000)) + 0.5));
+        );
+      );
+      // Tab : bouton suivant du panneau
+      (uc == 9 && edit_k >= 1 && edit_k < 7) ? ( edit_k += 1; strcpy(#ed, ""); ) : ( edit_k = -1; );
+    ) :
+    uc == 27 ? ( edit_k = -1; );
+    uc = edit_k >= 0 ? gfx_getchar() : 0;
+  );
+) : (
+  // Suppr : supprimer les bandes sélectionnées (de la plus haute à la plus basse)
+  (uc == 6579564 || uc == 8) ? (
+    ub = GN - 1; loop(GN, (SELM[ub] && GN > 1) ? del_band(ub); ub -= 1;);
+    memset(SELM, 0, 8); sel = max(0, min(sel, GN - 1));
+  );
+);
+// solo momentané : Ctrl (Cmd sur Mac) enfoncé = solo de la bande sous le pointeur
+solo_m = (mouse_cap & 4) ? ( drag >= 0 ? drag : (in_disp ? hovb : -1) ) : -1;
+last_mb1 = mb1; last_mb2 = mb2;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider100 = slider100 >= 0.5 ? 0 : 1; sliderchange(slider100); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;

@@ -1,8 +1,8 @@
 desc:RM1373 - ReNo Mellow 1373 (Class-A Preamp EQ, 3 Mids)
 //tags: equalizer EQ preamp class-A neve-style 1073 harmonics
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
+//@version 1.6
+//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
 //@about Égaliseur de préampli classe A inspiré du Neve 1073, avec trois médiums au lieu d'un : shelfs Baxandall, médiums à inductance, harmoniques du LINE, phase, EQL.
 //
 // ---------------------------------------------------------------------------
@@ -54,6 +54,7 @@ slider14:0<-12,12,0.1>-Calib (dB)
 slider15:0<-12,12,0.1>-Output (dB)
 slider16:1<0,3,1{75%,100%,125%,150%}>-Size
 slider17:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
+slider18:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -381,7 +382,7 @@ function ring(cx,cy,r1,r2,deg) local(i, x1, y1)
 );
 function draw_btn(x,y,w,h,on,str)
 (
-  on ? col(0.93,0.62,0.22) : col(0.19,0.19,0.21);
+  on ? col(thc6r,thc6g,thc6b) : col(0.19,0.19,0.21);
   rct(x,y,w,h,1);
   col(0.04,0.04,0.04); rct(x,y,w,h,0);
   on ? col(0.10,0.07,0.03) : col(0.82,0.79,0.72);
@@ -395,7 +396,7 @@ function draw_knob_s(cx,cy,r,frac) local(x1, y1, t)
   ln(x1,y1,kx,ky);
   col(0.06,0.06,0.07); gfx_circle(PX(cx), PY(cy), r*S, 1, 1);
   col(0.30,0.30,0.33); gfx_circle(PX(cx), PY(cy), r*0.86*S, 0, 1);
-  col(0.93,0.62,0.22);
+  col(thc6r,thc6g,thc6b);
   knob_pt(cx,cy,r*0.15,frac); x1 = kx; y1 = ky;
   knob_pt(cx,cy,r*0.8,frac);
   t = 0;
@@ -494,6 +495,14 @@ spl0 = min(max(zl, -1), 1);
 spl1 = min(max(zr, -1), 1);
 
 @gfx 1420 360
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider18
+slider18 >= 0.5 ? (
+  thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
+  thc8r = 0.78; thc8g = 0.96; thc8b = 0.92;
+) : (
+  thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
+  thc8r = 1.0; thc8g = 0.86; thc8b = 0.55;
+);
 S  = 0.75 + 0.25*floor(slider16 + 0.5);
 ox = max(0, floor((gfx_w - 1420*S)/2));
 oy = max(0, floor((gfx_h - 360*S)/2));
@@ -549,7 +558,7 @@ gfx_setfont(5); col(0.95,0.95,0.96); text_c(HX - 52, 78, "+"); text_c(HX + 52, 7
 gfx_setfont(3); text_c(HX, KYC + 62, "0"); text_c(HX, KYC + 80, "12 kHz");
 gain_scale(HX, KYC, 46, 17);
 grey(HX, KYC, 32, gdeg(slider2, 16));
-sprintf(#s, "%+.1f dB", slider2); col(0.93,0.62,0.22); text_c(HX, KYC + 100, #s);
+sprintf(#s, "%+.1f dB", slider2); col(thc6r,thc6g,thc6b); text_c(HX, KYC + 100, #s);
 
 // ---- 3 médiums ------------------------------------------------------------------------
 m = 0;
@@ -571,7 +580,7 @@ loop(3,
   ring(MX0, KYC, 30, 48, 90 + fi*30);
   grey(MX0, KYC, 28, gdeg(slider(4 + 2*m), 18));
   fi == 0 ? strcpy(#s, "OFF") : sprintf(#s, "%+.1f dB", slider(4 + 2*m));
-  col(0.93,0.62,0.22); text_c(MX0, KYC + 116, #s);
+  col(thc6r,thc6g,thc6b); text_c(MX0, KYC + 116, #s);
   sprintf(#s, "MID %d", m + 1); col(0.70,0.72,0.76); text_c(MX0, 24, #s);
   m += 1;
 );
@@ -593,7 +602,7 @@ fi = floor(slider9 + 0.5);
 ring(LFX, KYC, 30, 48, 90 + fi*32);
 grey(LFX, KYC, 28, gdeg(slider10, 16));
 fi == 0 ? strcpy(#s, "OFF") : sprintf(#s, "%+.1f dB", slider10);
-col(0.93,0.62,0.22); text_c(LFX, KYC + 116, #s);
+col(thc6r,thc6g,thc6b); text_c(LFX, KYC + 116, #s);
 
 // ---- HPF (bleu) ----------------------------------------------------------------------------
 HPX = 1210;
@@ -618,11 +627,11 @@ col(0.97,0.97,0.97); ang_pt(HPX, KYC, 6, angd); x1 = kx; y1 = ky; ang_pt(HPX, KY
 
 // ---- PHASE / EQL ---------------------------------------------------------------------------
 BX = 1300;
-slider12 >= 0.5 ? col(1.0,0.86,0.55) : col(0.95,0.95,0.94);
+slider12 >= 0.5 ? col(thc8r,thc8g,thc8b) : col(0.95,0.95,0.94);
 rct(BX, 62, 48, 70, 1); col(0.30,0.30,0.30); rct(BX, 62, 48, 70, 0);
 gfx_setfont(3); col(0.15,0.15,0.15);
 text_c(BX + 24, 76, "P"); text_c(BX + 24, 88, "H"); text_c(BX + 24, 100, "A"); text_c(BX + 24, 112, "S"); text_c(BX + 24, 124, "E");
-slider13 >= 0.5 ? col(1.0,0.86,0.55) : col(0.95,0.95,0.94);
+slider13 >= 0.5 ? col(thc8r,thc8g,thc8b) : col(0.95,0.95,0.94);
 rct(BX, 138, 48, 52, 1); col(0.30,0.30,0.30); rct(BX, 138, 48, 52, 0);
 gfx_setfont(5); col(0.15,0.15,0.15); text_c(BX + 24, 164, "EQL");
 gfx_setfont(4); col(0.95,0.95,0.96); text_c(BX + 24, 210, "1373");
@@ -633,7 +642,7 @@ slider13 >= 0.5 ? strcpy(#s, "EQ IN") : strcpy(#s, "BYPASS"); text_c(BX + 24, 23
 // ---- Bandeau --------------------------------------------------------------------------------
 col(0.06,0.06,0.065); rct(6, 304, 1408, 50, 1);
 oby = 318; cky = oby + 11;
-gfx_setfont(4); col(0.93,0.62,0.22); text_l(22, cky, "RM1373");
+gfx_setfont(4); col(thc6r,thc6g,thc6b); text_l(22, cky, "RM1373"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1373", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.85,0.82,0.75);
 text_c(160, cky, "CALIB");
 draw_knob_s(196, cky, 10, (slider14 + 12)/24);
@@ -698,3 +707,12 @@ mb1 = mouse_cap & 1;
 !mb1 ? (drag = 0);
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider18 = slider18 >= 0.5 ? 0 : 1; sliderchange(slider18); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;
