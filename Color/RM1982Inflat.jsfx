@@ -1,0 +1,340 @@
+desc:RM1982Inflat - ReNo Mellow 1982 (Inflator)
+//tags: inflator saturation loudness waveshaper
+//@author ReNo Mellow
+//@version 1.0
+//@changelog Première version publique
+//@about Inflator (comportement du Sonnox Oxford Inflator, mode Band Split compris), d'après RCInflator 2 (Oxford Edition) de lewloiwc, basé sur RCInflator de RCJacH (ajouts sai'ke et chmaha) : input, effect, curve, clip 0 dB, band split, effect in, output ; courbe de transfert affichée ; saisie des valeurs au clavier.
+//
+// ---------------------------------------------------------------------------
+// RM1982Inflat - "inflator" (clone du comportement du Sonnox Oxford
+// Inflator, mode Band Split compris), d'après RCInflator 2 (Oxford Edition)
+// de lewloiwc, lui-même basé sur RCInflator de RCJacH (ajouts sai'ke et
+// chmaha). Discussion : https://forum.cockos.com/showthread.php?t=256286
+// Algorithme repris tel quel, réécrit sans fonctions à instance pour la
+// série 1982.
+//
+// INPUT (-6..+12 dB) -> écrêtage à 0 dB (CLIP 0 dB) ou à +6 dB -> mise en
+// forme polynomiale (EFFECT = mélange, CURVE = forme) -> OUTPUT (-12..0 dB).
+// BAND SPLIT : traitement séparé grave (< 240 Hz), médium, aigu (> 2400 Hz)
+// par filtres passe-tout reconstructibles. EFFECT IN : bypass de l'effet.
+//
+// Ajouts de la série 1982 : interface 1982 en anglais, courbe de transfert
+// affichée, crête-mètres, tailles 75-150 %, double-clic pour saisir une
+// valeur, clipper caché à 0 dBFS en sortie, latence nulle.
+// ---------------------------------------------------------------------------
+
+slider1:0<-6,12,0.01>-Input (dB)
+slider2:0<0,100,0.1>-Effect (%)
+slider3:0<-50,50,0.1>-Curve
+slider4:1<0,1,1{Off,On}>-Clip 0 dB
+slider5:0<0,1,1{Off,On}>-Band Split
+slider6:1<0,1,1{Off,On}>-Effect In
+slider7:0<-12,0,0.01>-Output (dB)
+slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+ext_noinit = 1;
+ext_nodenorm = 1;
+EPS = 0.000000001;
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+function clamp(x, lo, hi) ( x < lo ? lo : x > hi ? hi : x; );
+function svf_c(f) ( tan($pi*(f/srate - 0.25))*0.5 + 0.5; );
+// mise en forme (identique à l'original) ; sh_a, sh_b, sh_c, sh_d, wet, dry globaux
+function shape(x) local(y)
+(
+  y = abs(x);
+  (y < 1 ? ( sh_a*y + sh_b*sqr(y) + sh_c*y*sqr(y) - sh_d*(sqr(y) - 2*sqr(y)*y + sqr(sqr(y))); ) :
+   y < 2 ? ( 2*y - sqr(y); ) : 0)*wet*sign(x) + x*dry;
+);
+// courbe sans le terme sec, pour l'affichage
+function shape_view(y) ( (y < 1 ? sh_a*y + sh_b*sqr(y) + sh_c*y*sqr(y) - sh_d*(sqr(y) - 2*sqr(y)*y + sqr(sqr(y))) : y < 2 ? 2*y - sqr(y) : 0)*wet + y*dry; );
+iL_a = iL_b = iR_a = iR_b = 0;
+edit_k = -1;
+pi0 = pi1 = po0 = po1 = 0;
+
+// ---- Outils graphiques ---------------------------------------------------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(pow(2, idx - 1)); ); );
+
+function draw_led(x, y, r, on)
+(
+  col(0.03,0.03,0.035); gfx_circle(PX(x), PY(y), (r + 2)*S, 1, 1);
+  col(0.20 + 0.80*on, 0.10 + 0.50*on, 0.04 + 0.08*on); gfx_circle(PX(x), PY(y), r*S, 1, 1);
+);
+// ---- Boutons : valeur <-> position (0..1) ----------------------------------------
+
+
+// k = 0 input, 1 effect, 2 curve, 3 output
+function k_frac(k) ( k == 0 ? (slider1 + 6)/18 : k == 1 ? slider2/100 : k == 2 ? (slider3 + 50)/100 : (slider7 + 12)/12; );
+function k_set(k, f)
+(
+  f = min(max(f, 0), 1);
+  k == 0 ? set_sl(1, floor((f*18 - 6)*100 + 0.5)/100) :
+  k == 1 ? set_sl(2, floor(f*1000 + 0.5)/10) :
+  k == 2 ? set_sl(3, floor((f*100 - 50)*10 + 0.5)/10) :
+  set_sl(7, floor((f*12 - 12)*100 + 0.5)/100);
+);
+function k_def(k) ( k == 0 ? set_sl(1, 0) : k == 1 ? set_sl(2, 0) : k == 2 ? set_sl(3, 0) : set_sl(7, 0); );
+function k_type(k, v)
+(
+  k == 0 ? set_sl(1, min(max(v, -6), 12)) : k == 1 ? set_sl(2, min(max(v, 0), 100)) :
+  k == 2 ? set_sl(3, min(max(v, -50), 50)) : set_sl(7, min(max(v, -12), 0));
+);
+function kx_(k) ( k == 0 ? 340 : k == 1 ? 480 : k == 2 ? 640 : 780; );
+function kr_(k) ( (k == 1 || k == 2) ? 44 : 27; );
+function hbar(x, y, w, h, v) local(f)
+(
+  f = min(max((lin2db(v) + 60)/60, 0), 1);
+  col(0.16,0.165,0.18); rct(x, y, w, h, 1);
+  f > 0.003 ? ( col(0.30,0.75,0.35); rct(x, y, w*min(f, 0.8), h, 1); );
+  f > 0.8 ? ( col(1.00,0.58,0.12); rct(x + w*0.8, y, w*(min(f, 0.95) - 0.8), h, 1); );
+  f > 0.95 ? ( col(1.00,0.25,0.18); rct(x + w*0.95, y, w*(f - 0.95), h, 1); );
+);
+
+@slider
+// (réglages relus à chaque bloc dans @block)
+
+@block
+pre = exp(slider1*(log(10)*0.05));
+post = exp(slider7*(log(10)*0.05));
+wet = slider2*0.01*0.99999955296;
+dry = 1 - slider2*0.01;
+sh_a = slider3*0.01 + 1.5;
+sh_b = slider3*-0.02;
+sh_c = slider3*0.01 - 0.5;
+sh_d = 0.0625 - slider3*0.0025 + sqr(slider3)*0.000025;
+clip_on = slider4 >= 0.5; split_on = slider5 >= 0.5; fx_on = slider6 >= 0.5;
+// séparation de bandes 240 / 2400 Hz
+bs_sr != srate ? (
+  ca = svf_c(240); cb = svf_c(2400);
+  bgain = cb*(1 - ca)/(cb - ca); bgain_div = 1/bgain;
+  bs_sr = srate;
+);
+
+@sample
+lim = clip_on ? 1 : 2;
+xl = clamp(spl0*pre, -lim, lim);
+xr = clamp(spl1*pre, -lim, lim);
+pi0 = max(abs(xl), pi0*0.99985); pi1 = max(abs(xr), pi1*0.99985);
+fx_on ? (
+  split_on ? (
+    // gauche
+    lo = iL_a + ca*(xl - iL_a); iL_a = 2*lo - iL_a;
+    r_ = (1 - cb)*iL_b + cb*xl; iL_b = 2*r_ - iL_b; hi = xl - r_;
+    md = xl - lo - hi;
+    xl = shape(lo) + shape(md*bgain)*bgain_div + shape(hi);
+    // droite
+    lo = iR_a + ca*(xr - iR_a); iR_a = 2*lo - iR_a;
+    r_ = (1 - cb)*iR_b + cb*xr; iR_b = 2*r_ - iR_b; hi = xr - r_;
+    md = xr - lo - hi;
+    xr = shape(lo) + shape(md*bgain)*bgain_div + shape(hi);
+  ) : (
+    xl = shape(xl);
+    xr = shape(xr);
+  );
+);
+abs(xl) < 0.0000000000000000555111512312578270211815834045 ? ( xl = 0; ) : ( xl *= post; );
+abs(xr) < 0.0000000000000000555111512312578270211815834045 ? ( xr = 0; ) : ( xr *= post; );
+// clipper caché à 0 dBFS
+(abs(xl) > 1 || abs(xr) > 1) ? ( clip_f = 1; );
+spl0 = min(max(xl, -1), 1);
+spl1 = min(max(xr, -1), 1);
+po0 = max(abs(spl0), po0*0.99985); po1 = max(abs(spl1), po1*0.99985);
+
+@gfx 860 412
+S  = 0.75 + 0.25*floor(slider8 + 0.5);
+ox = max(0, floor((gfx_w - 860*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+clip_f ? ( clip_hold = 60; clip_f = 0; ) : ( clip_hold = max(clip_hold - 1, 0); );
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(9*S)), 'b');
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,848,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 848, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,848,2,1);
+col(0.04,0.04,0.045); rct(6,364,848,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(842), PY(20), 4*S, 1, 1); gfx_circle(PX(842), PY(352), 4*S, 1, 1);
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982Inflat"); gfx_measurestr("RM1982Inflat", t_w, t_h); t_x = 34 + t_w/S + 14;
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(t_x, 38, "INFLATOR");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(826, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 792, 2, 1);
+
+// ---- Courbe de transfert ------------------------------------------------------------
+GX = 34; GY = 72; GW = 240; GH = 272;
+col(0.03,0.03,0.035); rct(GX, GY, GW, GH, 1);
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(GX + 10, GY + 12, "TRANSFER CURVE");
+// zone de tracé : entrée 0..lim (x), sortie 0..1.2 (y)
+PX0 = GX + 14; PY0 = GY + GH - 14; PW = GW - 28; PH = GH - 46;
+ulim = slider4 >= 0.5 ? 1 : 2;
+col(0.12,0.125,0.14);
+ui = 1; loop(3, rct(PX0 + PW*ui/4, PY0 - PH, 1, PH, 1); rct(PX0, PY0 - PH*ui/4, PW, 1, 1); ui += 1;);
+// diagonale (sans effet) : sortie = entrée
+col(0.32,0.33,0.36);
+ln(PX0, PY0, PX0 + PW*min(1, 1.2/ulim), PY0 - PH*min(ulim, 1.2)/1.2);
+col(1.00,0.58,0.12);
+ux0 = PX0; uy0 = PY0;
+ui = 1;
+loop(120,
+  uin = ui/120*ulim;
+  slider6 >= 0.5 ? ( uout = shape_view(uin); ) : ( uout = uin; );
+  uout *= exp(slider7*(log(10)*0.05));
+  ux1 = PX0 + PW*ui/120; uy1 = PY0 - PH*min(uout/1.2, 1);
+  ln(ux0, uy0, ux1, uy1); ln(ux0, uy0 - 1, ux1, uy1 - 1);
+  ux0 = ux1; uy0 = uy1;
+  ui += 1;
+);
+col(1.00,0.25,0.18); rct(PX0, PY0 - PH/1.2, PW, 1, 1);
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_l(PX0, PY0 + 8, "0"); text_r(PX0 + PW, PY0 + 8, ulim == 1 ? "IN 0 dB" : "IN +6 dB");
+text_l(PX0 + 2, PY0 - PH/1.2 - 7, "0 dB");
+
+// ---- Mètres ---------------------------------------------------------------------------
+col(0.03,0.03,0.035); rct(296, 72, 530, 50, 1);
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_l(306, 86, "IN  L"); text_l(306, 106, "IN  R"); text_l(566, 86, "OUT L"); text_l(566, 106, "OUT R");
+hbar(340, 81, 200, 10, pi0); hbar(340, 101, 200, 10, pi1);
+hbar(600, 81, 180, 10, po0); hbar(600, 101, 180, 10, po1);
+col(0.03,0.03,0.035); gfx_circle(PX(806), PY(92), 7*S, 1, 1);
+clip_hold > 0 ? col(1.00,0.20,0.15) : col(0.20,0.05,0.04); gfx_circle(PX(806), PY(92), 5*S, 1, 1);
+gfx_setfont(6); col(0.55,0.56,0.60); text_c(806, 110, "CLIP");
+
+// ---- Boutons rotatifs -------------------------------------------------------------------
+KNY = 214;
+ui = 0;
+loop(4,
+  kcx = kx_(ui); krr = kr_(ui);
+  ufz = ui == 0 ? 6/18 : ui == 2 ? 0.5 : ui == 3 ? 1 : 0;
+  draw_knob(kcx, KNY, krr, k_frac(ui), ufz);
+  gfx_setfont(4); col(0.92,0.93,0.95);
+  ui == 0 ? strcpy(#s, "INPUT") : ui == 1 ? strcpy(#s, "EFFECT") : ui == 2 ? strcpy(#s, "CURVE") : strcpy(#s, "OUTPUT");
+  text_c(kcx, KNY - krr - 22, #s);
+  gfx_setfont(1); col(1.00,0.70,0.35);
+  ui == 0 ? sprintf(#s, "%+.2f dB", slider1) : ui == 1 ? sprintf(#s, "%.1f %%", slider2) : ui == 2 ? sprintf(#s, "%+.1f", slider3) : sprintf(#s, "%.2f dB", slider7);
+  edit_k == ui ? (
+    col(0.03,0.03,0.035); rct(kcx - 42, KNY + krr + 14, 84, 20, 1);
+    col(1.00,0.58,0.12); rct(kcx - 42, KNY + krr + 14, 84, 20, 0);
+    strcpy(#s, #ed); time_precise()*2 % 2 < 1 ? strcat(#s, "_");
+    col(1.00,0.85,0.60);
+  );
+  text_c(kcx, KNY + krr + 24, #s);
+  ui += 1;
+);
+
+// ---- Commutateurs ------------------------------------------------------------------
+gfx_setfont(1);
+draw_btn(318, 314, 150, 30, slider4 >= 0.5, "CLIP 0 dB");
+draw_btn(486, 314, 150, 30, slider5 >= 0.5, "BAND SPLIT");
+draw_btn(654, 314, 150, 30, slider6 >= 0.5, "EFFECT IN");
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(618, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider8 + 0.5);
+draw_btn(642, 377, 46, 24, sz == 0, "75%");
+draw_btn(692, 377, 46, 24, sz == 1, "100%");
+draw_btn(742, 377, 46, 24, sz == 2, "125%");
+draw_btn(792, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50);
+text_l(34, 384, "Double-click: type a value  -  Ctrl-click: default  -  Shift: fine");
+text_l(34, 396, "based on RCInflator 2 (Oxford Edition) by lewloiwc, RCJacH, sai'ke, chmaha");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = -1;
+  ui = 0; loop(4, (in_circ(kx_(ui), KNY, kr_(ui) + 12) || in_rect(kx_(ui) - 42, KNY + kr_(ui) + 12, 84, 24)) ? ( drag = ui; ); ui += 1;);
+  edit_k >= 0 && drag != edit_k ? ( edit_k = -1; );
+  (drag >= 0 && (mouse_cap & 4)) ? ( k_def(drag); drag = -1; );
+  drag >= 0 ? (
+    (time_precise() - lc_t < 0.35 && lc_k == drag) ? ( edit_k = drag; strcpy(#ed, ""); drag = -1; lc_k = -1; ) : ( lc_t = time_precise(); lc_k = drag; );
+  );
+  in_rect(318, 314, 150, 30) ? ( set_sl(4, slider4 >= 0.5 ? 0 : 1); );
+  in_rect(486, 314, 150, 30) ? ( set_sl(5, slider5 >= 0.5 ? 0 : 1); );
+  in_rect(654, 314, 150, 30) ? ( set_sl(6, slider6 >= 0.5 ? 0 : 1); );
+  in_rect(642, 377, 46, 24) ? ( set_sl(8, 0); );
+  in_rect(692, 377, 46, 24) ? ( set_sl(8, 1); );
+  in_rect(742, 377, 46, 24) ? ( set_sl(8, 2); );
+  in_rect(792, 377, 46, 24) ? ( set_sl(8, 3); );
+);
+(mb1 && drag >= 0) ? (
+  fine = (mouse_cap & 8) ? 0.15 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? k_set(drag, k_frac(drag) + dy*0.006);
+);
+!mb1 ? ( drag = -1; );
+// saisie clavier
+edit_k >= 0 ? (
+  while ((ch = gfx_getchar()) > 0) (
+    (ch >= '0' && ch <= '9') || ch == '.' || ch == '-' ? ( strlen(#ed) < 8 ? ( sprintf(#ch1, "%c", ch); strcat(#ed, #ch1); ); ) :
+    ch == 8 ? ( strlen(#ed) > 0 ? strcpy_substr(#ed, #ed, 0, strlen(#ed) - 1); ) :
+    ch == 13 ? ( strlen(#ed) > 0 && match("%f", #ed, ed_v) ? k_type(edit_k, ed_v); edit_k = -1; ) :
+    ch == 27 ? ( edit_k = -1; );
+  );
+);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;

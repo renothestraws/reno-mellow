@@ -1,0 +1,326 @@
+desc:RM1982maximizer - ReNo Mellow 1982 (Sonic Maximizer)
+//tags: enhancer maximizer exciter bbe phase
+//@author ReNo Mellow
+//@version 1.0
+//@changelog Première version publique
+//@about Sonic maximizer façon BBE, d'après Sonic Enhancer de lubomir i. ivanov (GPL v2+) : passe-tout à 700 Hz + LOW CONTOUR (grave) + PROCESS (aigu piloté par un CV dynamique) ; input / output, noise floor ; crête-mètres et activité du process ; saisie des valeurs au clavier.
+//
+// ---------------------------------------------------------------------------
+// License: GPL v2 or later - http://www.gnu.org/licenses/gpl.html
+// RM1982maximizer - "sonic maximizer" façon BBE, d'après Sonic Enhancer
+// (C) 2011 lubomir i. ivanov (GPL v2+), réécrit pour la série 1982.
+//
+// Principe (identique à l'original) : le signal passe par un passe-tout à
+// 700 Hz (Q 0.23) qui décale le grave par rapport à l'aigu ; on y ajoute un
+// passe-bas (LOW CONTOUR) et un passe-haut (PROCESS) à 700 Hz. L'aigu ajouté
+// est piloté par un CV : plus l'entrée est forte, moins on ajoute d'aigu
+// (CV règle la sensibilité, lissage RC). Un filtre DC termine la chaîne.
+// NOISE FLOOR ajoute un bruit à -96 dBFS (comme l'original).
+//
+// Ajouts de la série 1982 : interface 1982 en anglais, tailles 75-150 %,
+// double-clic pour saisir une valeur, crête-mètres entrée / sortie, activité
+// du PROCESS (CV) par canal, clipper caché à 0 dBFS en sortie, latence nulle.
+// ---------------------------------------------------------------------------
+
+slider1:0<-12,12,0.1>-Input (dB)
+slider2:0<0,10,0.1>-Low Contour
+slider3:0<0,10,0.1>-Process
+slider4:2<0,10,0.1>-CV
+slider5:0<-12,12,0.1>-Output (dB)
+slider6:1<0,1,1{Off,On}>-Noise Floor
+slider7:1<0,3,1{75%,100%,125%,150%}>-Size
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+ext_noinit = 1;
+EPS = 0.000000001;
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+r_6 = 1/6;
+nf_k = pow(2, -96*r_6);
+rc0_k0 = 0.0003;
+rc0_k1 = 1 - rc0_k0;
+cv_rc0 = cv_rc1 = 1;
+edit_k = -1;
+pi0 = pi1 = po0 = po1 = 0;
+
+// ---- Outils graphiques ---------------------------------------------------------------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(1.00,0.58,0.12); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(1.00,0.58,0.12) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(0.10,0.06,0.02) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(pow(2, idx - 1)); ); );
+
+function draw_led(x, y, r, on)
+(
+  col(0.03,0.03,0.035); gfx_circle(PX(x), PY(y), (r + 2)*S, 1, 1);
+  col(0.20 + 0.80*on, 0.10 + 0.50*on, 0.04 + 0.08*on); gfx_circle(PX(x), PY(y), r*S, 1, 1);
+);
+// ---- Boutons : valeur <-> position (0..1) ----------------------------------------
+
+// k = 0 input, 1 low contour, 2 process, 3 cv, 4 output
+function k_frac(k)
+(
+  k == 0 ? (slider1 + 12)/24 : k == 1 ? slider2/10 : k == 2 ? slider3/10 : k == 3 ? slider4/10 : (slider5 + 12)/24;
+);
+function k_set(k, f)
+(
+  f = min(max(f, 0), 1);
+  k == 0 ? set_sl(1, floor((f*24 - 12)*10 + 0.5)/10) :
+  k == 1 ? set_sl(2, floor(f*100 + 0.5)/10) :
+  k == 2 ? set_sl(3, floor(f*100 + 0.5)/10) :
+  k == 3 ? set_sl(4, floor(f*100 + 0.5)/10) :
+  set_sl(5, floor((f*24 - 12)*10 + 0.5)/10);
+);
+function k_def(k) ( k == 0 ? set_sl(1, 0) : k == 1 ? set_sl(2, 0) : k == 2 ? set_sl(3, 0) : k == 3 ? set_sl(4, 2) : set_sl(5, 0); );
+function k_type(k, v)
+(
+  k == 0 ? set_sl(1, min(max(v, -12), 12)) : k == 1 ? set_sl(2, min(max(v, 0), 10)) :
+  k == 2 ? set_sl(3, min(max(v, 0), 10)) : k == 3 ? set_sl(4, min(max(v, 0), 10)) : set_sl(5, min(max(v, -12), 12));
+);
+// position et rayon des boutons
+function kx_(k) ( k == 0 ? 90 : k == 1 ? 250 : k == 2 ? 450 : k == 3 ? 610 : 730; );
+function kr_(k) ( (k == 1 || k == 2) ? 44 : 27; );
+function hbar(x, y, w, h, v) local(f)
+(
+  f = min(max((lin2db(v) + 60)/60, 0), 1);
+  col(0.16,0.165,0.18); rct(x, y, w, h, 1);
+  f > 0.003 ? ( col(0.30,0.75,0.35); rct(x, y, w*min(f, 0.8), h, 1); );
+  f > 0.8 ? ( col(1.00,0.58,0.12); rct(x + w*0.8, y, w*(min(f, 0.95) - 0.8), h, 1); );
+  f > 0.95 ? ( col(1.00,0.25,0.18); rct(x + w*0.95, y, w*(f - 0.95), h, 1); );
+);
+
+@slider
+// (réglages relus à chaque bloc dans @block)
+
+@block
+g_in = pow(2, slider1*r_6);
+g_lp = slider2*0.5;
+g_hp = slider3*0.5;
+cv_k = slider4;
+g_out = pow(2, slider5*r_6);
+noise_floor = slider6 >= 0.5;
+// filtres à 700 Hz, Q 0.23 (recalculés si la fréquence d'échantillonnage change)
+fsr != srate ? (
+  omega = 2*$pi*700/srate; sn = sin(omega); cs = cos(omega); alpha = sn/(2*0.23);
+  b0_ap = 1/(1 + alpha); b1_ap = -2*cs*b0_ap; b2_ap = (1 - alpha)*b0_ap;
+  a0_ap = b2_ap; a1_ap = b1_ap; a2_ap = 1;
+  b0_lp = b0_ap; b1_lp = b1_ap; b2_lp = b2_ap;
+  a1_lp = (1 - cs)*b0_lp; a0_lp = a1_lp*0.5; a2_lp = a0_lp;
+  b0_hp = b0_ap; b1_hp = b1_ap; b2_hp = b2_ap;
+  a1_hp = -(1 + cs)*b0_hp; a0_hp = -a1_hp*0.5; a2_hp = a0_hp;
+  fsr = srate;
+);
+
+@sample
+in0 = spl0*g_in;
+in1 = spl1*g_in;
+nf0 = nf1 = 0;
+noise_floor ? (
+  nf0 = (rand(2) - 1)*nf_k;
+  nf1 = (rand(2) - 1)*nf_k;
+);
+// passe-tout
+out_ap0 = a0_ap*in0 + a1_ap*x1_ap0 + a2_ap*x2_ap0 - b1_ap*y1_ap0 - b2_ap*y2_ap0;
+x2_ap0 = x1_ap0; x1_ap0 = in0; y2_ap0 = y1_ap0; y1_ap0 = out_ap0;
+out_ap1 = a0_ap*in1 + a1_ap*x1_ap1 + a2_ap*x2_ap1 - b1_ap*y1_ap1 - b2_ap*y2_ap1;
+x2_ap1 = x1_ap1; x1_ap1 = in1; y2_ap1 = y1_ap1; y1_ap1 = out_ap1;
+// passe-bas (low contour)
+out_lp0 = a0_lp*in0 + a1_lp*x1_lp0 + a2_lp*x2_lp0 - b1_lp*y1_lp0 - b2_lp*y2_lp0;
+x2_lp0 = x1_lp0; x1_lp0 = in0; y2_lp0 = y1_lp0; y1_lp0 = out_lp0;
+out_lp1 = a0_lp*in1 + a1_lp*x1_lp1 + a2_lp*x2_lp1 - b1_lp*y1_lp1 - b2_lp*y2_lp1;
+x2_lp1 = x1_lp1; x1_lp1 = in1; y2_lp1 = y1_lp1; y1_lp1 = out_lp1;
+// passe-haut (process)
+out_hp0 = a0_hp*in0 + a1_hp*x1_hp0 + a2_hp*x2_hp0 - b1_hp*y1_hp0 - b2_hp*y2_hp0;
+x2_hp0 = x1_hp0; x1_hp0 = in0; y2_hp0 = y1_hp0; y1_hp0 = out_hp0;
+out_hp1 = a0_hp*in1 + a1_hp*x1_hp1 + a2_hp*x2_hp1 - b1_hp*y1_hp1 - b2_hp*y2_hp1;
+x2_hp1 = x1_hp1; x1_hp1 = in1; y2_hp1 = y1_hp1; y1_hp1 = out_hp1;
+// CV : moins d'aigu ajouté quand l'entrée est forte
+cv0 = 1 - abs(in0)*cv_k;
+cv1 = 1 - abs(in1)*cv_k;
+cv_rc0 = rc0_k0*cv0 + rc0_k1*cv_rc0;
+cv_rc1 = rc0_k0*cv1 + rc0_k1*cv_rc1;
+out_sv0 = out_ap0 + out_hp0*cv_rc0*g_hp + out_lp0*g_lp;
+out_sv1 = out_ap1 + out_hp1*cv_rc1*g_hp + out_lp1*g_lp;
+// filtre DC
+out_rc0 = rc0_k0*out_sv0 + rc0_k1*out_rc0;
+out_rc1 = rc0_k0*out_sv1 + rc0_k1*out_rc1;
+oL = (out_sv0 - out_rc0)*g_out + nf0;
+oR = (out_sv1 - out_rc1)*g_out + nf1;
+// clipper caché à 0 dBFS
+(abs(oL) > 1 || abs(oR) > 1) ? ( clip_f = 1; );
+spl0 = min(max(oL, -1), 1);
+spl1 = min(max(oR, -1), 1);
+pi0 = max(abs(in0), pi0*0.99985); pi1 = max(abs(in1), pi1*0.99985);
+po0 = max(abs(spl0), po0*0.99985); po1 = max(abs(spl1), po1*0.99985);
+
+@gfx 860 412
+S  = 0.75 + 0.25*floor(slider7 + 0.5);
+ox = max(0, floor((gfx_w - 860*S)/2));
+oy = max(0, floor((gfx_h - 412*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+clip_f ? ( clip_hold = 60; clip_f = 0; ) : ( clip_hold = max(clip_hold - 1, 0); );
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(9*S)), 'b');
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,848,360,1);
+ui = 0; loop(36, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 848, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,848,2,1);
+col(0.04,0.04,0.045); rct(6,364,848,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(352), 4*S, 1, 1);
+gfx_circle(PX(842), PY(20), 4*S, 1, 1); gfx_circle(PX(842), PY(352), 4*S, 1, 1);
+gfx_setfont(2); col(1.00,0.58,0.12); text_l(34, 34, "RM1982maximizer"); gfx_measurestr("RM1982maximizer", t_w, t_h); t_x = 34 + t_w/S + 14;
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(t_x, 38, "SONIC  MAXIMIZER");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(826, 34, "ReNo Mellow");
+col(1.00,0.58,0.12); rct(34, 56, 792, 2, 1);
+
+// ---- Mètres : entrée, activité du process, sortie ------------------------------------
+col(0.03,0.03,0.035); rct(34, 72, 792, 82, 1);
+gfx_setfont(3); col(0.62,0.63,0.66);
+text_l(46, 86, "INPUT"); text_l(316, 86, "PROCESS  ACTIVITY"); text_l(586, 86, "OUTPUT");
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_l(46, 108, "L"); text_l(46, 128, "R"); text_l(586, 108, "L"); text_l(586, 128, "R"); text_l(316, 108, "L"); text_l(316, 128, "R");
+hbar(58, 102, 220, 12, pi0); hbar(58, 122, 220, 12, pi1);
+hbar(598, 102, 200, 12, po0); hbar(598, 122, 200, 12, po1);
+// activité : part de l'aigu ajouté (process x CV), 0..1
+ui = 0;
+loop(2,
+  ua = min(max((ui == 0 ? cv_rc0 : cv_rc1)*g_hp/5, 0), 1);
+  col(0.16,0.165,0.18); rct(328, 102 + ui*20, 220, 12, 1);
+  ua > 0.003 ? ( col(1.00,0.58,0.12); rct(328, 102 + ui*20, 220*ua, 12, 1); );
+  ui += 1;
+);
+gfx_setfont(6); col(0.45,0.46,0.50);
+text_l(58, 146, "-60"); text_r(278, 146, "0 dBFS"); text_l(598, 146, "-60"); text_r(798, 146, "0 dBFS");
+col(0.03,0.03,0.035); gfx_circle(PX(814), PY(118), 7*S, 1, 1);
+clip_hold > 0 ? col(1.00,0.20,0.15) : col(0.20,0.05,0.04); gfx_circle(PX(814), PY(118), 5*S, 1, 1);
+gfx_setfont(6); col(0.55,0.56,0.60); text_c(814, 134, "CLIP");
+
+// ---- Boutons rotatifs -------------------------------------------------------------------
+KNY = 262;
+ui = 0;
+loop(5,
+  kcx = kx_(ui); krr = kr_(ui);
+  ufz = (ui == 0 || ui == 4) ? 0.5 : 0;
+  draw_knob(kcx, KNY, krr, k_frac(ui), ufz);
+  gfx_setfont(4); col(0.92,0.93,0.95);
+  ui == 0 ? strcpy(#s, "INPUT") : ui == 1 ? strcpy(#s, "LOW CONTOUR") : ui == 2 ? strcpy(#s, "PROCESS") : ui == 3 ? strcpy(#s, "CV") : strcpy(#s, "OUTPUT");
+  text_c(kcx, KNY - krr - 22, #s);
+  gfx_setfont(1); col(1.00,0.70,0.35);
+  ui == 0 ? sprintf(#s, "%+.1f dB", slider1) : ui == 1 ? sprintf(#s, "%.1f", slider2) : ui == 2 ? sprintf(#s, "%.1f", slider3) :
+  ui == 3 ? sprintf(#s, "%.1f", slider4) : sprintf(#s, "%+.1f dB", slider5);
+  edit_k == ui ? (
+    col(0.03,0.03,0.035); rct(kcx - 42, KNY + krr + 14, 84, 20, 1);
+    col(1.00,0.58,0.12); rct(kcx - 42, KNY + krr + 14, 84, 20, 0);
+    strcpy(#s, #ed); time_precise()*2 % 2 < 1 ? strcat(#s, "_");
+    col(1.00,0.85,0.60);
+  );
+  text_c(kcx, KNY + krr + 24, #s);
+  ui += 1;
+);
+
+// ---- Bandeau -------------------------------------------------------------------------
+gfx_setfont(1);
+draw_btn(34, 377, 120, 24, slider6 >= 0.5, "NOISE FLOOR");
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(618, 389, "SIZE");
+gfx_setfont(1);
+sz = floor(slider7 + 0.5);
+draw_btn(642, 377, 46, 24, sz == 0, "75%");
+draw_btn(692, 377, 46, 24, sz == 1, "100%");
+draw_btn(742, 377, 46, 24, sz == 2, "125%");
+draw_btn(792, 377, 46, 24, sz == 3, "150%");
+gfx_setfont(5); col(0.45,0.46,0.50);
+text_l(166, 384, "Double-click: type a value  -  Ctrl-click: default  -  Shift: fine");
+text_l(166, 396, "based on Sonic Enhancer by lubomir i. ivanov (GPL)");
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = -1;
+  ui = 0; loop(5, (in_circ(kx_(ui), KNY, kr_(ui) + 12) || in_rect(kx_(ui) - 42, KNY + kr_(ui) + 12, 84, 24)) ? ( drag = ui; ); ui += 1;);
+  edit_k >= 0 && drag != edit_k ? ( edit_k = -1; );
+  (drag >= 0 && (mouse_cap & 4)) ? ( k_def(drag); drag = -1; );
+  drag >= 0 ? (
+    (time_precise() - lc_t < 0.35 && lc_k == drag) ? ( edit_k = drag; strcpy(#ed, ""); drag = -1; lc_k = -1; ) : ( lc_t = time_precise(); lc_k = drag; );
+  );
+  in_rect(34, 377, 120, 24) ? ( set_sl(6, slider6 >= 0.5 ? 0 : 1); );
+  in_rect(642, 377, 46, 24) ? ( set_sl(7, 0); );
+  in_rect(692, 377, 46, 24) ? ( set_sl(7, 1); );
+  in_rect(742, 377, 46, 24) ? ( set_sl(7, 2); );
+  in_rect(792, 377, 46, 24) ? ( set_sl(7, 3); );
+);
+(mb1 && drag >= 0) ? (
+  fine = (mouse_cap & 8) ? 0.15 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? k_set(drag, k_frac(drag) + dy*0.006);
+);
+!mb1 ? ( drag = -1; );
+// saisie clavier
+edit_k >= 0 ? (
+  while ((ch = gfx_getchar()) > 0) (
+    (ch >= '0' && ch <= '9') || ch == '.' || ch == '-' ? ( strlen(#ed) < 8 ? ( sprintf(#ch1, "%c", ch); strcat(#ed, #ch1); ); ) :
+    ch == 8 ? ( strlen(#ed) > 0 ? strcpy_substr(#ed, #ed, 0, strlen(#ed) - 1); ) :
+    ch == 13 ? ( strlen(#ed) > 0 && match("%f", #ed, ed_v) ? k_type(edit_k, ed_v); edit_k = -1; ) :
+    ch == 27 ? ( edit_k = -1; );
+  );
+);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;
