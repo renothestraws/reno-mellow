@@ -46,6 +46,8 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Bass** | Basse psycho-acoustique (harmoniques qui recréent la fondamentale) |
 | **RM1982Pre** | Étage de préampli coloré : DRIVE + GAIN, 5 couleurs (1073, 512, 610, 4000, 32) |
 | **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
+| **RM1982maximizer** | Sonic maximizer façon BBE : LOW CONTOUR + PROCESS (aigu dynamique piloté par CV), d'après Sonic Enhancer (GPL) |
+| **RM1982Inflat** | Inflator (comportement du Sonnox Oxford Inflator, Band Split compris), d'après RCInflator 2 de lewloiwc / RCJacH |
 
 ## Instruments
 
