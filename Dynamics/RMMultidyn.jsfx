@@ -1,9 +1,9 @@
 desc:RMMultidyn - ReNo Mellow Multiband Dynamics (6-band clean compressor / expander with analyzer)
 //tags: multiband compressor expander dynamics mid-side sidechain analyzer
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Première version publique
-//@about Compresseur / expandeur multibande propre et transparent inspiré du FabFilter Pro-MB : 1 à 6 bandes, crossovers 6 à 48 dB/oct à somme parfaite, compression et expansion vers le bas ou vers le haut, attaque 0-50 ms, release 50-3000 ms + auto, Stereo/Dual/L/R/Mid/Side par bande, side-chain 3/4 ou 5/6 par bande, sortie de chaque bande vers 1/2 à 11/12, analyseur, latence nulle.
+//@version 1.2
+//@changelog Side-chain : chaque bande peut réagir au signal de n'importe quelle autre bande
+//@about Compresseur / expandeur multibande propre et transparent inspiré du FabFilter Pro-MB : 1 à 6 bandes, crossovers 6 à 48 dB/oct à somme parfaite, compression et expansion vers le bas ou vers le haut, attaque 0-50 ms, release 50-3000 ms + auto, Stereo/Dual/L/R/Mid/Side par bande, side-chain par bande (entrée 3/4, 5/6 ou une autre bande), sortie de chaque bande vers 1/2 à 11/12, analyseur, latence nulle.
 //
 // ---------------------------------------------------------------------------
 // RMMultidyn - compresseur / expandeur multibande propre et transparent,
@@ -15,7 +15,7 @@ desc:RMMultidyn - ReNo Mellow Multiband Dynamics (6-band clean compressor / expa
 //   (compression vers le haut, expansion vers le haut) ; Threshold, Ratio, Knee,
 //   Attack 0-50 ms, Release 50-3000 ms + Auto Release, Output
 // - Canal par bande : Stereo (lié), Dual (L/R indépendants), Left, Right, Mid, Side
-// - Side-chain par bande : interne, entrée 3/4 ou entrée 5/6 (filtré par la bande)
+// - Side-chain par bande : interne, entrée 3/4 ou 5/6 (filtrée par la bande), ou n'importe quelle autre bande
 // - Sortie par bande : 1/2, 3/4, 5/6, 7/8, 9/10, 11/12 (la somme reste parfaite)
 // - Analyseur : pente +3 dB/oct (bruit rose plat), Peak ou RMS 500 ms, pré en option
 // - Latence nulle uniquement, pas de clipper interne
@@ -54,7 +54,7 @@ slider22:150<50,3000,1>-B1 Release (ms)
 slider23:0<0,1,1{Off,On}>-B1 Auto Release
 slider24:0<-24,24,0.1>-B1 Output (dB)
 slider25:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B1 Channel
-slider26:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B1 Sidechain
+slider26:0<0,8,1{Internal,Ext 3/4,Ext 5/6,Band 1,Band 2,Band 3,Band 4,Band 5,Band 6}>-B1 Sidechain
 slider27:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B1 Output Channels
 slider28:0<0,2,1{Active,Bypass,Mute}>-B1 State
 slider29:0<0,1,1{Off,On}>-B1 Solo
@@ -68,7 +68,7 @@ slider36:150<50,3000,1>-B2 Release (ms)
 slider37:0<0,1,1{Off,On}>-B2 Auto Release
 slider38:0<-24,24,0.1>-B2 Output (dB)
 slider39:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B2 Channel
-slider40:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B2 Sidechain
+slider40:0<0,8,1{Internal,Ext 3/4,Ext 5/6,Band 1,Band 2,Band 3,Band 4,Band 5,Band 6}>-B2 Sidechain
 slider41:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B2 Output Channels
 slider42:0<0,2,1{Active,Bypass,Mute}>-B2 State
 slider43:0<0,1,1{Off,On}>-B2 Solo
@@ -82,7 +82,7 @@ slider50:150<50,3000,1>-B3 Release (ms)
 slider51:0<0,1,1{Off,On}>-B3 Auto Release
 slider52:0<-24,24,0.1>-B3 Output (dB)
 slider53:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B3 Channel
-slider54:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B3 Sidechain
+slider54:0<0,8,1{Internal,Ext 3/4,Ext 5/6,Band 1,Band 2,Band 3,Band 4,Band 5,Band 6}>-B3 Sidechain
 slider55:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B3 Output Channels
 slider56:0<0,2,1{Active,Bypass,Mute}>-B3 State
 slider57:0<0,1,1{Off,On}>-B3 Solo
@@ -96,7 +96,7 @@ slider64:150<50,3000,1>-B4 Release (ms)
 slider65:0<0,1,1{Off,On}>-B4 Auto Release
 slider66:0<-24,24,0.1>-B4 Output (dB)
 slider67:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B4 Channel
-slider68:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B4 Sidechain
+slider68:0<0,8,1{Internal,Ext 3/4,Ext 5/6,Band 1,Band 2,Band 3,Band 4,Band 5,Band 6}>-B4 Sidechain
 slider69:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B4 Output Channels
 slider70:0<0,2,1{Active,Bypass,Mute}>-B4 State
 slider71:0<0,1,1{Off,On}>-B4 Solo
@@ -110,7 +110,7 @@ slider78:150<50,3000,1>-B5 Release (ms)
 slider79:0<0,1,1{Off,On}>-B5 Auto Release
 slider80:0<-24,24,0.1>-B5 Output (dB)
 slider81:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B5 Channel
-slider82:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B5 Sidechain
+slider82:0<0,8,1{Internal,Ext 3/4,Ext 5/6,Band 1,Band 2,Band 3,Band 4,Band 5,Band 6}>-B5 Sidechain
 slider83:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B5 Output Channels
 slider84:0<0,2,1{Active,Bypass,Mute}>-B5 State
 slider85:0<0,1,1{Off,On}>-B5 Solo
@@ -124,7 +124,7 @@ slider92:150<50,3000,1>-B6 Release (ms)
 slider93:0<0,1,1{Off,On}>-B6 Auto Release
 slider94:0<-24,24,0.1>-B6 Output (dB)
 slider95:0<0,5,1{Stereo,Dual,Left,Right,Mid,Side}>-B6 Channel
-slider96:0<0,2,1{Internal,Ext 3/4,Ext 5/6}>-B6 Sidechain
+slider96:0<0,8,1{Internal,Ext 3/4,Ext 5/6,Band 1,Band 2,Band 3,Band 4,Band 5,Band 6}>-B6 Sidechain
 slider97:0<0,5,1{1/2,3/4,5/6,7/8,9/10,11/12}>-B6 Output Channels
 slider98:0<0,2,1{Active,Bypass,Mute}>-B6 State
 slider99:0<0,1,1{Off,On}>-B6 Solo
@@ -386,10 +386,37 @@ function ch_name(c)
   c == 0 ? strcpy(#cn, "STEREO") : c == 1 ? strcpy(#cn, "DUAL L/R") : c == 2 ? strcpy(#cn, "LEFT") :
   c == 3 ? strcpy(#cn, "RIGHT") : c == 4 ? strcpy(#cn, "MID") : strcpy(#cn, "SIDE");
 );
-function sc_name(c) ( c == 0 ? strcpy(#scn, "SC: INTERNAL") : c == 1 ? strcpy(#scn, "SC: IN 3/4") : strcpy(#scn, "SC: IN 5/6"); );
+function sc_name(c) ( c == 0 ? strcpy(#scn, "SC: INTERNAL") : c == 1 ? strcpy(#scn, "SC: IN 3/4") : c == 2 ? strcpy(#scn, "SC: IN 5/6") : sprintf(#scn, "SC: BAND %d", c - 2); );
+// renumérotation des sources « Band n » après une coupe (op 1) ou une suppression (op -1) de la bande b
+function sc_fix(b, op) local(j, v)
+(
+  j = 0;
+  loop(6,
+    v = bint(j, 10);
+    v >= 3 ? (
+      op > 0 ? ( v - 3 > b ? set_sl(bsl(j, 10), v + 1); ) : ( v - 3 == b ? set_sl(bsl(j, 10), 0) : v - 3 > b ? set_sl(bsl(j, 10), v - 1); );
+      (bint(j, 10) - 3 == j) ? set_sl(bsl(j, 10), 0);
+    );
+    j += 1;
+  );
+);
 function out_name(d) ( sprintf(#on, "OUT %d/%d", 2*d + 1, 2*d + 2); );
 // éléments de menu : "!" devant l'élément actif
 function mk(on, str) ( on ? strcat(#m, "!"); strcat(#m, str); );
+// menu des sources de side-chain (bande b) : 9 éléments, la bande elle-même et les bandes absentes sont grisées
+function sc_items(cur, b, last) local(k)
+(
+  mk(cur == 0, "Internal|"); mk(cur == 1, "Sidechain input 3/4|"); mk(cur == 2, "Sidechain input 5/6|");
+  k = 0;
+  loop(6,
+    (k == b || k >= GN) ? strcpy(#mi, "#") : strcpy(#mi, "");
+    k == 5 && last ? ( strcpy(#c2, "<"); strcat(#c2, #mi); strcpy(#mi, #c2); );
+    sprintf(#c2, "Band %d", k + 1); strcat(#mi, #c2);
+    (k < 5 || last) ? strcat(#mi, "|");
+    mk(cur == k + 3, #mi);
+    k += 1;
+  );
+);
 // petit bouton rotatif
 function pknob(cx, cy, r, frac, fz) local(a1, a2, i, an)
 (
@@ -427,7 +454,7 @@ function split_band(b, f) local(j, k, lo, hi)
       copy_band(b, b + 1); set_sl(bsl(b + 1, 13), 0);
       k = GN - 2; loop(GN - 1 - b, set_sl(2 + k + 1, slider(2 + k)); set_sl(7 + k + 1, slider(7 + k)); k -= 1;);
       set_sl(2 + b, floor(f + 0.5)); set_sl(7 + b, b < GN - 1 ? slider(7 + b + 1) : 3);
-      set_sl(1, GN + 1); GN += 1; 
+      set_sl(1, GN + 1); GN += 1; sc_fix(b, 1); 
     );
   );
 );
@@ -437,7 +464,7 @@ function del_band(b) local(j, k)
   GN > 1 ? (
     j = b; loop(GN - 1 - b, copy_band(j + 1, j); j += 1;);
     b < GN - 1 ? ( k = b; loop(GN - 2 - b, set_sl(2 + k, slider(3 + k)); set_sl(7 + k, slider(8 + k)); k += 1;); );
-    set_sl(1, GN - 1); GN -= 1; 
+    set_sl(1, GN - 1); GN -= 1; sc_fix(b, -1); 
   );
 );
 // ---- réponse des bandes (complexe, par colonne), recalculée quand les crossovers changent ----
@@ -595,7 +622,8 @@ loop(6,
   p[7] = slider(sb + 7) >= 0.5;
   p[8] = exp(-1/(p[6]*srate));
   p[9] = floor(clampf(slider(sb + 9), 0, 5) + 0.5);
-  p[10] = floor(clampf(slider(sb + 10), 0, 2) + 0.5);
+  p[10] = floor(clampf(slider(sb + 10), 0, 8) + 0.5);
+  (p[10] >= 3 && (p[10] - 3 == b || p[10] - 3 >= NBD)) ? ( p[10] = 0; );
   st_ = floor(clampf(slider(sb + 12), 0, 2) + 0.5);
   p[12] = st_;
   // en solo : tout va sur 1/2, bandes non solo coupées
@@ -629,7 +657,8 @@ loop(NBD,
   rl = REG[b]; rr = REG[8 + b];
   p[12] == 0 ? (
     // signal de détection : la bande elle-même ou la même bande du side-chain
-    sd = REG + p[10]*16; d_l = sd[b]; d_r = sd[8 + b];
+    // source : la bande elle-même, la même bande d'une entrée side-chain, ou une autre bande
+    p[10] >= 3 ? ( sk = p[10] - 3; d_l = REG[sk]; d_r = REG[8 + sk]; ) : ( sd = REG + p[10]*16; d_l = sd[b]; d_r = sd[8 + b]; );
     cm = p[9];
     cm == 0 ? ( g0 = g1 = dyn(b, 0, max(abs(d_l), abs(d_r))); ) :
     cm == 1 ? ( g0 = dyn(b, 0, abs(d_l)); g1 = dyn(b, 1, abs(d_r)); ) :
@@ -1182,9 +1211,9 @@ menu_k > 0 ? (
     um = gfx_showmenu(#m);
     um > 0 ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 9), um - 1); ub += 1;); );
   ) : menu_k == 2 ? (
-    strcpy(#m, ""); mk(u10 == 0, "Internal|"); mk(u10 == 1, "Sidechain input 3/4|"); mk(u10 == 2, "Sidechain input 5/6");
+    strcpy(#m, ""); sc_items(u10, sel, 0);
     um = gfx_showmenu(#m);
-    um > 0 ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 10), um - 1); ub += 1;); );
+    um > 0 ? ( ub = 0; loop(GN, SELM[ub] ? set_sl(bsl(ub, 10), (um - 1 >= 3 && um - 4 == ub) ? 0 : um - 1); ub += 1;); );
   ) : menu_k == 3 ? (
     strcpy(#m, ""); uk = 0;
     loop(6, sprintf(#mi, "Output %d/%d", 2*uk + 1, 2*uk + 2); uk < 5 ? strcat(#mi, "|"); mk(u11 == uk, #mi); uk += 1;);
@@ -1199,7 +1228,7 @@ menu_k > 0 ? (
   ) : (
     strcpy(#m, ">Mode|"); mk(u0 == 0, "Compress|"); mk(u0 == 1, "<Expand|");
     strcat(#m, ">Channel|"); mk(u9 == 0, "Stereo (linked)|"); mk(u9 == 1, "Dual (L/R unlinked)|"); mk(u9 == 2, "Left|"); mk(u9 == 3, "Right|"); mk(u9 == 4, "Mid|"); mk(u9 == 5, "<Side|");
-    strcat(#m, ">Sidechain|"); mk(u10 == 0, "Internal|"); mk(u10 == 1, "Input 3/4|"); mk(u10 == 2, "<Input 5/6|");
+    strcat(#m, ">Sidechain|"); sc_items(u10, sel, 1);
     strcat(#m, ">Output|"); uk = 0; loop(6, sprintf(#mi, "%d/%d|", 2*uk + 1, 2*uk + 2); uk == 5 ? strcpy(#mi, "<11/12|"); mk(u11 == uk, #mi); uk += 1;);
     strcat(#m, "|"); mk(bint(sel, 7), "Auto Release|"); mk(bint(sel, 12) == 1, "Bypass|"); mk(bint(sel, 12) == 2, "Mute|"); mk(bint(sel, 13), "Solo|");
     strcat(#m, "|"); GN < 6 ? strcat(#m, "Split band here|") : strcat(#m, "#Split band here|");
@@ -1211,17 +1240,17 @@ menu_k > 0 ? (
       SELM[ub] ? (
         (um >= 1 && um <= 2) ? set_sl(bsl(ub, 0), um - 1) :
         (um >= 3 && um <= 8) ? set_sl(bsl(ub, 9), um - 3) :
-        (um >= 9 && um <= 11) ? set_sl(bsl(ub, 10), um - 9) :
-        (um >= 12 && um <= 17) ? set_sl(bsl(ub, 11), um - 12) :
-        um == 18 ? set_sl(bsl(ub, 7), u7n) :
-        um == 19 ? set_sl(bsl(ub, 12), u12b) :
-        um == 20 ? set_sl(bsl(ub, 12), u12m) :
-        um == 21 ? set_sl(bsl(ub, 13), u13n);
+        (um >= 9 && um <= 17) ? set_sl(bsl(ub, 10), (um - 9 >= 3 && um - 12 == ub) ? 0 : um - 9) :
+        (um >= 18 && um <= 23) ? set_sl(bsl(ub, 11), um - 18) :
+        um == 24 ? set_sl(bsl(ub, 7), u7n) :
+        um == 25 ? set_sl(bsl(ub, 12), u12b) :
+        um == 26 ? set_sl(bsl(ub, 12), u12m) :
+        um == 27 ? set_sl(bsl(ub, 13), u13n);
       );
       ub += 1;
     );
-    um == 22 ? ( split_band(sel, mn_f); memset(SELM, 0, 8); ) :
-    um == 23 ? ( del_band(sel); memset(SELM, 0, 8); sel = max(0, min(sel, GN - 1)); );
+    um == 28 ? ( split_band(sel, mn_f); memset(SELM, 0, 8); ) :
+    um == 29 ? ( del_band(sel); memset(SELM, 0, 8); sel = max(0, min(sel, GN - 1)); );
   );
   menu_k = 0;
 );
