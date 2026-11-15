@@ -115,3 +115,4 @@ appartiennent à leurs propriétaires respectifs et servent uniquement à décri
 des plugins. ReNo Mellow n'est affilié à aucune de ces marques.
 
 **Couleur de l'interface :** sur tous les plug-ins dont l'interface a un accent orange, un double-clic sur le nom du plug-in bascule entre orange et vert (réglage mémorisé dans le projet, par instance).
+

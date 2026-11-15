@@ -1,7 +1,7 @@
 desc:RMdrumhumanizer - ReNo Mellow MIDI Drum Humanizer
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Interface aux conventions RM (façade, tailles 75-150 %, double-clic sur le nom = orange / vert) ; corrections de syntaxe
+//@version 1.2
+//@changelog Curseurs REAPER masqués (interface seule) ; Interface aux conventions RM (façade, tailles 75-150 %, double-clic sur le nom = orange / vert) ; corrections de syntaxe
 //@about Humaniseur MIDI de batterie en trois groupes : TIGHT (jusqu'à 12 notes, 0-20 % du fader), POCKET (jusqu'à 12 notes, 20-40 %), LOOSE (toutes les autres notes, 40-100 %). Vélocité et timing ; Laid Back (notes en retard, latence nulle) ou Rush (notes en avance, anticipation compensée par REAPER).
 //tags: MIDI drums humanize velocity timing groove
 //
@@ -9,11 +9,11 @@ desc:RMdrumhumanizer - ReNo Mellow MIDI Drum Humanizer
 // clic droit = vider la case ; faders : glisser / molette (Shift = fin) ;
 // plages : glisser haut-bas / molette ; Ctrl + clic = valeur par défaut.
 
-slider1:vel_amt=0<0,100,0.1>Humanize Velocity (%)
-slider2:tim_amt=0<0,100,0.1>Humanize Timing (%)
-slider3:mode=0<0,1,1{Laid Back,Rush}>Timing Feel
-slider4:vel_range=50<1,64,1>Velocity Range (max +/-)
-slider5:tim_range=60<1,100,1>Timing Range (max ms)
+slider1:vel_amt=0<0,100,0.1>-Humanize Velocity (%)
+slider2:tim_amt=0<0,100,0.1>-Humanize Timing (%)
+slider3:mode=0<0,1,1{Laid Back,Rush}>-Timing Feel
+slider4:vel_range=50<1,64,1>-Velocity Range (max +/-)
+slider5:tim_range=60<1,100,1>-Timing Range (max ms)
 slider6:size_idx=1<0,3,1{75%,100%,125%,150%}>-Size
 
 // Default groups (General MIDI drum map)
