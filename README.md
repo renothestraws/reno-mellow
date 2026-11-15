@@ -57,6 +57,12 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 |---|---|
 | **RM90X** | Multi-effet numérique inspiré de la Yamaha SPX90II : les 30 programmes d'usine (réverbes calées sur des IR de l'appareil, early reflections, gate, delay, chorus, flanger, pitch, freeze…), mémoires 31 à 90, face avant opérationnelle, MIDI, traitement interne 31,25 kHz / 16 bits sans latence |
 
+## MIDI
+
+| Plugin | Description |
+|---|---|
+| **RMdrumhumanizer** | Humaniseur MIDI de batterie : vélocité et timing en trois groupes (Tight, Pocket, Loose), mode Laid Back (latence nulle) ou Rush (anticipation compensée) |
+
 ## Instruments
 
 | Plugin | Description |
