@@ -1,8 +1,8 @@
 desc:RM160A - ReNo Mellow 160A (True RMS VCA Compressor/Limiter)
 //tags: dynamics compressor limiter VCA RMS dbx 160
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Compresseur/limiteur VCA à RMS vrai inspiré du dbx 160A : OverEasy, ratios jusqu'à -1:1, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -44,10 +44,10 @@ slider4:1<0,1,1{Hard Knee,OverEasy}>-OverEasy
 slider5:0<0,1,1{Output,Input}>-Display
 slider6:1<0,1,1{Off,On}>-Link
 slider7:0<0,1,1{Off,On}>-Bypass
-slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+slider8:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider9:0<0,1,1{Off,On}>-Analog
 slider10:0<-12,12,0.1>-Calib (dB)
-slider11:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider11:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -286,7 +286,7 @@ slider11 >= 0.5 ? (
 ) : (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider8 + 0.5);
+S  = floor(slider8 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider8 + 0.5);
 ox = max(0, floor((gfx_w - 1180*S)/2));
 oy = max(0, floor((gfx_h - 256*S)/2));
 mx = (mouse_x - ox)/S;
@@ -432,10 +432,11 @@ text_c(950, cky, "SIZE");
 szx = 976;
 gfx_setfont(1);
 sz = floor(slider8 + 0.5);
-draw_btn(szx,     oby, 44, 22, sz == 0, "75%");
-draw_btn(szx+48,  oby, 44, 22, sz == 1, "100%");
-draw_btn(szx+96,  oby, 44, 22, sz == 2, "125%");
-draw_btn(szx+144, oby, 44, 22, sz == 3, "150%");
+draw_btn(szx, oby, 34.4, 22, sz == 0, "75");
+draw_btn(szx + 38.4, oby, 34.4, 22, sz == 1, "100");
+draw_btn(szx + 76.8, oby, 34.4, 22, sz == 2, "125");
+draw_btn(szx + 115.2, oby, 34.4, 22, sz == 3, "150");
+draw_btn(szx + 153.6, oby, 34.4, 22, sz == 4, "200");
 
 // ---- Souris ---------------------------------------------------------------------
 md = mouse_cap & 1;
@@ -460,10 +461,11 @@ md = mouse_cap & 1;
   in_circ(825, 140, 14) ? (slider5 = slider5 >= 0.5 ? 0 : 1; slider_automate(slider5););
 
   in_rect(20, oby, 84, 22) ? (slider9 = slider9 >= 0.5 ? 0 : 1; slider_automate(slider9););
-  in_rect(szx,     oby, 44, 22) ? (slider8 = 0; sliderchange(slider8););
-  in_rect(szx+48,  oby, 44, 22) ? (slider8 = 1; sliderchange(slider8););
-  in_rect(szx+96,  oby, 44, 22) ? (slider8 = 2; sliderchange(slider8););
-  in_rect(szx+144, oby, 44, 22) ? (slider8 = 3; sliderchange(slider8););
+  in_rect(szx, oby, 34.4, 22) ? (slider8 = 0; sliderchange(slider8););
+  in_rect(szx + 38.4, oby, 34.4, 22) ? (slider8 = 1; sliderchange(slider8););
+  in_rect(szx + 76.8, oby, 34.4, 22) ? (slider8 = 2; sliderchange(slider8););
+  in_rect(szx + 115.2, oby, 34.4, 22) ? (slider8 = 3; sliderchange(slider8););
+  in_rect(szx + 153.6, oby, 34.4, 22) ? (slider8 = 4; sliderchange(slider8););
 );
 
 (md && drag > 0) ? (

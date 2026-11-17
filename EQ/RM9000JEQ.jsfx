@@ -1,8 +1,8 @@
 desc:RM9000JEQ - ReNo Mellow 9000J EQ (Channel EQ + Filters)
 //tags: equalizer EQ parametric filters console ssl-style 9000j
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.6
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Section EQ et filtres d'une tranche inspirée de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -57,9 +57,9 @@ slider19:1<0,1,1{Bypass,In}>-EQ In
 slider20:0<0,1,1{Off,On}>-Vintage
 slider21:0<-12,12,0.1>-Calib (dB)
 slider22:0<-12,12,0.1>-Output (dB)
-slider23:1<0,3,1{75%,100%,125%,150%}>-Size
+slider23:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider24:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
-slider25:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider25:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -376,7 +376,7 @@ slider25 >= 0.5 ? (
 ) : (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider23 + 0.5);
+S  = floor(slider23 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider23 + 0.5);
 ox = max(0, floor((gfx_w - 340*S)/2));
 oy = max(0, floor((gfx_h - 952*S)/2));
 mx = (mouse_x - ox)/S;
@@ -529,10 +529,11 @@ col(0.85,0.82,0.75); text_c(34, 926, "SIZE");
 gfx_setfont(1);
 sz = floor(slider23 + 0.5);
 draw_btn(282, 883, 42, 22, slider24 >= 0.5, "HQ");
-draw_btn(62,  915, 62, 22, sz == 0, "75%");
-draw_btn(128, 915, 62, 22, sz == 1, "100%");
-draw_btn(194, 915, 62, 22, sz == 2, "125%");
-draw_btn(260, 915, 62, 22, sz == 3, "150%");
+draw_btn(62, 915, 48.8, 22, sz == 0, "75%");
+draw_btn(114.8, 915, 48.8, 22, sz == 1, "100%");
+draw_btn(167.6, 915, 48.8, 22, sz == 2, "125%");
+draw_btn(220.4, 915, 48.8, 22, sz == 3, "150%");
+draw_btn(273.2, 915, 48.8, 22, sz == 4, "200%");
 
 // ---- Souris ----------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -561,10 +562,11 @@ mb1 = mouse_cap & 1;
   in_rect(136, 630, 44, 22)  ? flip(15);
   in_rect(122, 682, 70, 22)  ? flip(18);
   in_rect(282, 883, 42, 22) ? set_sl(24, slider24 >= 0.5 ? 0 : 1);
-  in_rect(62,  915, 62, 22) ? (slider23 = 0; sliderchange(slider23););
-  in_rect(128, 915, 62, 22) ? (slider23 = 1; sliderchange(slider23););
-  in_rect(194, 915, 62, 22) ? (slider23 = 2; sliderchange(slider23););
-  in_rect(260, 915, 62, 22) ? (slider23 = 3; sliderchange(slider23););
+  in_rect(62, 915, 48.8, 22) ? (slider23 = 0; sliderchange(slider23););
+  in_rect(114.8, 915, 48.8, 22) ? (slider23 = 1; sliderchange(slider23););
+  in_rect(167.6, 915, 48.8, 22) ? (slider23 = 2; sliderchange(slider23););
+  in_rect(220.4, 915, 48.8, 22) ? (slider23 = 3; sliderchange(slider23););
+  in_rect(273.2, 915, 48.8, 22) ? (slider23 = 4; sliderchange(slider23););
   // Ctrl+clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (
     set_sl(drag, drag == 1 ? 0 : drag == 3 ? 30000 : drag == 6 ? 8000 : drag == 9 ? 2500 :

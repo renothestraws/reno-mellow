@@ -1,8 +1,8 @@
 desc:RM1982Meter - ReNo Mellow 1982 (Peak / RMS / Dynamic Range Meter)
 //tags: meter analysis peak rms dynamic range crest correlation loudness
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.5
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Mètre crête / RMS / plage dynamique dans l'esprit du TT Dynamic Range Meter : barres horizontales, DR sur 3 s, corrélation, seuils de couleur réglables (peak, RMS, DR), Mono, Link, AES17.
 //
 // ---------------------------------------------------------------------------
@@ -37,8 +37,8 @@ slider9:6<0,30,0.1>-DR threshold 3 (red below)
 slider10:0<0,1,1{Off,On}>-Mono
 slider11:0<0,1,1{Off,On}>-Link
 slider12:0<0,1,1{Off,On}>-AES17 (+3 dB RMS)
-slider13:1<0,3,1{75%,100%,125%,150%}>-Size
-slider14:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider13:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider14:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -190,7 +190,7 @@ slider14 >= 0.5 ? (
   thc4r = 1.0; thc4g = 0.92; thc4b = 0.75;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider13 + 0.5);
+S  = floor(slider13 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider13 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -315,10 +315,11 @@ draw_btn(910, 302, 116, 44, slider12 >= 0.5, "AES17 +3");
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider13 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Click the peak values or RESET to clear the peak hold");
 
 // ---- Souris ----------------------------------------------------------------------------------
@@ -334,10 +335,11 @@ mb1 = mouse_cap & 1;
   in_rect(910, 250, 116, 44) ? set_sl(10, slider10 >= 0.5 ? 0 : 1);
   in_rect(786, 302, 116, 44) ? set_sl(11, slider11 >= 0.5 ? 0 : 1);
   in_rect(910, 302, 116, 44) ? set_sl(12, slider12 >= 0.5 ? 0 : 1);
-  in_rect(842, 377, 46, 24) ? (slider13 = 0; sliderchange(slider13););
-  in_rect(892, 377, 46, 24) ? (slider13 = 1; sliderchange(slider13););
-  in_rect(942, 377, 46, 24) ? (slider13 = 2; sliderchange(slider13););
-  in_rect(992, 377, 46, 24) ? (slider13 = 3; sliderchange(slider13););
+  in_rect(842, 377, 36.0, 24) ? (slider13 = 0; sliderchange(slider13););
+  in_rect(882, 377, 36.0, 24) ? (slider13 = 1; sliderchange(slider13););
+  in_rect(922, 377, 36.0, 24) ? (slider13 = 2; sliderchange(slider13););
+  in_rect(962, 377, 36.0, 24) ? (slider13 = 3; sliderchange(slider13););
+  in_rect(1002, 377, 36.0, 24) ? (slider13 = 4; sliderchange(slider13););
   (drag > 0 && (mouse_cap & 4)) ? (
     set_sl(drag, drag == 1 ? -12 : drag == 2 ? -6 : drag == 3 ? -3 : drag == 4 ? -18 : drag == 5 ? -12 : drag == 6 ? -9 : drag == 7 ? 14 : drag == 8 ? 9 : 6);
     drag = 0;

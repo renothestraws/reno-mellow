@@ -1,8 +1,8 @@
 desc:RM1982Gain - ReNo Mellow 1982 (Gain Stage + VU / Peak meters)
 //tags: gain trim utility meter vu peak rms calibration gain-staging
 //@author ReNo Mellow
-//@version 1.6
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.7
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Étage de gain transparent avec VU-mètre RMS calibrable (balistique VU) et crête-mètre stéréo, mesure avant ou après le gain, option AES17 +3 dB.
 //
 // ---------------------------------------------------------------------------
@@ -28,9 +28,9 @@ desc:RM1982Gain - ReNo Mellow 1982 (Gain Stage + VU / Peak meters)
 slider1:0<-24,24,0.1>-Gain (dB)
 slider2:-18<-28,-6,0.1>-Calib (dBFS RMS = 0 VU)
 slider3:1<0,1,1{In (pre-gain),Out (post-gain)}>-Meter
-slider4:1<0,3,1{75%,100%,125%,150%}>-Size
+slider4:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider5:0<0,1,1{Off,On}>-AES17 (+3 dB RMS)
-slider6:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider6:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -241,7 +241,7 @@ slider6 >= 0.5 ? (
   thc2r = 1.0; thc2g = 0.7; thc2b = 0.2;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider4 + 0.5);
+S  = floor(slider4 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider4 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -330,10 +330,11 @@ gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 draw_btn(722, 377, 80, 24, slider5 >= 0.5, "AES17 +3");
 sz = floor(slider4 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust   -   click max values: reset");
 
 // ---- Souris ----------------------------------------------------------------------------------
@@ -346,10 +347,11 @@ mb1 = mouse_cap & 1;
   in_rect(308, 292, 54, 26) ? set_sl(3, 1);
   (in_rect(934, 322, 64, 32) || in_rect(400, 74, 516, 230)) ? ( pm0 = 0; pm1 = 0; );
   in_rect(722, 377, 80, 24) ? set_sl(5, slider5 >= 0.5 ? 0 : 1);
-  in_rect(842, 377, 46, 24) ? (slider4 = 0; sliderchange(slider4););
-  in_rect(892, 377, 46, 24) ? (slider4 = 1; sliderchange(slider4););
-  in_rect(942, 377, 46, 24) ? (slider4 = 2; sliderchange(slider4););
-  in_rect(992, 377, 46, 24) ? (slider4 = 3; sliderchange(slider4););
+  in_rect(842, 377, 36.0, 24) ? (slider4 = 0; sliderchange(slider4););
+  in_rect(882, 377, 36.0, 24) ? (slider4 = 1; sliderchange(slider4););
+  in_rect(922, 377, 36.0, 24) ? (slider4 = 2; sliderchange(slider4););
+  in_rect(962, 377, 36.0, 24) ? (slider4 = 3; sliderchange(slider4););
+  in_rect(1002, 377, 36.0, 24) ? (slider4 = 4; sliderchange(slider4););
   (drag > 0 && (mouse_cap & 4)) ? (
     drag == 1 ? set_sl(1, 0) : set_sl(2, -18);
     drag = 0;

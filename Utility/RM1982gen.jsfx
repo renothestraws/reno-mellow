@@ -1,8 +1,8 @@
 desc:RM1982gen - ReNo Mellow 1982 Tone Gate Generator
 //tags: generator gate tone sub kick noise
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.5
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Générateur déclenché par l'entrée (tone gate, d'après Tone Gate de remaincalm.org, GPL) : sinus, carré, dent de scie (anti-repliement), bruit rose, bruit blanc ; seuil, hold, fade in/out, passe-bas (50 Hz - 15 kHz) et passe-haut (off - 500 Hz) ; Dynamic pitch (à l'ouverture, glissement de Freq vers Freq /4 à x4 en un temps égal au Fade out) ; saisie des valeurs au clavier (double-clic) ; phase remise à zéro à chaque déclenchement ; idéal pour un sub sous un kick ou une tonalité sous une snare.
 //
 // ---------------------------------------------------------------------------
@@ -43,9 +43,9 @@ slider7:50<1,4000,1>-Hold / Silence Length (ms)
 slider8:10<1,100,0.1>-Fade In (ms)
 slider9:100<1,1000,1>-Fade Out (ms)
 slider10:0<0,12,1{Normal,Div 1.18,Div 1.5,Div 2,Div 2.3,Div 3,Div 4,Mult 1.18,Mult 1.5,Mult 2,Mult 2.3,Mult 3,Mult 4}>-Dynamic Pitch
-slider12:1<0,3,1{75%,100%,125%,150%}>-Size
+slider12:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider13:0<0,500,1>-Highpass (Hz, 0 = off)
-slider14:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider14:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -281,7 +281,7 @@ slider14 >= 0.5 ? (
   thc3r = 1.0; thc3g = 0.85; thc3b = 0.6;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider12 + 0.5);
+S  = floor(slider12 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider12 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -417,10 +417,11 @@ loop(9,
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider12 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50);
 text_l(34, 389, "Double-click: type a value  -  Ctrl-click: default  -  Shift: fine  -  based on Tone Gate by remaincalm.org (GPL)");
 
@@ -437,10 +438,11 @@ mb1 = mouse_cap & 1;
   ui = 0; loop(5, in_rect(34 + ui*100, 88, 94, 28) ? ( set_sl(4, ui); ); ui += 1;);
   in_rect(34, 146, 64, 58) ? ( set_sl(10, 0); );
   ui = 1; loop(12, in_rect(104 + ((ui - 1) % 6)*70, ui <= 6 ? 146 : 176, 64, 28) ? ( set_sl(10, ui); ); ui += 1;);
-  in_rect(842, 377, 46, 24) ? ( set_sl(12, 0); );
-  in_rect(892, 377, 46, 24) ? ( set_sl(12, 1); );
-  in_rect(942, 377, 46, 24) ? ( set_sl(12, 2); );
-  in_rect(992, 377, 46, 24) ? ( set_sl(12, 3); );
+in_rect(842, 377, 36, 24) ? ( set_sl(12, 0); );
+  in_rect(882, 377, 36, 24) ? ( set_sl(12, 1); );
+  in_rect(922, 377, 36, 24) ? ( set_sl(12, 2); );
+  in_rect(962, 377, 36, 24) ? ( set_sl(12, 3); );
+  in_rect(1002, 377, 36, 24) ? ( set_sl(12, 4); );
 );
 (mb1 && drag >= 0) ? (
   fine = (mouse_cap & 8) ? 0.15 : 1;

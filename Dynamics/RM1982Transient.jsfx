@@ -1,8 +1,8 @@
 desc:RM1982Transient - ReNo Mellow 1982 (Transient Designer)
 //tags: dynamics transient shaper designer attack sustain pump
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.6
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Transient designer : attaque, sustain et pump, speed (fenêtre d'attaque), side-chain, Vintage, clip optionnel.
 //
 // ---------------------------------------------------------------------------
@@ -35,8 +35,8 @@ slider5:0<0,1,1{Off,On}>-Sidechain (in 3/4)
 slider6:0<0,1,1{Off,On}>-Vintage
 slider7:1<0,1,1{Off,On}>-Clip 0 dBFS
 slider8:0<-20,20,0.1>-Output (dB)
-slider9:1<0,3,1{75%,100%,125%,150%}>-Size
-slider10:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider9:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider10:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -284,7 +284,7 @@ slider10 >= 0.5 ? (
   thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider9 + 0.5);
+S  = floor(slider9 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider9 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -405,10 +405,11 @@ loop(NH - 4,
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(780, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider9 + 0.5);
-draw_btn(806, 377, 54, 24, sz == 0, "75%");
-draw_btn(864, 377, 54, 24, sz == 1, "100%");
-draw_btn(922, 377, 54, 24, sz == 2, "125%");
-draw_btn(980, 377, 54, 24, sz == 3, "150%");
+draw_btn(806, 377, 42.4, 24, sz == 0, "75%");
+draw_btn(852.4, 377, 42.4, 24, sz == 1, "100%");
+draw_btn(898.8, 377, 42.4, 24, sz == 2, "125%");
+draw_btn(945.2, 377, 42.4, 24, sz == 3, "150%");
+draw_btn(991.6, 377, 42.4, 24, sz == 4, "200%");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
 
 // ---- Souris ----------------------------------------------------------------------------------
@@ -423,10 +424,11 @@ mb1 = mouse_cap & 1;
   in_rect(196, 286, 116, 26) ? set_sl(5, slider5 >= 0.5 ? 0 : 1);
   in_rect(332, 286, 116, 26) ? set_sl(6, slider6 >= 0.5 ? 0 : 1);
   in_rect(468, 286, 116, 26) ? set_sl(7, slider7 >= 0.5 ? 0 : 1);
-  in_rect(806, 377, 54, 24) ? (slider9 = 0; sliderchange(slider9););
-  in_rect(864, 377, 54, 24) ? (slider9 = 1; sliderchange(slider9););
-  in_rect(922, 377, 54, 24) ? (slider9 = 2; sliderchange(slider9););
-  in_rect(980, 377, 54, 24) ? (slider9 = 3; sliderchange(slider9););
+  in_rect(806, 377, 42.4, 24) ? (slider9 = 0; sliderchange(slider9););
+  in_rect(852.4, 377, 42.4, 24) ? (slider9 = 1; sliderchange(slider9););
+  in_rect(898.8, 377, 42.4, 24) ? (slider9 = 2; sliderchange(slider9););
+  in_rect(945.2, 377, 42.4, 24) ? (slider9 = 3; sliderchange(slider9););
+  in_rect(991.6, 377, 42.4, 24) ? (slider9 = 4; sliderchange(slider9););
   (drag > 0 && (mouse_cap & 4)) ? ( set_sl(drag, drag == 4 ? 15 : 0); drag = 0; );
 );
 (mb1 && drag > 0) ? (

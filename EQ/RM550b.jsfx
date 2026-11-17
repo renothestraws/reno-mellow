@@ -1,8 +1,8 @@
 desc:RM550b - ReNo Mellow 550b (Discrete 4-Band EQ)
 //tags: equalizer EQ proportional-q 500-series api-style 550b
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Égaliseur 4 bandes inspiré de l'API 550b : Q proportionnel réciproque calé sur les courbes d'usine, crans de gain, shelf/cloche en HF et LF, couleur ampli discret + transfo.
 //
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ slider10:1<0,1,1{Peak,Shelf}>-LF Shape
 slider11:1<0,1,1{Out,In}>-EQ In
 slider12:0<-12,12,0.1>-Calib (dB)
 slider13:0<-12,12,0.1>-Output (dB)
-slider14:1<0,3,1{75%,100%,125%,150%}>-Size
+slider14:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider15:1<0,1,1{Off,On}>-Color
 slider16:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
@@ -385,7 +385,7 @@ spl0 = min(max(yl*calib_c*out_g, -1), 1);
 spl1 = min(max(yr*calib_c*out_g, -1), 1);
 
 @gfx 300 1060
-S  = 0.75 + 0.25*floor(slider14 + 0.5);
+S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 300*S)/2));
 oy = max(0, floor((gfx_h - 1060*S)/2));
 mx = (mouse_x - ox)/S;
@@ -445,10 +445,11 @@ col(0.92,0.93,0.95); sprintf(#s, "%+.1f", slider13); text_l(212, 964, #s);
 gfx_setfont(1);
 sz = floor(slider14 + 0.5);
 col(0.80,0.81,0.84); gfx_setfont(5); text_c(30, 997, "SIZE"); gfx_setfont(1);
-draw_btn(56,  986, 56, 22, sz == 0, "75%");
-draw_btn(116, 986, 56, 22, sz == 1, "100%");
-draw_btn(176, 986, 56, 22, sz == 2, "125%");
-draw_btn(236, 986, 54, 22, sz == 3, "150%");
+draw_btn(56, 986, 43.6, 22, sz == 0, "75%");
+draw_btn(103.6, 986, 43.6, 22, sz == 1, "100%");
+draw_btn(151.2, 986, 43.6, 22, sz == 2, "125%");
+draw_btn(198.8, 986, 43.6, 22, sz == 3, "150%");
+draw_btn(246.4, 986, 43.6, 22, sz == 4, "200%");
 draw_btn(56,  1020, 116, 22, slider15 >= 0.5, "COLOR");
 draw_btn(176, 1020, 114, 22, slider16 >= 0.5, "HQ");
 
@@ -471,10 +472,11 @@ mb1 = mouse_cap & 1;
   (in_rect(50, 882, 32, 32) || dist(30, 898) < 9) ? set_sl(11, slider11 >= 0.5 ? 0 : 1);
   in_rect(56,  1020, 116, 22) ? set_sl(15, slider15 >= 0.5 ? 0 : 1);
   in_rect(176, 1020, 114, 22) ? set_sl(16, slider16 >= 0.5 ? 0 : 1);
-  in_rect(56,  986, 56, 22) ? (slider14 = 0; sliderchange(slider14););
-  in_rect(116, 986, 56, 22) ? (slider14 = 1; sliderchange(slider14););
-  in_rect(176, 986, 56, 22) ? (slider14 = 2; sliderchange(slider14););
-  in_rect(236, 986, 54, 22) ? (slider14 = 3; sliderchange(slider14););
+  in_rect(56, 986, 43.6, 22) ? (slider14 = 0; sliderchange(slider14););
+  in_rect(103.6, 986, 43.6, 22) ? (slider14 = 1; sliderchange(slider14););
+  in_rect(151.2, 986, 43.6, 22) ? (slider14 = 2; sliderchange(slider14););
+  in_rect(198.8, 986, 43.6, 22) ? (slider14 = 3; sliderchange(slider14););
+  in_rect(246.4, 986, 43.6, 22) ? (slider14 = 4; sliderchange(slider14););
   start = drag > 0 ? slider(drag) : 0;
   // Ctrl-clic : gain à 0 / trims à 0
   (drag > 0 && (mouse_cap & 4)) ? (

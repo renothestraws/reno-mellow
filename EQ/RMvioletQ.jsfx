@@ -1,8 +1,8 @@
 desc:RMvioletQ - ReNo Mellow violet Q (Passive Stereo Mastering EQ)
 //tags: equalizer EQ passive tube mastering stereo manley-style
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Nom du paramètre HQ en anglais (interface 100 % anglaise)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Égaliseur passif stéréo à lampes inspiré du Manley Massive Passive (version Mastering) : 2 x 4 bandes à crans, BANDWIDTH qui sculpte les shelfs (courbes Pultec), combinaison parallèle, LP/HP, Link.
 //
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ slider48:0<0,5,1{Off,12,16,23,30,39}>-R High Pass (Hz)
 slider49:1<0,1,1{Off,On}>-Link L/R
 slider50:0<-12,12,0.1>-Calib (dB)
 slider51:0<-12,12,0.1>-Output (dB)
-slider52:1<0,3,1{75%,100%,125%,150%}>-Size
+slider52:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider53:1<0,1,1{Off,On}>-Color
 slider54:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 
@@ -673,7 +673,7 @@ spl0 = min(max(yl*calib_c*out_g, -1), 1);
 spl1 = min(max(yr*calib_c*out_g, -1), 1);
 
 @gfx 1560 540
-S  = 0.75 + 0.25*floor(slider52 + 0.5);
+S  = floor(slider52 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider52 + 0.5);
 ox = max(0, floor((gfx_w - 1560*S)/2));
 oy = max(0, floor((gfx_h - 540*S)/2));
 mx = (mouse_x - ox)/S;
@@ -732,10 +732,11 @@ col(0.92,0.92,0.96); sprintf(#s, "%+.1f dB", slider51); text_l(288, 508, #s);
 col(0.82,0.82,0.88); text_c(1040, 508, "SIZE");
 gfx_setfont(1);
 sz = floor(slider52 + 0.5);
-draw_btn(1066, 496, 64, 24, sz == 0, "75%");
-draw_btn(1134, 496, 64, 24, sz == 1, "100%");
-draw_btn(1202, 496, 64, 24, sz == 2, "125%");
-draw_btn(1270, 496, 64, 24, sz == 3, "150%");
+draw_btn(1066, 496, 50.4, 24, sz == 0, "75%");
+draw_btn(1120.4, 496, 50.4, 24, sz == 1, "100%");
+draw_btn(1174.8, 496, 50.4, 24, sz == 2, "125%");
+draw_btn(1229.2, 496, 50.4, 24, sz == 3, "150%");
+draw_btn(1283.6, 496, 50.4, 24, sz == 4, "200%");
 draw_btn(1360, 496, 90, 24, slider53 >= 0.5, "COLOR");
 draw_btn(1456, 496, 64, 24, slider54 >= 0.5, "HQ");
 
@@ -772,10 +773,11 @@ mb1 = mouse_cap & 1;
   dist(272, 508) < 14 ? drag = 51;
   in_rect(1360, 496, 90, 24) ? set_sl(53, slider53 >= 0.5 ? 0 : 1);
   in_rect(1456, 496, 64, 24) ? set_sl(54, slider54 >= 0.5 ? 0 : 1);
-  in_rect(1066, 496, 64, 24) ? (slider52 = 0; sliderchange(slider52););
-  in_rect(1134, 496, 64, 24) ? (slider52 = 1; sliderchange(slider52););
-  in_rect(1202, 496, 64, 24) ? (slider52 = 2; sliderchange(slider52););
-  in_rect(1270, 496, 64, 24) ? (slider52 = 3; sliderchange(slider52););
+  in_rect(1066, 496, 50.4, 24) ? (slider52 = 0; sliderchange(slider52););
+  in_rect(1120.4, 496, 50.4, 24) ? (slider52 = 1; sliderchange(slider52););
+  in_rect(1174.8, 496, 50.4, 24) ? (slider52 = 2; sliderchange(slider52););
+  in_rect(1229.2, 496, 50.4, 24) ? (slider52 = 3; sliderchange(slider52););
+  in_rect(1283.6, 496, 50.4, 24) ? (slider52 = 4; sliderchange(slider52););
   start = drag > 0 ? slider(drag) : 0;
   // Ctrl-clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (

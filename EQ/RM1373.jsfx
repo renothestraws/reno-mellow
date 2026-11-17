@@ -1,8 +1,8 @@
 desc:RM1373 - ReNo Mellow 1373 (Class-A Preamp EQ, 3 Mids)
 //tags: equalizer EQ preamp class-A neve-style 1073 harmonics
 //@author ReNo Mellow
-//@version 1.6
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.7
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Égaliseur de préampli classe A inspiré du Neve 1073, avec trois médiums au lieu d'un : shelfs Baxandall, médiums à inductance, harmoniques du LINE, phase, EQL.
 //
 // ---------------------------------------------------------------------------
@@ -52,9 +52,9 @@ slider12:0<0,1,1{Normal,Inverted}>-Phase
 slider13:1<0,1,1{Bypass,In}>-EQL
 slider14:0<-12,12,0.1>-Calib (dB)
 slider15:0<-12,12,0.1>-Output (dB)
-slider16:1<0,3,1{75%,100%,125%,150%}>-Size
+slider16:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider17:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
-slider18:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider18:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -503,7 +503,7 @@ slider18 >= 0.5 ? (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
   thc8r = 1.0; thc8g = 0.86; thc8b = 0.55;
 );
-S  = 0.75 + 0.25*floor(slider16 + 0.5);
+S  = floor(slider16 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider16 + 0.5);
 ox = max(0, floor((gfx_w - 1420*S)/2));
 oy = max(0, floor((gfx_h - 360*S)/2));
 mx = (mouse_x - ox)/S;
@@ -655,10 +655,11 @@ szx = 1170;
 gfx_setfont(1);
 sz = floor(slider16 + 0.5);
 draw_btn(1062, oby, 50, 22, slider17 >= 0.5, "HQ");
-draw_btn(szx,     oby, 54, 22, sz == 0, "75%");
-draw_btn(szx+58,  oby, 54, 22, sz == 1, "100%");
-draw_btn(szx+116, oby, 54, 22, sz == 2, "125%");
-draw_btn(szx+174, oby, 54, 22, sz == 3, "150%");
+draw_btn(szx, oby, 42.4, 22, sz == 0, "75%");
+draw_btn(szx + 46.4, oby, 42.4, 22, sz == 1, "100%");
+draw_btn(szx + 92.8, oby, 42.4, 22, sz == 2, "125%");
+draw_btn(szx + 139.2, oby, 42.4, 22, sz == 3, "150%");
+draw_btn(szx + 185.6, oby, 42.4, 22, sz == 4, "200%");
 
 // ---- Souris ---------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -679,10 +680,11 @@ mb1 = mouse_cap & 1;
   in_rect(BX, 62, 48, 70) ? set_sl(12, slider12 >= 0.5 ? 0 : 1);
   in_rect(BX, 138, 48, 52) ? set_sl(13, slider13 >= 0.5 ? 0 : 1);
   in_rect(1062, oby, 50, 22) ? set_sl(17, slider17 >= 0.5 ? 0 : 1);
-  in_rect(szx,     oby, 54, 22) ? (slider16 = 0; sliderchange(slider16););
-  in_rect(szx+58,  oby, 54, 22) ? (slider16 = 1; sliderchange(slider16););
-  in_rect(szx+116, oby, 54, 22) ? (slider16 = 2; sliderchange(slider16););
-  in_rect(szx+174, oby, 54, 22) ? (slider16 = 3; sliderchange(slider16););
+  in_rect(szx, oby, 42.4, 22) ? (slider16 = 0; sliderchange(slider16););
+  in_rect(szx + 46.4, oby, 42.4, 22) ? (slider16 = 1; sliderchange(slider16););
+  in_rect(szx + 92.8, oby, 42.4, 22) ? (slider16 = 2; sliderchange(slider16););
+  in_rect(szx + 139.2, oby, 42.4, 22) ? (slider16 = 3; sliderchange(slider16););
+  in_rect(szx + 185.6, oby, 42.4, 22) ? (slider16 = 4; sliderchange(slider16););
   start = drag > 0 ? slider(drag) : 0;
   // Ctrl+clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (

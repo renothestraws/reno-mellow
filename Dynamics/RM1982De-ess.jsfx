@@ -1,8 +1,8 @@
 desc:RM1982De-ess - ReNo Mellow 1982 (De-Esser)
 //tags: dynamics de-esser sibilance split-band high-frequency limiter
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.4
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about De-esser inspiré du FabFilter Pro-DS : modes Vocal/Allround, Wide/Split, side-chain filtré ou externe, stereo link (stéréo/mid/side), lookahead, écoute du side-chain.
 //
 // ---------------------------------------------------------------------------
@@ -45,8 +45,8 @@ slider10:0<0,15,0.1>-Lookahead (ms)
 slider11:0<0,1,1{Off,On}>-Listen (removed signal)
 slider12:0<0,1,1{Off,On}>-Audition SC
 slider13:0<-12,12,0.1>-Output (dB)
-slider14:1<0,3,1{75%,100%,125%,150%}>-Size
-slider15:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider14:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider15:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -282,7 +282,7 @@ slider15 >= 0.5 ? (
   thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider14 + 0.5);
+S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -391,10 +391,11 @@ lbtn(916, 318, 104, 22, slider11 >= 0.5, "LISTEN", 1.00, 0.25, 0.20);
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider14 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
 
 // ---- Souris ----------------------------------------------------------------------------------
@@ -417,10 +418,11 @@ mb1 = mouse_cap & 1;
   in_rect(602, 310, 78, 26) ? set_sl(7, 1);
   in_rect(716, 318, 80, 22) ? set_sl(9, (floor(slider9 + 0.5) + 1) % 3);
   in_rect(916, 318, 104, 22) ? set_sl(11, slider11 >= 0.5 ? 0 : 1);
-  in_rect(842, 377, 46, 24) ? (slider14 = 0; sliderchange(slider14););
-  in_rect(892, 377, 46, 24) ? (slider14 = 1; sliderchange(slider14););
-  in_rect(942, 377, 46, 24) ? (slider14 = 2; sliderchange(slider14););
-  in_rect(992, 377, 46, 24) ? (slider14 = 3; sliderchange(slider14););
+  in_rect(842, 377, 36.0, 24) ? (slider14 = 0; sliderchange(slider14););
+  in_rect(882, 377, 36.0, 24) ? (slider14 = 1; sliderchange(slider14););
+  in_rect(922, 377, 36.0, 24) ? (slider14 = 2; sliderchange(slider14););
+  in_rect(962, 377, 36.0, 24) ? (slider14 = 3; sliderchange(slider14););
+  in_rect(1002, 377, 36.0, 24) ? (slider14 = 4; sliderchange(slider14););
   (drag > 0 && (mouse_cap & 4)) ? (
     drag == 1 ? set_sl(1, -20) : drag == 2 ? set_sl(2, 6) : drag == 3 ? set_sl(3, 6000) :
     drag == 4 ? set_sl(4, 20000) : drag == 8 ? set_sl(8, 100) : drag == 10 ? set_sl(10, 0) : set_sl(13, 0);

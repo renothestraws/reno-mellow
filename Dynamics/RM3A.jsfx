@@ -1,8 +1,8 @@
 desc:RM3A - ReNo Mellow 3A (Solid-State Optical Audio Leveler)
 //tags: dynamics compressor leveler opto optical LA-3A
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Leveler optique transistorisé inspiré du LA-3A : cellule optique rapide, contour HF dans le side-chain, Vintage.
 //
 // ---------------------------------------------------------------------------
@@ -43,13 +43,13 @@ slider2:5<0,10,0.01>-Peak Reduction
 slider3:0<0,1,1{Compress,Limit}>-Mode
 slider4:0<0,3,1{GR,Out,In,OFF}>-Meter
 slider5:1<0,1,1{Dual Mono,Stereo Link}>-Stereo
-slider6:1<0,3,1{75%,100%,125%,150%}>-Size
+slider6:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider7:0<0,1,1{Off,On}>-Analog
 slider8:0<-12,12,0.1>-Calib (dB)
 slider9:0<0,1,1{Classic,Vintage}>-Character
 slider10:0<0,10,0.01>-HF Contour
 slider11:1<0,1,1{Off,On}>-MOD
-slider12:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider12:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -426,7 +426,7 @@ slider12 >= 0.5 ? (
 ) : (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider6 + 0.5);
+S  = floor(slider6 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider6 + 0.5);
 ox = max(0, floor((gfx_w - 640*S)/2));
 oy = max(0, floor((gfx_h - 310*S)/2));
 mx = (mouse_x - ox)/S;
@@ -572,10 +572,11 @@ text_c(424, cky, "SIZE");
 szx = 452;
 gfx_setfont(1);
 sz = floor(slider6 + 0.5);
-draw_btn(szx,     oby, 40, 22, sz == 0, "75%");
-draw_btn(szx+44,  oby, 40, 22, sz == 1, "100%");
-draw_btn(szx+88,  oby, 40, 22, sz == 2, "125%");
-draw_btn(szx+132, oby, 40, 22, sz == 3, "150%");
+draw_btn(szx, oby, 31.2, 22, sz == 0, "75");
+draw_btn(szx + 35.2, oby, 31.2, 22, sz == 1, "100");
+draw_btn(szx + 70.4, oby, 31.2, 22, sz == 2, "125");
+draw_btn(szx + 105.6, oby, 31.2, 22, sz == 3, "150");
+draw_btn(szx + 140.8, oby, 31.2, 22, sz == 4, "200");
 
 // ---- Souris -----------------------------------------------------------------
 md = mouse_cap & 1;
@@ -606,10 +607,11 @@ md = mouse_cap & 1;
   in_rect(20,  oby, 76, 22) ? (slider7  = slider7  >= 0.5 ? 0 : 1; slider_automate(slider7););
   in_rect(102, oby, 50, 22) ? (slider11 = slider11 >= 0.5 ? 0 : 1; slider_automate(slider11););
 
-  in_rect(szx,     oby, 40, 22) ? (slider6 = 0; sliderchange(slider6););
-  in_rect(szx+44,  oby, 40, 22) ? (slider6 = 1; sliderchange(slider6););
-  in_rect(szx+88,  oby, 40, 22) ? (slider6 = 2; sliderchange(slider6););
-  in_rect(szx+132, oby, 40, 22) ? (slider6 = 3; sliderchange(slider6););
+  in_rect(szx, oby, 31.2, 22) ? (slider6 = 0; sliderchange(slider6););
+  in_rect(szx + 35.2, oby, 31.2, 22) ? (slider6 = 1; sliderchange(slider6););
+  in_rect(szx + 70.4, oby, 31.2, 22) ? (slider6 = 2; sliderchange(slider6););
+  in_rect(szx + 105.6, oby, 31.2, 22) ? (slider6 = 3; sliderchange(slider6););
+  in_rect(szx + 140.8, oby, 31.2, 22) ? (slider6 = 4; sliderchange(slider6););
 );
 
 (md && drag > 0) ? (

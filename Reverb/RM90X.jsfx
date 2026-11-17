@@ -1,8 +1,8 @@
 desc:RM90X - ReNo Mellow 90X (Digital Multi-Effect Processor)
 //tags: multi-effect reverb early-reflections delay echo flanger chorus phaser tremolo symphonic pitch freeze gate compressor pan eq SPX90 vintage digital
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Double-clic sur le numéro de mémoire = saisie au clavier du programme (1 à 90) ; potard WET/DRY global (100 % wet par défaut) ; réverbes recalées sur les IR : grave plus plein (bosse 40-100 Hz, coupure raide sous 35 Hz), coupure d'aigu raide vers 12,5-14 kHz et images de conversion très basses, amortissement de l'aigu corrigé (Hall, Room, Vocal, Plate)
+//@version 1.4
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Multi-effet numérique inspiré de la Yamaha SPX90II : les 30 programmes d'usine (4 réverbes, early reflections, gate reverb, reverse gate, delay, echo, flanger, chorus, phasing, tremolo, symphonic, ADR noise gate, compressor, reverb & gate, 4 pitch change, 2 freeze, pan, triggered pan, delay vibrato, EQ paramétrique), mémoires utilisateur 31 à 90 avec titres, face avant opérationnelle (LCD 2 x 16, PARAMETER, BALANCE, STORE, RECALL, UTILITY, BYPASS), MIDI (notes et program change). Traitement interne à 31,25 kHz / 16 bits comme l'original, sans latence ; réverbes calées sur des réponses impulsionnelles de l'appareil.
 //
 // ---------------------------------------------------------------------------
@@ -80,8 +80,8 @@ slider13:0<-24,12,0.1>-Input (dB)
 slider14:0<0,1,1{Off,On}>-Bypass
 slider15:0<0,1,1{Modern,Vintage}>-Character
 slider16:0<0,1,1{Stereo,Mono}>-Dry (Modern)
-slider17:1<0,3,1{75%,100%,125%,150%}>-Size
-slider18:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider17:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider18:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 slider19:100<0,100,1>-Wet/Dry (%)
 
 in_pin:Left In
@@ -1013,7 +1013,7 @@ spl1 = min(max(yr, -1), 1);
 @gfx 1060 240
 // thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider18
 slider18 >= 0.5 ? ( thc6r = 0.4; thc6g = 0.82; thc6b = 0.75; ) : ( thc6r = 0.93; thc6g = 0.62; thc6b = 0.22; );
-S  = 0.75 + 0.25*floor(slider17 + 0.5);
+S  = floor(slider17 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider17 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 240*S)/2));
 mx = (mouse_x - ox)/S;
@@ -1324,10 +1324,11 @@ gfx_setfont(3); col(0.55,0.54,0.50);
 text_l(420, oby + 6, "LCD: DRAG / WHEEL = DATA    SHIFT = FINE    CTRL+CLICK = DEFAULT");
 gfx_setfont(3); col(0.85,0.82,0.75); text_l(850, oby + 6, "SIZE");
 szx = 880; sz = floor(slider17 + 0.5);
-draw_btn(szx,       oby, 40, 22, sz == 0, "75%");
-draw_btn(szx + 43,  oby, 40, 22, sz == 1, "100%");
-draw_btn(szx + 86,  oby, 40, 22, sz == 2, "125%");
-draw_btn(szx + 129, oby, 40, 22, sz == 3, "150%");
+draw_btn(szx, oby, 31.4, 22, sz == 0, "75");
+draw_btn(szx + 34.4, oby, 31.4, 22, sz == 1, "100");
+draw_btn(szx + 68.8, oby, 31.4, 22, sz == 2, "125");
+draw_btn(szx + 103.2, oby, 31.4, 22, sz == 3, "150");
+draw_btn(szx + 137.6, oby, 31.4, 22, sz == 4, "200");
 
 // ---- Souris ---------------------------------------------------------------------------
 md = mouse_cap & 1;
@@ -1358,10 +1359,11 @@ g_ctrl = mouse_cap & 4;
     in_rect(156, oby, 68, 22) ? ( slider15 = 1; slider_automate(2^14); ) :
     in_rect(274, oby, 60, 22) ? ( slider16 = 0; slider_automate(2^15); ) :
     in_rect(338, oby, 60, 22) ? ( slider16 = 1; slider_automate(2^15); ) :
-    in_rect(szx, oby, 40, 22) ? ( slider17 = 0; sliderchange(2^16); ) :
-    in_rect(szx + 43, oby, 40, 22) ? ( slider17 = 1; sliderchange(2^16); ) :
-    in_rect(szx + 86, oby, 40, 22) ? ( slider17 = 2; sliderchange(2^16); ) :
-    in_rect(szx + 129, oby, 40, 22) ? ( slider17 = 3; sliderchange(2^16); );
+    in_rect(szx + 0.0, oby, 31.4, 22) ? ( slider17 = 0; sliderchange(2^16); ) :
+    in_rect(szx + 34.4, oby, 31.4, 22) ? ( slider17 = 1; sliderchange(2^16); ) :
+    in_rect(szx + 68.8, oby, 31.4, 22) ? ( slider17 = 2; sliderchange(2^16); ) :
+    in_rect(szx + 103.2, oby, 31.4, 22) ? ( slider17 = 3; sliderchange(2^16); ) :
+    in_rect(szx + 137.6, oby, 31.4, 22) ? ( slider17 = 4; sliderchange(2^16); );
 );
 // répétition des touches DEC / INC / MEMORY
 (md && hold_id > 0 && gnow - hold_t0 > 0.4 && gnow - hold_last > 0.06) ? (

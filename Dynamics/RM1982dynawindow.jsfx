@@ -1,8 +1,8 @@
 desc:RM1982dynawindow - ReNo Mellow 1982 (Dynamic Window Compressor/Expander)
 //tags: dynamics compressor expander window sidechain
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.3
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Compresseur/expandeur original à fenêtre : signal intact autour du seuil, compression 2/4/20:1 au-dessus, expansion 1:2/1:4/1:8 en dessous, side-chain externe.
 //
 // ---------------------------------------------------------------------------
@@ -46,14 +46,14 @@ slider2:0<-20,20,0.1>-Output (dB)
 slider3:0<0,300,1>-SC Filter (Hz, 0 = Off)
 slider4:0<0,1,1{Internal,External 3/4}>-Sidechain
 slider5:0<0,1,1{Off,On}>-Vintage
-slider6:1<0,3,1{75%,100%,125%,150%}>-Size
+slider6:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider7:9<3,18,0.5>-Window (+/- dB)
 slider8:0<0,2,1{2:1,4:1,20:1}>-Comp Ratio
 slider9:0<0,2,1{1:2,1:4,1:8}>-Exp Ratio
 slider10:1<0,1,1{Fast 1ms,Slow 30ms}>-Comp Attack
 slider11:1<0,1,1{Fast 1ms,Slow 15ms}>-Exp Attack
 slider12:1<0,2,1{Fast 100ms,Medium 300ms,Slow 600ms}>-Exp Release
-slider13:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider13:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -366,7 +366,7 @@ slider13 >= 0.5 ? (
   thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider6 + 0.5);
+S  = floor(slider6 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider6 + 0.5);
 ox = max(0, floor((gfx_w - 1120*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -551,10 +551,11 @@ gfx_setfont(3); col(0.62,0.63,0.66); text_c(842, oby + 11, "SIZE");
 szx = 868;
 gfx_setfont(1);
 sz = floor(slider6 + 0.5);
-draw_btn(szx,     oby, 54, 22, sz == 0, "75%");
-draw_btn(szx+58,  oby, 54, 22, sz == 1, "100%");
-draw_btn(szx+116, oby, 54, 22, sz == 2, "125%");
-draw_btn(szx+174, oby, 54, 22, sz == 3, "150%");
+draw_btn(szx, oby, 42.4, 22, sz == 0, "75%");
+draw_btn(szx + 46.4, oby, 42.4, 22, sz == 1, "100%");
+draw_btn(szx + 92.8, oby, 42.4, 22, sz == 2, "125%");
+draw_btn(szx + 139.2, oby, 42.4, 22, sz == 3, "150%");
+draw_btn(szx + 185.6, oby, 42.4, 22, sz == 4, "200%");
 
 // ---- Souris -----------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -579,10 +580,11 @@ mb1 = mouse_cap & 1;
   in_rect(650, 322, 52, 24) ? set_sl(12, 0);
   in_rect(706, 322, 52, 24) ? set_sl(12, 1);
   in_rect(762, 322, 52, 24) ? set_sl(12, 2);
-  in_rect(szx,     oby, 54, 22) ? (slider6 = 0; sliderchange(slider6););
-  in_rect(szx+58,  oby, 54, 22) ? (slider6 = 1; sliderchange(slider6););
-  in_rect(szx+116, oby, 54, 22) ? (slider6 = 2; sliderchange(slider6););
-  in_rect(szx+174, oby, 54, 22) ? (slider6 = 3; sliderchange(slider6););
+  in_rect(szx, oby, 42.4, 22) ? (slider6 = 0; sliderchange(slider6););
+  in_rect(szx + 46.4, oby, 42.4, 22) ? (slider6 = 1; sliderchange(slider6););
+  in_rect(szx + 92.8, oby, 42.4, 22) ? (slider6 = 2; sliderchange(slider6););
+  in_rect(szx + 139.2, oby, 42.4, 22) ? (slider6 = 3; sliderchange(slider6););
+  in_rect(szx + 185.6, oby, 42.4, 22) ? (slider6 = 4; sliderchange(slider6););
   // Ctrl+clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (
     set_sl(drag, drag == 1 ? -24 : drag == 7 ? 9 : 0);

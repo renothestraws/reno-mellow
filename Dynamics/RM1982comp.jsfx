@@ -1,8 +1,8 @@
 desc:RM1982comp - ReNo Mellow 1982 (Versatile Compressor)
 //tags: dynamics compressor feedback feedforward rms sidechain transparent
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.6
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Compresseur polyvalent et transparent : feedforward/feedback, attaque 0,1-50 ms et release 25 ms-3 s avec 3 courbes chacune, auto-release, fenêtre RMS 0-500 ms, knee, side-chain externe avec HPF, make-up, mix, mètre de réduction et courbe de transfert.
 //
 // ---------------------------------------------------------------------------
@@ -42,8 +42,8 @@ slider11:10<0,500,0.1>-RMS Window (ms, 0 = peak)
 slider12:0<0,1,1{Off,On}>-External Sidechain (in 3/4)
 slider13:0<-12,24,0.1>-Make-up (dB)
 slider14:100<0,100,0.1>-Mix (%)
-slider15:1<0,3,1{75%,100%,125%,150%}>-Size
-slider16:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider15:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider16:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -309,7 +309,7 @@ slider16 >= 0.5 ? (
   thc4r = 1.0; thc4g = 0.92; thc4b = 0.75;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider15 + 0.5);
+S  = floor(slider15 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider15 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -429,10 +429,11 @@ gfx_setfont(6); col(0.55,0.56,0.60); sprintf(#s, "max -%.1f", grpk); text_c(930,
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider15 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
 
 // ---- Souris ----------------------------------------------------------------------------------
@@ -459,10 +460,11 @@ mb1 = mouse_cap & 1;
   in_rect(91, 240, 45, 24) ? set_sl(9, 1);
   in_rect(44, 272, 92, 24) ? set_sl(12, slider12 >= 0.5 ? 0 : 1);
   in_rect(44, 304, 92, 24) ? set_sl(8, slider8 >= 0.5 ? 0 : 1);
-  in_rect(842, 377, 46, 24) ? (slider15 = 0; sliderchange(slider15););
-  in_rect(892, 377, 46, 24) ? (slider15 = 1; sliderchange(slider15););
-  in_rect(942, 377, 46, 24) ? (slider15 = 2; sliderchange(slider15););
-  in_rect(992, 377, 46, 24) ? (slider15 = 3; sliderchange(slider15););
+  in_rect(842, 377, 36.0, 24) ? (slider15 = 0; sliderchange(slider15););
+  in_rect(882, 377, 36.0, 24) ? (slider15 = 1; sliderchange(slider15););
+  in_rect(922, 377, 36.0, 24) ? (slider15 = 2; sliderchange(slider15););
+  in_rect(962, 377, 36.0, 24) ? (slider15 = 3; sliderchange(slider15););
+  in_rect(1002, 377, 36.0, 24) ? (slider15 = 4; sliderchange(slider15););
   (drag > 0 && (mouse_cap & 4)) ? ( kdef(drag); drag = 0; );
 );
 (mb1 && drag > 0) ? (

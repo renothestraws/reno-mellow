@@ -1,8 +1,8 @@
 desc:RM1982Trig - ReNo Mellow 1982 (Trigger to MIDI)
 //tags: trigger midi drum replacement transient detection sidechain reject
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.5
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Trigger to MIDI : transforme les transitoires audio en notes MIDI (seuil, sensibilité, masque, vélocité crête/RMS avec 5 courbes, note, canal, durée), 6 entrées de rejet, volume audio.
 //
 // ---------------------------------------------------------------------------
@@ -48,10 +48,10 @@ slider14:1<0,1,1{Off,On}>-Reject In 5
 slider15:1<0,1,1{Off,On}>-Reject In 6
 slider16:1<0,1,1{Off,On}>-Reject In 7
 slider17:1<0,1,1{Off,On}>-Reject In 8
-slider18:1<0,3,1{75%,100%,125%,150%}>-Size
+slider18:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider19:0<-60,6,0.1>-Audio Out (dB, -60 = Off)
 slider20:0<0,1,1{Off,On}>-Audio Mute
-slider21:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider21:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Main Left
 in_pin:Main Right
@@ -277,7 +277,7 @@ slider21 >= 0.5 ? (
   thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider18 + 0.5);
+S  = floor(slider18 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider18 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -411,10 +411,11 @@ draw_btn(944, 320, 82, 24, cv == 4, "S-CURVE");
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider18 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default  -  Shift: fine");
 // AUDIO OUT
 gfx_setfont(3); col(0.62,0.63,0.66); text_r(452, 389, "AUDIO OUT");
@@ -446,10 +447,11 @@ mb1 = mouse_cap & 1;
   in_rect(780, 320, 76, 24) ? set_sl(11, 2);
   in_rect(862, 320, 76, 24) ? set_sl(11, 3);
   in_rect(944, 320, 82, 24) ? set_sl(11, 4);
-  in_rect(842, 377, 46, 24) ? (slider18 = 0; sliderchange(slider18););
-  in_rect(892, 377, 46, 24) ? (slider18 = 1; sliderchange(slider18););
-  in_rect(942, 377, 46, 24) ? (slider18 = 2; sliderchange(slider18););
-  in_rect(992, 377, 46, 24) ? (slider18 = 3; sliderchange(slider18););
+  in_rect(842, 377, 36.0, 24) ? (slider18 = 0; sliderchange(slider18););
+  in_rect(882, 377, 36.0, 24) ? (slider18 = 1; sliderchange(slider18););
+  in_rect(922, 377, 36.0, 24) ? (slider18 = 2; sliderchange(slider18););
+  in_rect(962, 377, 36.0, 24) ? (slider18 = 3; sliderchange(slider18););
+  in_rect(1002, 377, 36.0, 24) ? (slider18 = 4; sliderchange(slider18););
   (drag > 0 && (mouse_cap & 4)) ? (
     drag == 1 ? set_sl(1, -24) : drag == 2 ? set_sl(2, 50) : drag == 3 ? set_sl(3, 50) :
     drag == 4 ? set_sl(4, 2) : drag == 5 ? set_sl(5, 0) : drag == 6 ? set_sl(6, 36) :

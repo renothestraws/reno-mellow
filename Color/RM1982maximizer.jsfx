@@ -1,8 +1,8 @@
 desc:RM1982maximizer - ReNo Mellow 1982 (Sonic Maximizer)
 //tags: enhancer maximizer exciter bbe phase
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Sonic maximizer façon BBE, d'après Sonic Enhancer de lubomir i. ivanov (GPL v2+) : passe-tout à 700 Hz + LOW CONTOUR (grave) + PROCESS (aigu piloté par un CV dynamique) ; input / output, noise floor ; crête-mètres et activité du process ; saisie des valeurs au clavier.
 //
 // ---------------------------------------------------------------------------
@@ -28,8 +28,8 @@ slider3:0<0,10,0.1>-Process
 slider4:2<0,10,0.1>-CV
 slider5:0<-12,12,0.1>-Output (dB)
 slider6:1<0,1,1{Off,On}>-Noise Floor
-slider7:1<0,3,1{75%,100%,125%,150%}>-Size
-slider8:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider7:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider8:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -217,7 +217,7 @@ slider8 >= 0.5 ? (
   thc3r = 1.0; thc3g = 0.85; thc3b = 0.6;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider7 + 0.5);
+S  = floor(slider7 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider7 + 0.5);
 ox = max(0, floor((gfx_w - 860*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -296,10 +296,11 @@ draw_btn(34, 377, 120, 24, slider6 >= 0.5, "NOISE FLOOR");
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(618, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider7 + 0.5);
-draw_btn(642, 377, 46, 24, sz == 0, "75%");
-draw_btn(692, 377, 46, 24, sz == 1, "100%");
-draw_btn(742, 377, 46, 24, sz == 2, "125%");
-draw_btn(792, 377, 46, 24, sz == 3, "150%");
+draw_btn(642, 377, 36.0, 24, sz == 0, "75");
+draw_btn(682, 377, 36.0, 24, sz == 1, "100");
+draw_btn(722, 377, 36.0, 24, sz == 2, "125");
+draw_btn(762, 377, 36.0, 24, sz == 3, "150");
+draw_btn(802, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50);
 text_l(166, 384, "Double-click: type a value  -  Ctrl-click: default  -  Shift: fine");
 text_l(166, 396, "based on Sonic Enhancer by lubomir i. ivanov (GPL)");
@@ -315,10 +316,11 @@ mb1 = mouse_cap & 1;
     (time_precise() - lc_t < 0.35 && lc_k == drag) ? ( edit_k = drag; strcpy(#ed, ""); drag = -1; lc_k = -1; ) : ( lc_t = time_precise(); lc_k = drag; );
   );
   in_rect(34, 377, 120, 24) ? ( set_sl(6, slider6 >= 0.5 ? 0 : 1); );
-  in_rect(642, 377, 46, 24) ? ( set_sl(7, 0); );
-  in_rect(692, 377, 46, 24) ? ( set_sl(7, 1); );
-  in_rect(742, 377, 46, 24) ? ( set_sl(7, 2); );
-  in_rect(792, 377, 46, 24) ? ( set_sl(7, 3); );
+  in_rect(642, 377, 36, 24) ? ( set_sl(7, 0); );
+  in_rect(682, 377, 36, 24) ? ( set_sl(7, 1); );
+  in_rect(722, 377, 36, 24) ? ( set_sl(7, 2); );
+  in_rect(762, 377, 36, 24) ? ( set_sl(7, 3); );
+  in_rect(802, 377, 36, 24) ? ( set_sl(7, 4); );
 );
 (mb1 && drag >= 0) ? (
   fine = (mouse_cap & 8) ? 0.15 : 1;

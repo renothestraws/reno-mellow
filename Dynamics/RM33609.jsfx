@@ -1,8 +1,8 @@
 desc:RM33609 - ReNo Mellow 33609 (Diode-Bridge Stereo Limiter/Compressor)
 //tags: dynamics compressor limiter diode-bridge class-A stereo
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Limiteur/compresseur stéréo à pont de diodes inspiré du Neve 33609 : sections Limit et Compress, auto-recovery a1/a2, couleur transfos et classe A.
 //
 // ---------------------------------------------------------------------------
@@ -73,10 +73,10 @@ slider21:0<0,1,1{Fast,Slow}>-Ch2 Compress Attack
 slider22:1<0,1,1{Bypass,In}>-Ch2 Bypass/In
 // ---- Commun ----
 slider23:0<0,1,1{Mono,Stereo}>-Mono/Stereo
-slider24:1<0,3,1{75%,100%,125%,150%}>-Size
+slider24:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider25:0<0,1,1{Off,On}>-Analog
 slider26:0<-12,12,0.1>-Calib (dB)
-slider27:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider27:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -503,7 +503,7 @@ slider27 >= 0.5 ? (
 ) : (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider24 + 0.5);
+S  = floor(slider24 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider24 + 0.5);
 ox = max(0, floor((gfx_w - 1320*S)/2));
 oy = max(0, floor((gfx_h - 380*S)/2));
 mx = (mouse_x - ox)/S;
@@ -639,10 +639,11 @@ col(0.85,0.82,0.75); text_c(1044, cky, "SIZE");
 szx = 1070;
 gfx_setfont(1);
 sz = floor(slider24 + 0.5);
-draw_btn(szx,     oby, 54, 22, sz == 0, "75%");
-draw_btn(szx+58,  oby, 54, 22, sz == 1, "100%");
-draw_btn(szx+116, oby, 54, 22, sz == 2, "125%");
-draw_btn(szx+174, oby, 54, 22, sz == 3, "150%");
+draw_btn(szx, oby, 42.4, 22, sz == 0, "75%");
+draw_btn(szx + 46.4, oby, 42.4, 22, sz == 1, "100%");
+draw_btn(szx + 92.8, oby, 42.4, 22, sz == 2, "125%");
+draw_btn(szx + 139.2, oby, 42.4, 22, sz == 3, "150%");
+draw_btn(szx + 185.6, oby, 42.4, 22, sz == 4, "200%");
 
 // ---- Souris ---------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -667,10 +668,11 @@ mb1 = mouse_cap & 1;
   );
   in_rect(892, 66, 24, 40) ? flip(23);
   in_rect(20, oby, 84, 22) ? flip(25);
-  in_rect(szx,     oby, 54, 22) ? (slider24 = 0; sliderchange(slider24););
-  in_rect(szx+58,  oby, 54, 22) ? (slider24 = 1; sliderchange(slider24););
-  in_rect(szx+116, oby, 54, 22) ? (slider24 = 2; sliderchange(slider24););
-  in_rect(szx+174, oby, 54, 22) ? (slider24 = 3; sliderchange(slider24););
+  in_rect(szx, oby, 42.4, 22) ? (slider24 = 0; sliderchange(slider24););
+  in_rect(szx + 46.4, oby, 42.4, 22) ? (slider24 = 1; sliderchange(slider24););
+  in_rect(szx + 92.8, oby, 42.4, 22) ? (slider24 = 2; sliderchange(slider24););
+  in_rect(szx + 139.2, oby, 42.4, 22) ? (slider24 = 3; sliderchange(slider24););
+  in_rect(szx + 185.6, oby, 42.4, 22) ? (slider24 = 4; sliderchange(slider24););
   start = drag > 0 ? slider(drag) : 0;
   // Ctrl+clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (

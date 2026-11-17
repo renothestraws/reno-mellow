@@ -1,8 +1,8 @@
 desc:RM1176 - ReNo Mellow 1176 (FET Limiting Amplifier)
 //tags: dynamics compressor limiter FET 1176
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Compresseur/limiteur FET inspiré du 1176 : ratios 4/8/12/20 et all-buttons, attaque et release ultra-rapides, Punch, Analog, Calib.
 //
 // ---------------------------------------------------------------------------
@@ -38,11 +38,11 @@ slider4:4<1,7,0.01>-Release
 slider5:0<0,4,1{4:1,8:1,12:1,20:1,All-Button}>-Ratio
 slider6:1<0,3,1{GR,Out,In,OFF}>-Meter
 slider7:1<0,1,1{Dual Mono,Stereo Link}>-Stereo
-slider8:1<0,3,1{75%,100%,125%,150%}>-Size
+slider8:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider9:0<0,1,1{Off,On}>-Analog
 slider10:0<0,1,1{Off,On}>-Punch
 slider11:0<-12,12,0.1>-Calib (dB)
-slider12:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider12:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -307,7 +307,7 @@ slider12 >= 0.5 ? (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
   thc7r = 0.97; thc7g = 0.87; thc7b = 0.6;
 );
-S  = 0.75 + 0.25*floor(slider8 + 0.5);
+S  = floor(slider8 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider8 + 0.5);
 ox = max(0, floor((gfx_w - 640*S)/2));
 oy = max(0, floor((gfx_h - 310*S)/2));
 mx = (mouse_x - ox)/S;
@@ -452,10 +452,11 @@ gfx_setfont(3); col(0.85,0.82,0.75);
 text_c(424, oby+11, "SIZE");
 gfx_setfont(1);
 sz = floor(slider8 + 0.5);
-draw_btn(vx,     oby, 40, 22, sz == 0, "75%");
-draw_btn(vx+44,  oby, 40, 22, sz == 1, "100%");
-draw_btn(vx+88,  oby, 40, 22, sz == 2, "125%");
-draw_btn(vx+132, oby, 40, 22, sz == 3, "150%");
+draw_btn(vx, oby, 31.2, 22, sz == 0, "75");
+draw_btn(vx + 35.2, oby, 31.2, 22, sz == 1, "100");
+draw_btn(vx + 70.4, oby, 31.2, 22, sz == 2, "125");
+draw_btn(vx + 105.6, oby, 31.2, 22, sz == 3, "150");
+draw_btn(vx + 140.8, oby, 31.2, 22, sz == 4, "200");
 
 // ---- Souris -----------------------------------------------------------------
 md = mouse_cap & 1;
@@ -491,10 +492,11 @@ md = mouse_cap & 1;
   in_rect(20,  oby, 84, 22) ? (slider9  = slider9  >= 0.5 ? 0 : 1; slider_automate(slider9););
   in_rect(112, oby, 84, 22) ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
 
-  in_rect(vx,     oby, 40, 22) ? (slider8 = 0; sliderchange(slider8););
-  in_rect(vx+44,  oby, 40, 22) ? (slider8 = 1; sliderchange(slider8););
-  in_rect(vx+88,  oby, 40, 22) ? (slider8 = 2; sliderchange(slider8););
-  in_rect(vx+132, oby, 40, 22) ? (slider8 = 3; sliderchange(slider8););
+  in_rect(vx, oby, 31.2, 22) ? (slider8 = 0; sliderchange(slider8););
+  in_rect(vx + 35.2, oby, 31.2, 22) ? (slider8 = 1; sliderchange(slider8););
+  in_rect(vx + 70.4, oby, 31.2, 22) ? (slider8 = 2; sliderchange(slider8););
+  in_rect(vx + 105.6, oby, 31.2, 22) ? (slider8 = 3; sliderchange(slider8););
+  in_rect(vx + 140.8, oby, 31.2, 22) ? (slider8 = 4; sliderchange(slider8););
 );
 
 (md && drag > 0) ? (

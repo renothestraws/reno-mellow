@@ -1,8 +1,8 @@
 desc:RMGbuss - ReNo Mellow G Buss (VCA Bus Compressor)
 //tags: dynamics compressor bus VCA SSL G
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Compresseur de bus VCA inspiré du compresseur de bus SSL série G : détection feedback, Auto release, filtre side-chain, Mix, Modern.
 //
 // ---------------------------------------------------------------------------
@@ -52,13 +52,13 @@ slider3:1<0,2,1{2:1,4:1,10:1}>-Ratio
 slider4:4<0,4,1{0.1 s,0.3 s,0.6 s,1.2 s,Auto}>-Release
 slider5:0<-5,15,0.1>-Make-Up (dB)
 slider6:1<0,1,1{Out,In}>-Compressor
-slider7:1<0,3,1{75%,100%,125%,150%}>-Size
+slider7:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider8:0<-12,12,0.1>-Calib (dB)
 slider9:0<0,1,1{Off,On}>-Analog
 slider10:0<0,1,1{Off,On}>-Modern
 slider11:0<0,500,1>-SC Filter (Hz)
 slider12:100<0,100,0.1>-Mix (%)
-slider13:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider13:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -325,7 +325,7 @@ slider13 >= 0.5 ? (
 ) : (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider7 + 0.5);
+S  = floor(slider7 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider7 + 0.5);
 ox = max(0, floor((gfx_w - 360*S)/2));
 oy = max(0, floor((gfx_h - 760*S)/2));
 mx = (mouse_x - ox)/S;
@@ -502,10 +502,11 @@ text_c(38, 731, "SIZE");
 szx = 66; szy = 720;
 gfx_setfont(1);
 sz = floor(slider7 + 0.5);
-draw_btn(szx,      szy, 62, 22, sz == 0, "75%");
-draw_btn(szx+68,   szy, 62, 22, sz == 1, "100%");
-draw_btn(szx+136,  szy, 62, 22, sz == 2, "125%");
-draw_btn(szx+204,  szy, 62, 22, sz == 3, "150%");
+draw_btn(szx, szy, 48.4, 22, sz == 0, "75%");
+draw_btn(szx + 54.4, szy, 48.4, 22, sz == 1, "100%");
+draw_btn(szx + 108.8, szy, 48.4, 22, sz == 2, "125%");
+draw_btn(szx + 163.2, szy, 48.4, 22, sz == 3, "150%");
+draw_btn(szx + 217.6, szy, 48.4, 22, sz == 4, "200%");
 
 // ---- Souris ---------------------------------------------------------------------
 md = mouse_cap & 1;
@@ -547,10 +548,11 @@ md = mouse_cap & 1;
   in_rect(b2x, by, bw, bh) ? (slider9  = slider9  >= 0.5 ? 0 : 1; slider_automate(slider9););
   in_rect(b3x, by, bw, bh) ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
 
-  in_rect(szx,     szy, 62, 22) ? (slider7 = 0; sliderchange(slider7););
-  in_rect(szx+68,  szy, 62, 22) ? (slider7 = 1; sliderchange(slider7););
-  in_rect(szx+136, szy, 62, 22) ? (slider7 = 2; sliderchange(slider7););
-  in_rect(szx+204, szy, 62, 22) ? (slider7 = 3; sliderchange(slider7););
+  in_rect(szx, szy, 48.4, 22) ? (slider7 = 0; sliderchange(slider7););
+  in_rect(szx + 54.4, szy, 48.4, 22) ? (slider7 = 1; sliderchange(slider7););
+  in_rect(szx + 108.8, szy, 48.4, 22) ? (slider7 = 2; sliderchange(slider7););
+  in_rect(szx + 163.2, szy, 48.4, 22) ? (slider7 = 3; sliderchange(slider7););
+  in_rect(szx + 217.6, szy, 48.4, 22) ? (slider7 = 4; sliderchange(slider7););
 );
 
 (md && drag > 0) ? (

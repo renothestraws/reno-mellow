@@ -1,8 +1,8 @@
 desc:RM1982Inflat - ReNo Mellow 1982 (Inflator)
 //tags: inflator saturation loudness waveshaper
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Inflator (comportement du Sonnox Oxford Inflator, mode Band Split compris), d'après RCInflator 2 (Oxford Edition) de lewloiwc, basé sur RCInflator de RCJacH (ajouts sai'ke et chmaha) : input, effect, curve, clip 0 dB, band split, effect in, output ; courbe de transfert affichée ; saisie des valeurs au clavier.
 //
 // ---------------------------------------------------------------------------
@@ -30,8 +30,8 @@ slider4:1<0,1,1{Off,On}>-Clip 0 dB
 slider5:0<0,1,1{Off,On}>-Band Split
 slider6:1<0,1,1{Off,On}>-Effect In
 slider7:0<-12,0,0.01>-Output (dB)
-slider8:1<0,3,1{75%,100%,125%,150%}>-Size
-slider9:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider8:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider9:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -209,7 +209,7 @@ slider9 >= 0.5 ? (
   thc3r = 1.0; thc3g = 0.85; thc3b = 0.6;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider8 + 0.5);
+S  = floor(slider8 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider8 + 0.5);
 ox = max(0, floor((gfx_w - 860*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -308,10 +308,11 @@ draw_btn(654, 314, 150, 30, slider6 >= 0.5, "EFFECT IN");
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(618, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider8 + 0.5);
-draw_btn(642, 377, 46, 24, sz == 0, "75%");
-draw_btn(692, 377, 46, 24, sz == 1, "100%");
-draw_btn(742, 377, 46, 24, sz == 2, "125%");
-draw_btn(792, 377, 46, 24, sz == 3, "150%");
+draw_btn(642, 377, 36.0, 24, sz == 0, "75");
+draw_btn(682, 377, 36.0, 24, sz == 1, "100");
+draw_btn(722, 377, 36.0, 24, sz == 2, "125");
+draw_btn(762, 377, 36.0, 24, sz == 3, "150");
+draw_btn(802, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50);
 text_l(34, 384, "Double-click: type a value  -  Ctrl-click: default  -  Shift: fine");
 text_l(34, 396, "based on RCInflator 2 (Oxford Edition) by lewloiwc, RCJacH, sai'ke, chmaha");
@@ -329,10 +330,11 @@ mb1 = mouse_cap & 1;
   in_rect(318, 314, 150, 30) ? ( set_sl(4, slider4 >= 0.5 ? 0 : 1); );
   in_rect(486, 314, 150, 30) ? ( set_sl(5, slider5 >= 0.5 ? 0 : 1); );
   in_rect(654, 314, 150, 30) ? ( set_sl(6, slider6 >= 0.5 ? 0 : 1); );
-  in_rect(642, 377, 46, 24) ? ( set_sl(8, 0); );
-  in_rect(692, 377, 46, 24) ? ( set_sl(8, 1); );
-  in_rect(742, 377, 46, 24) ? ( set_sl(8, 2); );
-  in_rect(792, 377, 46, 24) ? ( set_sl(8, 3); );
+in_rect(642, 377, 36, 24) ? ( set_sl(8, 0); );
+  in_rect(682, 377, 36, 24) ? ( set_sl(8, 1); );
+  in_rect(722, 377, 36, 24) ? ( set_sl(8, 2); );
+  in_rect(762, 377, 36, 24) ? ( set_sl(8, 3); );
+  in_rect(802, 377, 36, 24) ? ( set_sl(8, 4); );
 );
 (mb1 && drag >= 0) ? (
   fine = (mouse_cap & 8) ? 0.15 : 1;

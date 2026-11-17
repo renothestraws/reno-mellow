@@ -1,8 +1,8 @@
 desc:RM1982Fletcher - ReNo Mellow 1982 (Fletcher-Munson Loudness EQ)
 //tags: equalizer EQ loudness fletcher-munson contour one-knob
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.5
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Égaliseur original à un seul bouton d'après les courbes d'isosonie de Fletcher-Munson : compensation physiologique ou courbe inverse, écart limité à 18 dB, Auto Level, HPF/LPF.
 //
 // ---------------------------------------------------------------------------
@@ -33,11 +33,11 @@ slider2:1<0,1,1{Off,On}>-Auto Level
 slider3:1<0,1,1{Out,In}>-EQ In
 slider4:0<-12,12,0.1>-Calib (dB)
 slider5:0<-12,12,0.1>-Output (dB)
-slider6:1<0,3,1{75%,100%,125%,150%}>-Size
+slider6:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider7:0<0,1,1{Off,On}>-HQ (oversampling x2, 46 samples latency)
 slider8:0<0,200,1>-HPF (Hz, 0 = Off)
 slider9:20000<5000,20000,1>-LPF (Hz, 20000 = Off)
-slider10:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider10:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -315,7 +315,7 @@ slider10 >= 0.5 ? (
 ) : (
   thc9r = 0.98; thc9g = 0.7; thc9b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider6 + 0.5);
+S  = floor(slider6 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider6 + 0.5);
 ox = max(0, floor((gfx_w - 720*S)/2));
 oy = max(0, floor((gfx_h - 520*S)/2));
 mx = (mouse_x - ox)/S;
@@ -434,10 +434,11 @@ col(0.94,0.94,0.96); sprintf(#s, "%+.1f", slider5); text_l(204, 489, #s);
 col(0.82,0.83,0.87); text_c(282, 489, "SIZE");
 gfx_setfont(1);
 sz = floor(slider6 + 0.5);
-draw_btn(306, 477, 64, 24, sz == 0, "75%");
-draw_btn(374, 477, 64, 24, sz == 1, "100%");
-draw_btn(442, 477, 64, 24, sz == 2, "125%");
-draw_btn(510, 477, 64, 24, sz == 3, "150%");
+draw_btn(306, 477, 50.4, 24, sz == 0, "75%");
+draw_btn(360.4, 477, 50.4, 24, sz == 1, "100%");
+draw_btn(414.8, 477, 50.4, 24, sz == 2, "125%");
+draw_btn(469.2, 477, 50.4, 24, sz == 3, "150%");
+draw_btn(523.6, 477, 50.4, 24, sz == 4, "200%");
 draw_btn(600, 477, 80, 24, slider7 >= 0.5, "HQ");
 
 // ---- Souris ----------------------------------------------------------------------------------
@@ -452,10 +453,11 @@ mb1 = mouse_cap & 1;
   in_rect(40, 362, 110, 30) ? set_sl(2, slider2 >= 0.5 ? 0 : 1);
   in_rect(570, 362, 110, 30) ? set_sl(3, slider3 >= 0.5 ? 0 : 1);
   in_rect(600, 477, 80, 24) ? set_sl(7, slider7 >= 0.5 ? 0 : 1);
-  in_rect(306, 477, 64, 24) ? (slider6 = 0; sliderchange(slider6););
-  in_rect(374, 477, 64, 24) ? (slider6 = 1; sliderchange(slider6););
-  in_rect(442, 477, 64, 24) ? (slider6 = 2; sliderchange(slider6););
-  in_rect(510, 477, 64, 24) ? (slider6 = 3; sliderchange(slider6););
+  in_rect(306, 477, 50.4, 24) ? (slider6 = 0; sliderchange(slider6););
+  in_rect(360.4, 477, 50.4, 24) ? (slider6 = 1; sliderchange(slider6););
+  in_rect(414.8, 477, 50.4, 24) ? (slider6 = 2; sliderchange(slider6););
+  in_rect(469.2, 477, 50.4, 24) ? (slider6 = 3; sliderchange(slider6););
+  in_rect(523.6, 477, 50.4, 24) ? (slider6 = 4; sliderchange(slider6););
   start = drag > 0 ? slider(drag) : 0;
   (drag > 0 && (mouse_cap & 4)) ? ( set_sl(drag, drag == 9 ? 20000 : 0); drag = 0; );
 );

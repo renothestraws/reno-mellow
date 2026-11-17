@@ -1,8 +1,8 @@
 desc:RMcleanEQ - ReNo Mellow Clean EQ (precise transparent 10-band EQ with analyzer)
 //tags: equalizer eq parametric analyzer mid-side surgical
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Première version publique ; Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.4
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about EQ précise et transparente inspirée du FabFilter Pro-Q 3 : 10 bandes (Bell, Low/High Shelf, Low/High Cut 6 à 96 dB/oct, Tilt), Bell et cuts « matched » sans resserrement dans l'aigu, placement Stereo/L/R/Mid/Side par bande, solo de bande (bouton ou Ctrl maintenu), sélection multiple, Auto Gain, analyseur +3 dB/oct (Peak / RMS 500 ms, pré-EQ), latence nulle, interface redimensionnable.
 //
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ slider61:0<-24,24,0.01>-Output (dB)
 slider62:0<0,1,1{Off,On}>-Auto Gain
 slider63:4<0,5,1>-Analyzer (0 off 1 peak 2 rms, +3 = pre)
 slider64:2<0,3,1{3 dB,6 dB,12 dB,30 dB}>-Display Range
-slider65:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider65:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In

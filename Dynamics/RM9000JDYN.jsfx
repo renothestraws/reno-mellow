@@ -1,8 +1,8 @@
 desc:RM9000JDYN - ReNo Mellow 9000J Channel Dynamics
 //tags: dynamics compressor gate expander VCA SSL 9000J channel strip
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.2
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Dynamiques de tranche inspirées de la SSL 9000J : compresseur RMS/peak, gate/expandeur avec hold, bypass séparés, vumètre d'entrée.
 //
 // ---------------------------------------------------------------------------
@@ -57,13 +57,13 @@ slider10:0<0,1,1{Gate,Expander}>-Gate EXP
 slider11:0<0,1,1{Off,On}>-Gate Fast Attack
 slider12:1<0,1,1{Out,In}>-Dynamics In
 slider13:1<0,1,1{Off,On}>-Link
-slider14:1<0,3,1{75%,100%,125%,150%}>-Size
+slider14:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider15:0<0,1,1{Off,On}>-Analog
 slider16:0<-12,12,0.1>-Calib (dB)
 slider17:1<0,1,1{Bypass,In}>-Comp In
 slider18:1<0,1,1{Bypass,In}>-Gate In
 slider19:0<-12,12,0.1>-Out (dB)
-slider20:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider20:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:Left In
 in_pin:Right In
@@ -350,7 +350,7 @@ slider20 >= 0.5 ? (
 ) : (
   thc6r = 0.93; thc6g = 0.62; thc6b = 0.22;
 );
-S  = 0.75 + 0.25*floor(slider14 + 0.5);
+S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 320*S)/2));
 oy = max(0, floor((gfx_h - 760*S)/2));
 mx = (mouse_x - ox)/S;
@@ -521,10 +521,11 @@ gfx_setfont(3); col(0.85,0.82,0.75); text_c(30, 742, "SIZE");
 szx = 52; szy = 732;
 gfx_setfont(1);
 sz = floor(slider14 + 0.5);
-draw_btn(szx,      szy, 60, 19, sz == 0, "75%");
-draw_btn(szx+64,   szy, 60, 19, sz == 1, "100%");
-draw_btn(szx+128,  szy, 60, 19, sz == 2, "125%");
-draw_btn(szx+192,  szy, 60, 19, sz == 3, "150%");
+draw_btn(szx, szy, 47.2, 19, sz == 0, "75%");
+draw_btn(szx + 51.2, szy, 47.2, 19, sz == 1, "100%");
+draw_btn(szx + 102.4, szy, 47.2, 19, sz == 2, "125%");
+draw_btn(szx + 153.6, szy, 47.2, 19, sz == 3, "150%");
+draw_btn(szx + 204.8, szy, 47.2, 19, sz == 4, "200%");
 
 // ---- Souris ---------------------------------------------------------------------
 md = mouse_cap & 1;
@@ -562,10 +563,11 @@ md = mouse_cap & 1;
   in_rect(lx - 20, 556, 40, 40)  ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
   in_rect(rx + 17, 615, 38, 38)  ? (slider11 = slider11 >= 0.5 ? 0 : 1; slider_automate(slider11););
   in_rect(14, 708, 70, 20)       ? (slider15 = slider15 >= 0.5 ? 0 : 1; slider_automate(slider15););
-  in_rect(szx,     szy, 60, 19) ? (slider14 = 0; sliderchange(slider14););
-  in_rect(szx+64,  szy, 60, 19) ? (slider14 = 1; sliderchange(slider14););
-  in_rect(szx+128, szy, 60, 19) ? (slider14 = 2; sliderchange(slider14););
-  in_rect(szx+192, szy, 60, 19) ? (slider14 = 3; sliderchange(slider14););
+  in_rect(szx, szy, 47.2, 19) ? (slider14 = 0; sliderchange(slider14););
+  in_rect(szx + 51.2, szy, 47.2, 19) ? (slider14 = 1; sliderchange(slider14););
+  in_rect(szx + 102.4, szy, 47.2, 19) ? (slider14 = 2; sliderchange(slider14););
+  in_rect(szx + 153.6, szy, 47.2, 19) ? (slider14 = 3; sliderchange(slider14););
+  in_rect(szx + 204.8, szy, 47.2, 19) ? (slider14 = 4; sliderchange(slider14););
 );
 
 (md && drag > 0) ? (
