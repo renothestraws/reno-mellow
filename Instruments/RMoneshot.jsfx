@@ -1,8 +1,8 @@
 desc:RMoneshot - ReNo Mellow Smart One-Shot (velocity, random and rhythm aware drum sample player)
 //tags: sampler one-shot drum snare kick velocity humanize instrument
 //@author ReNo Mellow
-//@version 1.8
-//@changelog Double-clic sur le nom du plug-in : couleur orange ou verte (mémorisée par instance)
+//@version 1.9
+//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
 //@about Lecteur d'échantillon one-shot intelligent (snare et kick) : un seul sample = la frappe de référence à vélocité 100 ; niveau, timbre (fût / clic de batte), résonance, attaque et pitch recalculés selon la vélocité d'après un modèle calé sur des séries réelles de 12 vélocités ; variations aléatoires (pas d'effet mitraillette), roulements rapides et alternance des mains, étouffement du coup précédent ; volume, pitch, ADSR, dynamic range ; glisser-déposer WAV/OGG (mono, stéréo ou multicanal).
 //
 // ---------------------------------------------------------------------------
@@ -53,9 +53,9 @@ slider5:5000<10,5000,1>-Decay (ms, max = off)
 slider6:-60<-60,0,0.1>-Sustain (dB)
 slider7:5000<5,5000,1>-Release (ms, max = off)
 slider8:60<10,80,0.1>-Dynamic Range (dB)
-slider9:1<0,3,1{75%,100%,125%,150%}>-Size
+slider9:1<0,4,1{75%,100%,125%,150%,200%}>-Size
 slider10:20<5,80,0.1>-Attack Size (ms)
-slider11:0<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider11:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
 
 in_pin:none
 out_pin:Left Out
@@ -537,7 +537,7 @@ slider11 >= 0.5 ? (
   thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
   thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
 );
-S  = 0.75 + 0.25*floor(slider9 + 0.5);
+S  = floor(slider9 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider9 + 0.5);
 ox = max(0, floor((gfx_w - 1060*S)/2));
 oy = max(0, floor((gfx_h - 412*S)/2));
 mx = (mouse_x - ox)/S;
@@ -686,10 +686,11 @@ text_c(kxpos(7), KNY + 66, "vel 1 to 127");
 gfx_setfont(3); col(0.62,0.63,0.66); text_c(818, 389, "SIZE");
 gfx_setfont(1);
 sz = floor(slider9 + 0.5);
-draw_btn(842, 377, 46, 24, sz == 0, "75%");
-draw_btn(892, 377, 46, 24, sz == 1, "100%");
-draw_btn(942, 377, 46, 24, sz == 2, "125%");
-draw_btn(992, 377, 46, 24, sz == 3, "150%");
+draw_btn(842, 377, 36.0, 24, sz == 0, "75");
+draw_btn(882, 377, 36.0, 24, sz == 1, "100");
+draw_btn(922, 377, 36.0, 24, sz == 2, "125");
+draw_btn(962, 377, 36.0, 24, sz == 3, "150");
+draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50);
 text_l(34, 389, "Drop a sample on the display (right-click: clear)  -  Ctrl-click: default  -  Shift: fine  -  click display: audition (vel 100)");
 
@@ -703,10 +704,11 @@ mb2 = mouse_cap & 2;
   in_rect(660, 88, 110, 34) ? ( set_sl(1, 0); );
   in_rect(776, 88, 110, 34) ? ( set_sl(1, 1); );
   in_rect(WX, WY, WW, WH) ? ( s_ok ? ( aud_req = 1; ); );
-  in_rect(842, 377, 46, 24) ? (slider9 = 0; sliderchange(slider9););
-  in_rect(892, 377, 46, 24) ? (slider9 = 1; sliderchange(slider9););
-  in_rect(942, 377, 46, 24) ? (slider9 = 2; sliderchange(slider9););
-  in_rect(992, 377, 46, 24) ? (slider9 = 3; sliderchange(slider9););
+  in_rect(842, 377, 36.0, 24) ? (slider9 = 0; sliderchange(slider9););
+  in_rect(882, 377, 36.0, 24) ? (slider9 = 1; sliderchange(slider9););
+  in_rect(922, 377, 36.0, 24) ? (slider9 = 2; sliderchange(slider9););
+  in_rect(962, 377, 36.0, 24) ? (slider9 = 3; sliderchange(slider9););
+  in_rect(1002, 377, 36.0, 24) ? (slider9 = 4; sliderchange(slider9););
 );
 (mb2 && !last_mb2 && in_rect(WX, WY, WW, WH)) ? ( strcpy(#path, ""); strcpy(#sname, ""); s_req = 1; );
 (mb1 && drag >= 0) ? (

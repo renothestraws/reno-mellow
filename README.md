@@ -47,6 +47,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982REC** | Simulateur de supports d'enregistrement (cire, laque, bande 1/4", bande 2", numérique 16 bits, flottant) |
 | **RM1982Bass** | Basse psycho-acoustique (harmoniques qui recréent la fondamentale) |
 | **RM1982Pre** | Étage de préampli coloré : DRIVE + GAIN, 5 couleurs (1073, 512, 610, 4000, 32) |
+| **RMdrumsat** | Saturation pour la batterie : couleur 4000 encadrée par une EQ miroir (low shelf 1 kHz −12 dB avant, +12 dB après) pour colorer les attaques sans faire baver le grave ; DRIVE à volume constant, GAIN, VU-mètres, crête-mètre, HQ |
 | **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
 | **RM1982maximizer** | Sonic maximizer façon BBE : LOW CONTOUR + PROCESS (aigu dynamique piloté par CV), d'après Sonic Enhancer (GPL) |
 | **RM1982Inflat** | Inflator (comportement du Sonnox Oxford Inflator, Band Split compris), d'après RCInflator 2 de lewloiwc / RCJacH |
@@ -116,3 +117,6 @@ des plugins. ReNo Mellow n'est affilié à aucune de ces marques.
 
 **Couleur de l'interface :** sur tous les plug-ins dont l'interface a un accent orange, un double-clic sur le nom du plug-in bascule entre orange et vert (réglage mémorisé dans le projet, par instance).
 
+## Installation individuelle (sans ReaPack)
+
+Chaque plug-in existe aussi en paquet REAPER `.ReaperPkg` (un fichier par plug-in, Windows / macOS / Linux) : voir la liste des liens de téléchargement dans [packages/LIENS.md](packages/LIENS.md). Glisser le fichier téléchargé dans la fenêtre de REAPER pour l'installer.
