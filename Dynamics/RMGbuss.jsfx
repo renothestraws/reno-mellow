@@ -1,8 +1,8 @@
 desc:RMGbuss - ReNo Mellow G Buss (VCA Bus Compressor)
 //tags: dynamics compressor bus VCA SSL G
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.3
+//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
 //@about Compresseur de bus VCA inspiré du compresseur de bus SSL série G : détection feedback, Auto release, filtre side-chain, Mix, Modern.
 //
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ spl1 = min(max(zr, -1), 1);
 m = comp_in ? cv : 0;
 gr_a = m + vu_c*(gr_a - m);  gr_b = gr_a + vu_c*(gr_b - gr_a);
 
-@gfx 360 760
+@gfx 360 754
 // thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider13
 slider13 >= 0.5 ? (
   thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
@@ -327,7 +327,7 @@ slider13 >= 0.5 ? (
 );
 S  = floor(slider7 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider7 + 0.5);
 ox = max(0, floor((gfx_w - 360*S)/2));
-oy = max(0, floor((gfx_h - 760*S)/2));
+oy = max(0, floor((gfx_h - 754*S)/2)) + 34*S; // bandeau SIZE au-dessus du y = 0 logique
 mx = (mouse_x - ox)/S;
 my = (mouse_y - oy)/S;
 
@@ -343,7 +343,17 @@ rl = floor(slider4 + 0.5);
 
 // ---- Fond -----------------------------------------------------------------------
 col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
-col(0.20,0.20,0.21);  rct(6,6,348,748,1);
+
+// ---- Bandeau SIZE (en haut : toujours visible) ----------------------------------
+col(0.08,0.08,0.08); rct(6, -28, 348, 28, 1);
+gfx_setfont(3); col(0.85,0.82,0.75); text_c(29, -14, "SIZE");
+gfx_setfont(1); tsz_i = floor(slider7 + 0.5); tsz_n = 0;
+loop(5,
+  tsz_n == 0 ? strcpy(#tsz, "75%") : tsz_n == 1 ? strcpy(#tsz, "100%") : tsz_n == 2 ? strcpy(#tsz, "125%") : tsz_n == 3 ? strcpy(#tsz, "150%") : strcpy(#tsz, "200%");
+  draw_btn(52 + tsz_n*60.4, -25, 56.4, 22, tsz_i == tsz_n, #tsz);
+  tsz_n += 1;
+);
+col(0.20,0.20,0.21);  rct(6,6,348,708,1);
 col(0.08,0.08,0.08);  rct(6,6,348,30,1);
 gfx_setfont(2); col(thc6r,thc6g,thc6b); text_l(16, 21, "RMGbuss"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RMGbuss", th_w, th_h); th_x0 = th_x1 - th_w;
 gfx_setfont(3); col(0.72,0.69,0.63); text_l(120, 22, "RENO MELLOW  -  VCA BUSS COMPRESSOR");
@@ -496,17 +506,11 @@ gfx_setfont(4); col(0.80,0.80,0.80);
 text_c(180, 694, "G-STYLE  BUSS  COMPRESSOR");
 
 // ---- Bandeau Size --------------------------------------------------------------
-col(0.08,0.08,0.08); rct(6, 714, 348, 34, 1);
 gfx_setfont(3); col(0.85,0.82,0.75);
-text_c(38, 731, "SIZE");
+
 szx = 66; szy = 720;
 gfx_setfont(1);
 sz = floor(slider7 + 0.5);
-draw_btn(szx, szy, 48.4, 22, sz == 0, "75%");
-draw_btn(szx + 54.4, szy, 48.4, 22, sz == 1, "100%");
-draw_btn(szx + 108.8, szy, 48.4, 22, sz == 2, "125%");
-draw_btn(szx + 163.2, szy, 48.4, 22, sz == 3, "150%");
-draw_btn(szx + 217.6, szy, 48.4, 22, sz == 4, "200%");
 
 // ---- Souris ---------------------------------------------------------------------
 md = mouse_cap & 1;
@@ -548,11 +552,7 @@ md = mouse_cap & 1;
   in_rect(b2x, by, bw, bh) ? (slider9  = slider9  >= 0.5 ? 0 : 1; slider_automate(slider9););
   in_rect(b3x, by, bw, bh) ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
 
-  in_rect(szx, szy, 48.4, 22) ? (slider7 = 0; sliderchange(slider7););
-  in_rect(szx + 54.4, szy, 48.4, 22) ? (slider7 = 1; sliderchange(slider7););
-  in_rect(szx + 108.8, szy, 48.4, 22) ? (slider7 = 2; sliderchange(slider7););
-  in_rect(szx + 163.2, szy, 48.4, 22) ? (slider7 = 3; sliderchange(slider7););
-  in_rect(szx + 217.6, szy, 48.4, 22) ? (slider7 = 4; sliderchange(slider7););
+  tsz_n = 0; loop(5, in_rect(52 + tsz_n*60.4, -25, 56.4, 22) ? (slider7 = tsz_n; sliderchange(slider7);); tsz_n += 1;);
 );
 
 (md && drag > 0) ? (

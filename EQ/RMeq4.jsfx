@@ -1,8 +1,8 @@
 desc:RMeq4 - ReNo Mellow EQ4 (6-Band Air EQ)
 //tags: equalizer EQ air band shelf maag-style
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.6
+//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
 //@about Égaliseur 6 bandes inspiré du Maag EQ4 : cloches larges calées sur les relevés, shelf 2,5 kHz et Air Band (2,5 à 40 kHz) aux aigus soyeux.
 //
 // ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ pk_hold > 0 ? pk_hold -= 1;
 spl0 = min(max(zl, -1), 1);
 spl1 = min(max(zr, -1), 1);
 
-@gfx 300 960
+@gfx 300 962
 // thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider13
 slider13 >= 0.5 ? (
   thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
@@ -330,7 +330,7 @@ slider13 >= 0.5 ? (
 );
 S  = floor(slider11 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider11 + 0.5);
 ox = max(0, floor((gfx_w - 300*S)/2));
-oy = max(0, floor((gfx_h - 960*S)/2));
+oy = max(0, floor((gfx_h - 962*S)/2)) + 34*S; // bandeau SIZE au-dessus du y = 0 logique
 mx = (mouse_x - ox)/S;
 my = (mouse_y - oy)/S;
 
@@ -342,6 +342,16 @@ gfx_setfont(5, "Arial", max(5, floor(10*S)));
 
 // ---- Façade bleue ------------------------------------------------------------------------
 col(0.08,0.10,0.14); gfx_rect(0,0,gfx_w,gfx_h);
+
+// ---- Bandeau SIZE (en haut : toujours visible) ----------------------------------
+col(0.06,0.06,0.065); rct(6, -28, 288, 28, 1);
+gfx_setfont(5); col(0.85,0.82,0.75); text_c(29, -14, "SIZE");
+gfx_setfont(1); tsz_i = floor(slider11 + 0.5); tsz_n = 0;
+loop(5,
+  tsz_n == 0 ? strcpy(#tsz, "75%") : tsz_n == 1 ? strcpy(#tsz, "100%") : tsz_n == 2 ? strcpy(#tsz, "125%") : tsz_n == 3 ? strcpy(#tsz, "150%") : strcpy(#tsz, "200%");
+  draw_btn(52 + tsz_n*48.4, -25, 44.4, 22, tsz_i == tsz_n, #tsz);
+  tsz_n += 1;
+);
 col(0.17,0.53,0.86); rct(6,6,288,866,1);
 col(0.24,0.62,0.93); rct(6,6,288,3,1);
 col(0.11,0.40,0.70); rct(6,869,288,3,1);
@@ -408,7 +418,7 @@ gfx_setfont(4); col(0.90,0.18,0.15); text_l(20, 852, "RM"); th_x1 = gfx_x; th_y0
 col(0.97,0.98,1.0); text_l(66, 856, "eq4");
 
 // ---- Bandeau -------------------------------------------------------------------------------
-col(0.06,0.06,0.065); rct(6, 878, 288, 78, 1);
+col(0.06,0.06,0.065); rct(6, 878, 288, 44, 1);
 gfx_setfont(5); col(0.85,0.82,0.75);
 text_c(32, 898, "CALIB");
 draw_knob_s(66, 898, 10, (slider9 + 12)/24);
@@ -416,15 +426,10 @@ col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider9); text_l(82, 898, #s);
 col(0.85,0.82,0.75); text_c(166, 898, "OUT");
 draw_knob_s(196, 898, 10, (slider10 + 12)/24);
 col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider10); text_l(212, 898, #s);
-col(0.85,0.82,0.75); text_c(30, 932, "SIZE");
+col(0.85,0.82,0.75); 
 gfx_setfont(1);
 sz = floor(slider11 + 0.5);
 draw_btn(250, 887, 42, 22, slider12 >= 0.5, "HQ");
-draw_btn(56, 921, 43.6, 22, sz == 0, "75%");
-draw_btn(103.6, 921, 43.6, 22, sz == 1, "100%");
-draw_btn(151.2, 921, 43.6, 22, sz == 2, "125%");
-draw_btn(198.8, 921, 43.6, 22, sz == 3, "150%");
-draw_btn(246.4, 921, 43.6, 22, sz == 4, "200%");
 
 // ---- Souris ----------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -441,11 +446,7 @@ mb1 = mouse_cap & 1;
   dist(196, 898) < 13 ? drag = 10;
   dist(84, 812) < 22 ? set_sl(8, slider8 >= 0.5 ? 0 : 1);
   in_rect(250, 887, 42, 22) ? set_sl(12, slider12 >= 0.5 ? 0 : 1);
-  in_rect(56, 921, 43.6, 22) ? (slider11 = 0; sliderchange(slider11););
-  in_rect(103.6, 921, 43.6, 22) ? (slider11 = 1; sliderchange(slider11););
-  in_rect(151.2, 921, 43.6, 22) ? (slider11 = 2; sliderchange(slider11););
-  in_rect(198.8, 921, 43.6, 22) ? (slider11 = 3; sliderchange(slider11););
-  in_rect(246.4, 921, 43.6, 22) ? (slider11 = 4; sliderchange(slider11););
+  tsz_n = 0; loop(5, in_rect(52 + tsz_n*48.4, -25, 44.4, 22) ? (slider11 = tsz_n; sliderchange(slider11);); tsz_n += 1;);
   start = drag > 0 ? slider(drag) : 0;
   (drag > 0 && (mouse_cap & 4)) ? ( set_sl(drag, 0); drag = 0; );
 );

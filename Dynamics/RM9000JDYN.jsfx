@@ -1,8 +1,8 @@
 desc:RM9000JDYN - ReNo Mellow 9000J Channel Dynamics
 //tags: dynamics compressor gate expander VCA SSL 9000J channel strip
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.3
+//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
 //@about Dynamiques de tranche inspirées de la SSL 9000J : compresseur RMS/peak, gate/expandeur avec hold, bypass séparés, vumètre d'entrée.
 //
 // ---------------------------------------------------------------------------
@@ -343,7 +343,7 @@ m = max(crl, crr); cm = m > cm ? m : m + c_led*(cm - m);
 m = max(ggl, ggr); gm = m > gm ? m : m + c_led*(gm - m);
 in_m = 10*log10(max(in_p, 0.00000000000000000001)) + REF_DB;
 
-@gfx 320 760
+@gfx 320 772
 // thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider20
 slider20 >= 0.5 ? (
   thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
@@ -352,7 +352,7 @@ slider20 >= 0.5 ? (
 );
 S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 320*S)/2));
-oy = max(0, floor((gfx_h - 760*S)/2));
+oy = max(0, floor((gfx_h - 772*S)/2)) + 34*S; // bandeau SIZE au-dessus du y = 0 logique
 mx = (mouse_x - ox)/S;
 my = (mouse_y - oy)/S;
 
@@ -364,7 +364,17 @@ gfx_setfont(5, "Arial", max(7, floor(16*S)), 'b');
 
 // ---- Fond : face grise brossée ------------------------------------------------
 col(0.11,0.105,0.10); gfx_rect(0,0,gfx_w,gfx_h);
-col(0.30,0.30,0.31);  rct(6,6,308,748,1);
+
+// ---- Bandeau SIZE (en haut : toujours visible) ----------------------------------
+col(0.08,0.08,0.08); rct(6, -28, 308, 28, 1);
+gfx_setfont(3); col(0.85,0.82,0.75); text_c(29, -14, "SIZE");
+gfx_setfont(1); tsz_i = floor(slider14 + 0.5); tsz_n = 0;
+loop(5,
+  tsz_n == 0 ? strcpy(#tsz, "75%") : tsz_n == 1 ? strcpy(#tsz, "100%") : tsz_n == 2 ? strcpy(#tsz, "125%") : tsz_n == 3 ? strcpy(#tsz, "150%") : strcpy(#tsz, "200%");
+  draw_btn(52 + tsz_n*52.4, -25, 48.4, 22, tsz_i == tsz_n, #tsz);
+  tsz_n += 1;
+);
+col(0.30,0.30,0.31);  rct(6,6,308,726,1);
 j = 0; col(0.33,0.33,0.34);
 loop(60, ln(8, 40 + j*11, 312, 40 + j*11); j += 1;);
 col(0.08,0.08,0.08);  rct(6,6,308,32,1);
@@ -505,7 +515,7 @@ sq_btn(rx + 36, 634, 32, slider11 >= 0.5);
 gfx_setfont(3); col(0.96,0.96,0.96); text_c(rx + 36, 660, "FAST"); text_c(rx + 36, 671, "ATTK");
 
 // ---- Bandeau d'options --------------------------------------------------------------
-col(0.08,0.08,0.08); rct(6, 704, 308, 50, 1);
+col(0.08,0.08,0.08); rct(6, 704, 308, 28, 1);
 gfx_setfont(1);
 draw_btn(14, 708, 70, 20, slider15 >= 0.5, "ANALOG");
 cky = 718; ckx = 160;
@@ -517,15 +527,10 @@ okx = 264;
 col(0.85,0.82,0.75); text_c(238, cky, "OUT");
 draw_knob_s(okx, cky, 9, (slider19 + 12)/24);
 col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider19); text_l(278, cky, #s);
-gfx_setfont(3); col(0.85,0.82,0.75); text_c(30, 742, "SIZE");
+gfx_setfont(3); col(0.85,0.82,0.75); 
 szx = 52; szy = 732;
 gfx_setfont(1);
 sz = floor(slider14 + 0.5);
-draw_btn(szx, szy, 47.2, 19, sz == 0, "75%");
-draw_btn(szx + 51.2, szy, 47.2, 19, sz == 1, "100%");
-draw_btn(szx + 102.4, szy, 47.2, 19, sz == 2, "125%");
-draw_btn(szx + 153.6, szy, 47.2, 19, sz == 3, "150%");
-draw_btn(szx + 204.8, szy, 47.2, 19, sz == 4, "200%");
 
 // ---- Souris ---------------------------------------------------------------------
 md = mouse_cap & 1;
@@ -563,11 +568,7 @@ md = mouse_cap & 1;
   in_rect(lx - 20, 556, 40, 40)  ? (slider10 = slider10 >= 0.5 ? 0 : 1; slider_automate(slider10););
   in_rect(rx + 17, 615, 38, 38)  ? (slider11 = slider11 >= 0.5 ? 0 : 1; slider_automate(slider11););
   in_rect(14, 708, 70, 20)       ? (slider15 = slider15 >= 0.5 ? 0 : 1; slider_automate(slider15););
-  in_rect(szx, szy, 47.2, 19) ? (slider14 = 0; sliderchange(slider14););
-  in_rect(szx + 51.2, szy, 47.2, 19) ? (slider14 = 1; sliderchange(slider14););
-  in_rect(szx + 102.4, szy, 47.2, 19) ? (slider14 = 2; sliderchange(slider14););
-  in_rect(szx + 153.6, szy, 47.2, 19) ? (slider14 = 3; sliderchange(slider14););
-  in_rect(szx + 204.8, szy, 47.2, 19) ? (slider14 = 4; sliderchange(slider14););
+  tsz_n = 0; loop(5, in_rect(52 + tsz_n*52.4, -25, 48.4, 22) ? (slider14 = tsz_n; sliderchange(slider14);); tsz_n += 1;);
 );
 
 (md && drag > 0) ? (

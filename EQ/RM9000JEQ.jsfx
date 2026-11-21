@@ -1,8 +1,8 @@
 desc:RM9000JEQ - ReNo Mellow 9000J EQ (Channel EQ + Filters)
 //tags: equalizer EQ parametric filters console ssl-style 9000j
 //@author ReNo Mellow
-//@version 1.6
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.7
+//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
 //@about Section EQ et filtres d'une tranche inspirée de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ spl0 = min(max(zl, -1), 1);
 spl1 = min(max(zr, -1), 1);
 mo += k_mt*(max(zl*zl, zr*zr) - mo);
 
-@gfx 340 952
+@gfx 340 956
 // thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider25
 slider25 >= 0.5 ? (
   thc6r = 0.4; thc6g = 0.82; thc6b = 0.75;
@@ -378,7 +378,7 @@ slider25 >= 0.5 ? (
 );
 S  = floor(slider23 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider23 + 0.5);
 ox = max(0, floor((gfx_w - 340*S)/2));
-oy = max(0, floor((gfx_h - 952*S)/2));
+oy = max(0, floor((gfx_h - 956*S)/2)) + 34*S; // bandeau SIZE au-dessus du y = 0 logique
 mx = (mouse_x - ox)/S;
 my = (mouse_y - oy)/S;
 
@@ -399,6 +399,16 @@ RG = 22; RQ = 16;
 
 // ---- Façade ---------------------------------------------------------------------------
 col(0.10,0.10,0.11); gfx_rect(0,0,gfx_w,gfx_h);
+
+// ---- Bandeau SIZE (en haut : toujours visible) ----------------------------------
+col(0.06,0.06,0.065); rct(6, -28, 328, 28, 1);
+gfx_setfont(3); col(0.85,0.82,0.75); text_c(29, -14, "SIZE");
+gfx_setfont(1); tsz_i = floor(slider23 + 0.5); tsz_n = 0;
+loop(5,
+  tsz_n == 0 ? strcpy(#tsz, "75%") : tsz_n == 1 ? strcpy(#tsz, "100%") : tsz_n == 2 ? strcpy(#tsz, "125%") : tsz_n == 3 ? strcpy(#tsz, "150%") : strcpy(#tsz, "200%");
+  draw_btn(52 + tsz_n*56.4, -25, 52.4, 22, tsz_i == tsz_n, #tsz);
+  tsz_n += 1;
+);
 col(0.29,0.29,0.30); rct(6,6,328,858,1);
 i = 0; loop(85, col(0.31,0.31,0.32); rct(6, 10 + i*10, 328, 1, 1); i += 1;);
 col(0.12,0.12,0.13); rct(6,6,328,40,1);
@@ -517,7 +527,7 @@ loop(8,
 );
 
 // ---- Bandeau -------------------------------------------------------------------------------
-col(0.06,0.06,0.065); rct(6, 872, 328, 76, 1);
+col(0.06,0.06,0.065); rct(6, 872, 328, 44, 1);
 gfx_setfont(3); col(0.85,0.82,0.75);
 text_c(34, 894, "CALIB");
 draw_knob_s(70, 894, 10, (slider21 + 12)/24);
@@ -525,15 +535,10 @@ col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider21); text_l(86, 894, #s);
 col(0.85,0.82,0.75); text_c(188, 894, "OUT");
 draw_knob_s(218, 894, 10, (slider22 + 12)/24);
 col(0.93,0.90,0.82); sprintf(#s, "%+.1f", slider22); text_l(234, 894, #s);
-col(0.85,0.82,0.75); text_c(34, 926, "SIZE");
+col(0.85,0.82,0.75); 
 gfx_setfont(1);
 sz = floor(slider23 + 0.5);
 draw_btn(282, 883, 42, 22, slider24 >= 0.5, "HQ");
-draw_btn(62, 915, 48.8, 22, sz == 0, "75%");
-draw_btn(114.8, 915, 48.8, 22, sz == 1, "100%");
-draw_btn(167.6, 915, 48.8, 22, sz == 2, "125%");
-draw_btn(220.4, 915, 48.8, 22, sz == 3, "150%");
-draw_btn(273.2, 915, 48.8, 22, sz == 4, "200%");
 
 // ---- Souris ----------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -562,11 +567,7 @@ mb1 = mouse_cap & 1;
   in_rect(136, 630, 44, 22)  ? flip(15);
   in_rect(122, 682, 70, 22)  ? flip(18);
   in_rect(282, 883, 42, 22) ? set_sl(24, slider24 >= 0.5 ? 0 : 1);
-  in_rect(62, 915, 48.8, 22) ? (slider23 = 0; sliderchange(slider23););
-  in_rect(114.8, 915, 48.8, 22) ? (slider23 = 1; sliderchange(slider23););
-  in_rect(167.6, 915, 48.8, 22) ? (slider23 = 2; sliderchange(slider23););
-  in_rect(220.4, 915, 48.8, 22) ? (slider23 = 3; sliderchange(slider23););
-  in_rect(273.2, 915, 48.8, 22) ? (slider23 = 4; sliderchange(slider23););
+  tsz_n = 0; loop(5, in_rect(52 + tsz_n*56.4, -25, 52.4, 22) ? (slider23 = tsz_n; sliderchange(slider23);); tsz_n += 1;);
   // Ctrl+clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (
     set_sl(drag, drag == 1 ? 0 : drag == 3 ? 30000 : drag == 6 ? 8000 : drag == 9 ? 2500 :

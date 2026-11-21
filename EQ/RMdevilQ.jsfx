@@ -1,8 +1,8 @@
 desc:RMdevilQ - ReNo Mellow devil Q (Colored British 4-Band EQ)
 //tags: equalizer EQ inductor saturation colored 500-series british chandler-style
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.5
+//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
 //@about Égaliseur 4 bandes à l'anglaise inspiré du Chandler Little Devil : shelfs à condensateur, médiums à inductance avec Q hi/lo, low cut, et une couleur riche et épaisse réglable (HEAT).
 //
 // ---------------------------------------------------------------------------
@@ -416,10 +416,10 @@ os == 2 ? (
 spl0 = min(max(yl*calib_c*out_g, -1), 1);
 spl1 = min(max(yr*calib_c*out_g, -1), 1);
 
-@gfx 300 1060
+@gfx 300 1062
 S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 300*S)/2));
-oy = max(0, floor((gfx_h - 1060*S)/2));
+oy = max(0, floor((gfx_h - 1062*S)/2)) + 34*S; // bandeau SIZE au-dessus du y = 0 logique
 mx = (mouse_x - ox)/S;
 my = (mouse_y - oy)/S;
 
@@ -431,6 +431,16 @@ gfx_setfont(5, "Arial", max(5, floor(10*S)), 'b');
 
 // ---- Façade rouge ------------------------------------------------------------------------
 col(0.12,0.05,0.05); gfx_rect(0,0,gfx_w,gfx_h);
+
+// ---- Bandeau SIZE (en haut : toujours visible) ----------------------------------
+col(0.07,0.03,0.03); rct(6, -28, 288, 28, 1);
+gfx_setfont(5); col(0.92,0.80,0.70); text_c(29, -14, "SIZE");
+gfx_setfont(1); tsz_i = floor(slider14 + 0.5); tsz_n = 0;
+loop(5,
+  tsz_n == 0 ? strcpy(#tsz, "75%") : tsz_n == 1 ? strcpy(#tsz, "100%") : tsz_n == 2 ? strcpy(#tsz, "125%") : tsz_n == 3 ? strcpy(#tsz, "150%") : strcpy(#tsz, "200%");
+  draw_btn(52 + tsz_n*48.4, -25, 44.4, 22, tsz_i == tsz_n, #tsz);
+  tsz_n += 1;
+);
 col(0.80,0.08,0.07); rct(6, 6, 288, 936, 1);
 col(0.86,0.14,0.12); rct(6, 6, 288, 3, 1);
 col(0.55,0.04,0.04); rct(6, 939, 288, 3, 1);
@@ -495,7 +505,7 @@ gfx_setfont(4); col(0.99,0.80,0.12); text_c(232, 916, "devil Q");
 gfx_setfont(5); text_c(232, 933, "EQUALIZER");
 
 // ---- Bandeau -------------------------------------------------------------------------------
-col(0.07,0.03,0.03); rct(6, 946, 288, 110, 1);
+col(0.07,0.03,0.03); rct(6, 946, 288, 76, 1);
 gfx_setfont(5); col(0.92,0.80,0.70);
 text_c(30, 966, "CALIB");
 draw_knob_s(64, 966, 10, (slider12 + 12)/24);
@@ -506,15 +516,10 @@ col(0.98,0.92,0.84); sprintf(#s, "%+.1f", slider13); text_l(180, 966, #s);
 col(0.92,0.80,0.70); text_c(232, 966, "HEAT");
 draw_knob_s(262, 966, 11, slider15/10);
 col(0.98,0.92,0.84); sprintf(#s, "%.1f", slider15); text_c(262, 986, #s);
-col(0.92,0.80,0.70); text_c(30, 1004, "SIZE");
+col(0.92,0.80,0.70); 
 gfx_setfont(1);
 sz = floor(slider14 + 0.5);
-draw_btn(56, 993, 43.6, 22, sz == 0, "75%");
-draw_btn(103.6, 993, 43.6, 22, sz == 1, "100%");
-draw_btn(151.2, 993, 43.6, 22, sz == 2, "125%");
-draw_btn(198.8, 993, 43.6, 22, sz == 3, "150%");
-draw_btn(246.4, 993, 43.6, 22, sz == 4, "200%");
-draw_btn(56, 1024, 234, 22, slider16 >= 0.5, "HQ");
+draw_btn(56, 993, 234, 22, slider16 >= 0.5, "HQ");
 
 // ---- Souris ----------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -535,12 +540,8 @@ mb1 = mouse_cap & 1;
   in_rect(64, 726, 28, 60)  ? set_sl(9, slider9 >= 0.5 ? 0 : 1);
   in_rect(74, 852, 74, 38)  ? set_sl(10, floor(slider10 + 0.5) ~ 1);
   in_rect(152, 852, 74, 38) ? set_sl(10, floor(slider10 + 0.5) ~ 2);
-  in_rect(56, 1024, 234, 22) ? set_sl(16, slider16 >= 0.5 ? 0 : 1);
-  in_rect(56, 993, 43.6, 22) ? (slider14 = 0; sliderchange(slider14););
-  in_rect(103.6, 993, 43.6, 22) ? (slider14 = 1; sliderchange(slider14););
-  in_rect(151.2, 993, 43.6, 22) ? (slider14 = 2; sliderchange(slider14););
-  in_rect(198.8, 993, 43.6, 22) ? (slider14 = 3; sliderchange(slider14););
-  in_rect(246.4, 993, 43.6, 22) ? (slider14 = 4; sliderchange(slider14););
+  in_rect(56, 993, 234, 22) ? set_sl(16, slider16 >= 0.5 ? 0 : 1);
+  tsz_n = 0; loop(5, in_rect(52 + tsz_n*48.4, -25, 44.4, 22) ? (slider14 = tsz_n; sliderchange(slider14);); tsz_n += 1;);
   start = drag > 0 ? slider(drag) : 0;
   // Ctrl-clic : valeur par défaut
   (drag > 0 && (mouse_cap & 4)) ? (

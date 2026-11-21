@@ -1,8 +1,8 @@
 desc:RM550b - ReNo Mellow 550b (Discrete 4-Band EQ)
 //tags: equalizer EQ proportional-q 500-series api-style 550b
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.3
+//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
 //@about Égaliseur 4 bandes inspiré de l'API 550b : Q proportionnel réciproque calé sur les courbes d'usine, crans de gain, shelf/cloche en HF et LF, couleur ampli discret + transfo.
 //
 // ---------------------------------------------------------------------------
@@ -384,10 +384,10 @@ os == 2 ? (
 spl0 = min(max(yl*calib_c*out_g, -1), 1);
 spl1 = min(max(yr*calib_c*out_g, -1), 1);
 
-@gfx 300 1060
+@gfx 300 1054
 S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
 ox = max(0, floor((gfx_w - 300*S)/2));
-oy = max(0, floor((gfx_h - 1060*S)/2));
+oy = max(0, floor((gfx_h - 1054*S)/2)) + 34*S; // bandeau SIZE au-dessus du y = 0 logique
 mx = (mouse_x - ox)/S;
 my = (mouse_y - oy)/S;
 
@@ -400,6 +400,16 @@ gfx_setfont(6, "Arial", max(8, floor(22*S)));
 
 // ---- Façade noire ------------------------------------------------------------------------
 col(0.12,0.12,0.13); gfx_rect(0,0,gfx_w,gfx_h);
+
+// ---- Bandeau SIZE (en haut : toujours visible) ----------------------------------
+col(0.035,0.035,0.04); rct(6, -28, 288, 28, 1);
+gfx_setfont(5); col(0.80,0.81,0.84); text_c(29, -14, "SIZE");
+gfx_setfont(1); tsz_i = floor(slider14 + 0.5); tsz_n = 0;
+loop(5,
+  tsz_n == 0 ? strcpy(#tsz, "75%") : tsz_n == 1 ? strcpy(#tsz, "100%") : tsz_n == 2 ? strcpy(#tsz, "125%") : tsz_n == 3 ? strcpy(#tsz, "150%") : strcpy(#tsz, "200%");
+  draw_btn(52 + tsz_n*48.4, -25, 44.4, 22, tsz_i == tsz_n, #tsz);
+  tsz_n += 1;
+);
 col(0.055,0.055,0.06); rct(6,6,288,932,1);
 col(0.10,0.10,0.11); rct(6,6,288,2,1);
 screwhole(150, 26); screwhole(150, 924);
@@ -434,7 +444,7 @@ col(0.70,0.70,0.68); rct(52, 908, 28, 4, 1);
 gfx_setfont(6); col(0.97,0.97,0.97); text_c(66, 930, "IN");
 
 // ---- Bandeau -------------------------------------------------------------------------------
-col(0.035,0.035,0.04); rct(6, 944, 288, 112, 1);
+col(0.035,0.035,0.04); rct(6, 944, 288, 70, 1);
 gfx_setfont(5); col(0.80,0.81,0.84);
 text_c(32, 964, "CALIB");
 draw_knob_s(68, 964, 10, (slider12 + 12)/24);
@@ -444,14 +454,9 @@ draw_knob_s(196, 964, 10, (slider13 + 12)/24);
 col(0.92,0.93,0.95); sprintf(#s, "%+.1f", slider13); text_l(212, 964, #s);
 gfx_setfont(1);
 sz = floor(slider14 + 0.5);
-col(0.80,0.81,0.84); gfx_setfont(5); text_c(30, 997, "SIZE"); gfx_setfont(1);
-draw_btn(56, 986, 43.6, 22, sz == 0, "75%");
-draw_btn(103.6, 986, 43.6, 22, sz == 1, "100%");
-draw_btn(151.2, 986, 43.6, 22, sz == 2, "125%");
-draw_btn(198.8, 986, 43.6, 22, sz == 3, "150%");
-draw_btn(246.4, 986, 43.6, 22, sz == 4, "200%");
-draw_btn(56,  1020, 116, 22, slider15 >= 0.5, "COLOR");
-draw_btn(176, 1020, 114, 22, slider16 >= 0.5, "HQ");
+col(0.80,0.81,0.84); gfx_setfont(5);  gfx_setfont(1);
+draw_btn(56,  986, 116, 22, slider15 >= 0.5, "COLOR");
+draw_btn(176, 986, 114, 22, slider16 >= 0.5, "HQ");
 
 // ---- Souris ----------------------------------------------------------------------------------
 mb1 = mouse_cap & 1;
@@ -470,13 +475,9 @@ mb1 = mouse_cap & 1;
   dist(262, 270) < 22 ? set_sl(3, slider3 >= 0.5 ? 0 : 1);
   dist(262, 702) < 22 ? set_sl(10, slider10 >= 0.5 ? 0 : 1);
   (in_rect(50, 882, 32, 32) || dist(30, 898) < 9) ? set_sl(11, slider11 >= 0.5 ? 0 : 1);
-  in_rect(56,  1020, 116, 22) ? set_sl(15, slider15 >= 0.5 ? 0 : 1);
-  in_rect(176, 1020, 114, 22) ? set_sl(16, slider16 >= 0.5 ? 0 : 1);
-  in_rect(56, 986, 43.6, 22) ? (slider14 = 0; sliderchange(slider14););
-  in_rect(103.6, 986, 43.6, 22) ? (slider14 = 1; sliderchange(slider14););
-  in_rect(151.2, 986, 43.6, 22) ? (slider14 = 2; sliderchange(slider14););
-  in_rect(198.8, 986, 43.6, 22) ? (slider14 = 3; sliderchange(slider14););
-  in_rect(246.4, 986, 43.6, 22) ? (slider14 = 4; sliderchange(slider14););
+  in_rect(56,  986, 116, 22) ? set_sl(15, slider15 >= 0.5 ? 0 : 1);
+  in_rect(176, 986, 114, 22) ? set_sl(16, slider16 >= 0.5 ? 0 : 1);
+  tsz_n = 0; loop(5, in_rect(52 + tsz_n*48.4, -25, 44.4, 22) ? (slider14 = tsz_n; sliderchange(slider14);); tsz_n += 1;);
   start = drag > 0 ? slider(drag) : 0;
   // Ctrl-clic : gain à 0 / trims à 0
   (drag > 0 && (mouse_cap & 4)) ? (
