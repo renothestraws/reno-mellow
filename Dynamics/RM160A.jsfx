@@ -1,8 +1,8 @@
 desc:RM160A - ReNo Mellow 160A (True RMS VCA Compressor/Limiter)
 //tags: dynamics compressor limiter VCA RMS dbx 160
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.3
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Compresseur/limiteur VCA à RMS vrai inspiré du dbx 160A : OverEasy, ratios jusqu'à -1:1, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -439,6 +439,107 @@ draw_btn(szx + 115.2, oby, 34.4, 22, sz == 3, "150");
 draw_btn(szx + 153.6, oby, 34.4, 22, sz == 4, "200");
 
 // ---- Souris ---------------------------------------------------------------------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( slider(idx) = v; slider_automate(2 ^ (idx - 1)); );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  in_circ(tkx, tky, 34) ? 1 :
+  in_circ(rkx, rky, 34) ? 2 :
+  in_circ(gkx, gky, 34) ? 3 :
+  in_circ(ckx, cky, 14) ? 4 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? tkx :
+  i == 2 ? rkx :
+  i == 3 ? gkx :
+  i == 4 ? ckx :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? tky :
+  i == 2 ? rky :
+  i == 3 ? gky :
+  i == 4 ? cky :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 && kbx_ok ? kbx_put(1, v * 1, -40, 20, 0.1);
+  i == 2 ? ( (kbx_ok || kbx_inf) ? ( kbx_sl = kbx_inf ? 1 : (abs(v) < 1 ? 0 : 1 - 1 / v); kbx_j = 0; kbx_p = -1; loop(NR - 1, (kbx_p < 0 && kbx_sl >= RS[kbx_j] && kbx_sl <= RS[kbx_j + 1]) ? kbx_p = RP[kbx_j] + (RP[kbx_j + 1] - RP[kbx_j]) * (kbx_sl - RS[kbx_j]) / max(0.000001, RS[kbx_j + 1] - RS[kbx_j]); kbx_j += 1; ); kbx_p < 0 ? kbx_p = (kbx_sl > RS[NR - 1] ? 1 : 0); slider2 = kbx_p; slider_automate(slider2); ); );
+  i == 3 && kbx_ok ? kbx_put(3, v * 1, -20, 20, 0.1);
+  i == 4 && kbx_ok ? kbx_put(10, v * 1, -12, 12, 0.1);
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 md = mouse_cap & 1;
 (md && !last_md) ? (
   drag = 0;
@@ -490,3 +591,18 @@ th_mb = mouse_cap & 1;
   );
 );
 th_lmb = th_mb;
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);

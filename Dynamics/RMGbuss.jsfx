@@ -1,8 +1,8 @@
 desc:RMGbuss - ReNo Mellow G Buss (VCA Bus Compressor)
 //tags: dynamics compressor bus VCA SSL G
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
+//@version 1.4
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Compresseur de bus VCA inspiré du compresseur de bus SSL série G : détection feedback, Auto release, filtre side-chain, Mix, Modern.
 //
 // ---------------------------------------------------------------------------
@@ -513,6 +513,165 @@ gfx_setfont(1);
 sz = floor(slider7 + 0.5);
 
 // ---- Souris ---------------------------------------------------------------------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( slider(idx) = v; slider_automate(2 ^ (idx - 1)); );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  in_circ(lx, r1, 34) ? 1 :
+  in_circ(rx, r1, 34) ? 2 :
+  in_circ(lx, r2, 34) ? 3 :
+  in_circ(rx, r2, 34) ? 4 :
+  in_circ(lx, r3, 34) ? 5 :
+  in_circ(rx, r3, 28) ? 6 :
+  in_circ(cx, scy, 24) ? 7 :
+  in_circ(cx, mxy, 24) ? 8 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? lx :
+  i == 2 ? rx :
+  i == 3 ? lx :
+  i == 4 ? rx :
+  i == 5 ? lx :
+  i == 6 ? rx :
+  i == 7 ? cx :
+  i == 8 ? cx :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? r1 :
+  i == 2 ? r1 :
+  i == 3 ? r2 :
+  i == 4 ? r2 :
+  i == 5 ? r3 :
+  i == 6 ? r3 :
+  i == 7 ? scy :
+  i == 8 ? mxy :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 && kbx_ok ? kbx_put(1, v * 1, -15, 15, 0.1);
+  i == 2 && kbx_ok ? kbx_put(5, v * 1, -5, 15, 0.1);
+  i == 3 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "0.1ms") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "0.3ms") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "1ms") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "3ms") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "10ms") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "30ms") == 0 ? kbx_b = 5;
+    kbx_b < 0 && kbx_ok ? (
+      abs(v - (0.1)) < kbx_bd ? ( kbx_bd = abs(v - (0.1)); kbx_b = 0; );
+      abs(v - (0.3)) < kbx_bd ? ( kbx_bd = abs(v - (0.3)); kbx_b = 1; );
+      abs(v - (1)) < kbx_bd ? ( kbx_bd = abs(v - (1)); kbx_b = 2; );
+      abs(v - (3)) < kbx_bd ? ( kbx_bd = abs(v - (3)); kbx_b = 3; );
+      abs(v - (10)) < kbx_bd ? ( kbx_bd = abs(v - (10)); kbx_b = 4; );
+      abs(v - (30)) < kbx_bd ? ( kbx_bd = abs(v - (30)); kbx_b = 5; );
+    );
+    kbx_b >= 0 ? kbx_setsl(2, kbx_b);
+  );
+  i == 4 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "0.1s") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "0.3s") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "0.6s") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "1.2s") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "auto") == 0 ? kbx_b = 4;
+    kbx_b < 0 && kbx_ok ? (
+      abs(v - (0.1)) < kbx_bd ? ( kbx_bd = abs(v - (0.1)); kbx_b = 0; );
+      abs(v - (0.3)) < kbx_bd ? ( kbx_bd = abs(v - (0.3)); kbx_b = 1; );
+      abs(v - (0.6)) < kbx_bd ? ( kbx_bd = abs(v - (0.6)); kbx_b = 2; );
+      abs(v - (1.2)) < kbx_bd ? ( kbx_bd = abs(v - (1.2)); kbx_b = 3; );
+    );
+    kbx_b >= 0 ? kbx_setsl(4, kbx_b);
+  );
+  i == 5 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "2:1") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "4:1") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "10:1") == 0 ? kbx_b = 2;
+    kbx_b < 0 && kbx_ok ? (
+      abs(v - (2)) < kbx_bd ? ( kbx_bd = abs(v - (2)); kbx_b = 0; );
+      abs(v - (4)) < kbx_bd ? ( kbx_bd = abs(v - (4)); kbx_b = 1; );
+      abs(v - (10)) < kbx_bd ? ( kbx_bd = abs(v - (10)); kbx_b = 2; );
+    );
+    kbx_b >= 0 ? kbx_setsl(3, kbx_b);
+  );
+  i == 6 && kbx_ok ? kbx_put(8, v * 1, -12, 12, 0.1);
+  i == 7 ? ( kbx_off ? kbx_put(11, 0, 0, 500, 1) : kbx_ok ? kbx_put(11, v * 1, 0, 500, 1); );
+  i == 8 && kbx_ok ? kbx_put(12, v * 1, 0, 100, 0.1);
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 md = mouse_cap & 1;
 (md && !last_md) ? (
   drag = 0; acc = 0;
@@ -585,3 +744,18 @@ th_mb = mouse_cap & 1;
   );
 );
 th_lmb = th_mb;
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);
