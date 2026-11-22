@@ -73,6 +73,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | Plugin | Description |
 |---|---|
 | **RMdrumachine** ([manuel PDF](Instruments/RMdrumachine/RMdrumachine_Manual.pdf)) | Boîte à rythmes 16 pads avec 4 kits fournis, 8 motifs, step séquenceur (accent, ghost, découpe des pas, swing, play style), MIDI et CV, 8 sorties |
+| **RMsynth** | Synthé wavetable dans l'esprit de Serum : 2 oscillateurs (10 tables, 14 warps, unisson 8 voix), sub, bruit, filtre 9 types, 3 enveloppes, 2 LFO, matrice de modulation (glisser-déposer), 6 effets ; presets rangés par type (BASS, LEAD, PAD, ANALOG, PLUCK, KEYS, BELL, FX) : 128 d'usine (16 par type) + 64 emplacements utilisateur ; limiteur de sécurité (jamais au-dessus de 0 dBFS) |
 | **RMoneshot** | Lecteur one-shot intelligent (snare, kick) : la vélocité, le hasard et le rythme de jeu font varier niveau, timbre, résonance et pitch d'un seul sample |
 
 ## Utilitaires
