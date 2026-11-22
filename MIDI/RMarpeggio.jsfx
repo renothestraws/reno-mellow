@@ -1,7 +1,7 @@
 desc:RMarpeggio - ReNo Mellow MIDI Arpeggiator
 //@author ReNo Mellow
-//@version 1.0
-//@changelog Première version : 11 modes, 14 cadences, 1 à 4 octaves, pas programmables (vélocité, liaison, octave), swing, humanize, latch, 14 presets d'usine et 8 mémoires utilisateur
+//@version 1.1
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Arpégiateur MIDI synchronisé au tempo de REAPER (ou en roue libre transport arrêté). Modes Up, Down, Up/Down, Down/Up, Up & Down, Converge, Diverge, Random, Walk, As Played, Chord ; cadences 1/1 à 1/32 (pointées et triolets) ; 1 à 4 octaves vers le haut, le bas ou les deux ; gate 5-200 % ; swing ; repeat ; humanize ; latch ; key sync ; thru ; canal de sortie. Séquenceur de 1 à 16 pas : on/off et vélocité, liaisons (TIE), transposition d'octave par pas. 14 presets d'usine et 8 mémoires utilisateur nommables (enregistrées avec le projet et dans les presets REAPER). Latence nulle.
 //tags: MIDI arpeggiator arp sequencer pattern
 //
@@ -647,6 +647,125 @@ gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
 gfx_setfont(5, "Arial", max(6, floor(11*S)));
 
 now = time_precise();
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0; kbx_pl = 0; kbx_pr = 0; kbx_pc0 = 0; kbx_sl2 = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    c == 'l' ? kbx_pl = 1;
+    c == 'r' ? kbx_pr = 1;
+    c == 'c' ? kbx_pc0 = 1;
+    c == '/' ? kbx_sl2 = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( slider(idx) = v; slider_automate(2 ^ (idx - 1)); );
+function kbx_ic(cx, cy, r) ( sqr(mx - cx) + sqr(my - cy) <= r * r; );
+function kbx_ir(x, y, w, h) ( mx >= x && mx < x + w && my >= y && my < y + h; );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  kbx_ic(62, 208, 24) ? 1 :
+  kbx_ir(16, 235, 92, 22) ? 1 :
+  kbx_ic(142, 208, 24) ? 2 :
+  kbx_ir(96, 235, 92, 22) ? 2 :
+  kbx_ic(222, 208, 24) ? 3 :
+  kbx_ir(176, 235, 92, 22) ? 3 :
+  kbx_ir(490, 180, 110, 24) ? 4 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? 62 :
+  i == 2 ? 142 :
+  i == 3 ? 222 :
+  i == 4 ? 545 :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? 246 :
+  i == 2 ? 246 :
+  i == 3 ? 246 :
+  i == 4 ? 192 :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 ? (
+    kbx_ok ? ( kbx_put(5, v, 5, 200, 1); touch(); );
+  );
+  i == 2 ? (
+    kbx_ok ? ( kbx_put(6, v, 0, 100, 1); touch(); );
+  );
+  i == 3 ? (
+    kbx_ok ? ( kbx_put(13, v, 0, 100, 1); touch(); );
+  );
+  i == 4 ? (
+    kbx_ok ? ( kbx_put(8, v, 1, 127, 1); touch(); );
+  );
+);
+function kbx_open() ( 0; );
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0; kbx_open();
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 lclick = (mouse_cap & 1) && !(last_cap & 1);
 rclick = (mouse_cap & 2) && !(last_cap & 2);
 lrel   = !(mouse_cap & 1) && (last_cap & 1);
@@ -1006,3 +1125,18 @@ th_mb = mouse_cap & 1;
   );
 );
 th_lmb = th_mb;
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);
