@@ -1,7 +1,7 @@
 desc:RM1982flanger - ReNo Mellow flanger
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.2
+//@changelog 10 factory presets (presets do not change Size or color)
 //@about
 //  # RM1982flanger
 //  Through-zero style tape flanger sound: a very short modulated delay mixed with the dry signal.

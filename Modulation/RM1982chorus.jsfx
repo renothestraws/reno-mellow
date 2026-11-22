@@ -1,7 +1,7 @@
 desc:RM1982chorus - ReNo Mellow chorus
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.2
+//@changelog 10 factory presets (presets do not change Size or color)
 //@about
 //  # RM1982chorus
 //  Classic multi-voice chorus: up to 4 modulated delay voices per side, mixed with the dry signal.

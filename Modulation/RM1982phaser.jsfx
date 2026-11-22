@@ -1,7 +1,7 @@
 desc:RM1982phaser - ReNo Mellow phaser
 //@author ReNo Mellow
-//@version 1.1
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.2
+//@changelog 10 factory presets (presets do not change Size or color)
 //@about
 //  # RM1982phaser
 //  Classic all-pass phaser: a chain of 2 to 12 swept all-pass stages mixed with the dry signal.
