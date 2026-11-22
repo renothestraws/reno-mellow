@@ -24,7 +24,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982De-ess** | De-esser (inspiré du FabFilter Pro-DS) |
 | **RM1982Transient** | Transient designer |
 | **RMtrancegate** | Gate programmable synchronisée au tempo (inspirée du Kilohearts Trance Gate) : 8 patterns de 1 à 32 pas avec liaisons, ADSR, résolution 1/2 à 1/64, mix, changement de pattern par MIDI |
-| **RMsidekicker** | Shaper type sidechain / ducking (inspiré de Slate Digital Submerge) : sync ou Hz, déclenchement auto / MIDI / audio avec seuil et délai, formes Natural / Extreme / Special inversables, morph, depth, 8 effets (gain M/S, high / low duck, sample rate, HP, LP, HP+LP, HP-LP) avec tweak |
+| **RMsidekicker** | Shaper type sidechain / ducking (inspiré de Slate Digital Submerge) : sync ou Hz, déclenchement auto / MIDI / audio avec seuil et offset, courbes Soft / Hard / Wave avec Flip, variant, amount, 8 cibles (M/S gain, hi / lo shelf, decimate, high-pass, low-pass, band-pass, notch) avec tweak |
 
 ## Égaliseurs
 
