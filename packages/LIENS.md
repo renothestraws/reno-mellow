@@ -53,5 +53,8 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Instruments | RMoneshot | 1.9 | [RMoneshot.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMoneshot.ReaperPkg) |
 | Instruments | RMsynth | 1.2 | [RMsynth.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMsynth.ReaperPkg) |
 | Reverb | RM90X | 1.4 | [RM90X.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM90X.ReaperPkg) |
+| Modulation | RM1982chorus | 1.0 | [RM1982chorus.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982chorus.ReaperPkg) |
+| Modulation | RM1982flanger | 1.0 | [RM1982flanger.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982flanger.ReaperPkg) |
+| Modulation | RM1982phaser | 1.0 | [RM1982phaser.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982phaser.ReaperPkg) |
 | MIDI | RMarpeggio | 1.0 | [RMarpeggio.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMarpeggio.ReaperPkg) |
 | MIDI | RMdrumhumanizer | 1.3 | [RMdrumhumanizer.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumhumanizer.ReaperPkg) |

@@ -1,0 +1,389 @@
+desc:RM1982flanger - ReNo Mellow flanger
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release
+//@about
+//  # RM1982flanger
+//  Through-zero style tape flanger sound: a very short modulated delay mixed with the dry signal.
+//  - RATE (or SYNC to the project tempo), DEPTH (sweep up to +/- 3 octaves around MANUAL).
+//  - MANUAL = centre delay (0.1 to 10 ms), FEEDBACK positive or negative (-95 to +95 %).
+//  - STEREO = LFO offset between left and right (0 to 180 degrees), MIX = dry / wet.
+//  - SYNC locks the LFO to the project tempo (8 bars to 1/32, follows the play position).
+//  - Drag the knobs (Shift = fine), Ctrl-click or double-click = default, mouse wheel. Zero latency.
+//  - Double-click the plug-in name to switch the colour (green / orange).
+
+slider1:0.25<0.02,10,0.01>-Rate
+slider2:60<0,100,0.01>-Depth
+slider3:2<0.1,10,0.01>-Manual
+slider4:50<-95,95,0.01>-Feedback
+slider5:90<0,180,0.01>-Stereo
+slider6:50<0,100,0.01>-Mix
+slider7:0<0,1,1{Off,On}>-Sync
+slider8:5<0,8,1{8 BARS,4 BARS,2 BARS,1/1,1/2,1/4,1/8,1/16,1/32}>-Sync division
+slider9:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider10:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+ext_noinit = 1;
+pdc_delay = 0;
+d_ph = 0;
+
+// 4-point Hermite read, d samples behind write position wp
+function rd_h(base, size, wp, d) local(r, i, f, i0, i1, i2, i3, xm1, x0, x1, x2, c1, c2, c3)
+(
+  r = wp - d;
+  i = floor(r); f = r - i;
+  i0 = i - 1; i1 = i; i2 = i + 1; i3 = i + 2;
+  i0 < 0 ? i0 += size; i1 < 0 ? i1 += size; i2 < 0 ? i2 += size; i3 < 0 ? i3 += size;
+  i0 >= size ? i0 -= size; i1 >= size ? i1 -= size; i2 >= size ? i2 -= size; i3 >= size ? i3 -= size;
+  xm1 = base[i0]; x0 = base[i1]; x1 = base[i2]; x2 = base[i3];
+  c1 = 0.5 * (x1 - xm1);
+  c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2;
+  c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+  ((c3 * f + c2) * f + c1) * f + x0;
+);
+
+d_size = 16384;
+d_bl = 0; d_br = 16384;
+memset(0, 0, 32768);
+d_wp = 0;
+d_man = slider3;
+
+@block
+d_psm = 1 - exp(-1 / (0.03 * srate));
+d_div = floor(slider8 + 0.5);
+d_cb = 1;
+d_div == 0 ? d_cb = 32;
+d_div == 1 ? d_cb = 16;
+d_div == 2 ? d_cb = 8;
+d_div == 3 ? d_cb = 4;
+d_div == 4 ? d_cb = 2;
+d_div == 5 ? d_cb = 1;
+d_div == 6 ? d_cb = 0.5;
+d_div == 7 ? d_cb = 0.25;
+d_div == 8 ? d_cb = 0.125;
+slider7 >= 0.5 ? (
+  d_inc = tempo / 60 / srate / d_cb;
+  (play_state & 1) ? ( d_ph = beat_position / d_cb; d_ph -= floor(d_ph); );
+) : (
+  d_inc = slider1 / srate;
+);
+
+d_dep = slider2 * 0.01 * 3;
+d_fb = slider4 * 0.01;
+d_off = slider5 / 360;
+d_mix = slider6 * 0.01;
+d_tman = slider3;
+
+@sample
+d_ph += d_inc; d_ph >= 1 ? d_ph -= 1;
+d_lfol = sin(2 * $pi * d_ph);
+d_lfor = sin(2 * $pi * (d_ph + d_off));
+
+d_man += (d_tman - d_man) * d_psm;
+d_dlm = d_man * 2 ^ (d_dep * d_lfol);
+d_drm = d_man * 2 ^ (d_dep * d_lfor);
+d_dsl = min(d_size - 4, max(2, min(18, max(0.05, d_dlm)) * 0.001 * srate));
+d_dsr = min(d_size - 4, max(2, min(18, max(0.05, d_drm)) * 0.001 * srate));
+d_wl = rd_h(d_bl, d_size, d_wp, d_dsl);
+d_wr = rd_h(d_br, d_size, d_wp, d_dsr);
+d_bl[d_wp] = spl0 + max(-2, min(2, d_wl * d_fb));
+d_br[d_wp] = spl1 + max(-2, min(2, d_wr * d_fb));
+d_wp += 1; d_wp >= d_size ? d_wp = 0;
+spl0 = spl0 * (1 - d_mix) + d_wl * d_mix;
+spl1 = spl1 * (1 - d_mix) + d_wr * d_mix;
+
+@gfx 600 230
+LW = 600;
+LH = 230;
+KY = 112; KR = 26;
+NK = 6;
+
+function PX(x) ( ox + x * sc; );
+function PY(y) ( oy + y * sc; );
+function col(r, g, b) ( gfx_set(r, g, b, 1); );
+function acc() ( gfx_set(acR, acG, acB, 1); );
+function acc_d() ( gfx_set(adR, adG, adB, 1); );
+function rct(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc); );
+function text_c(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw / 2; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_l(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x); gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_r(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function in_rect(x, y, ww, hh) ( mx >= x && mx < x + ww && my >= y && my < y + hh; );
+
+function k_x(i) ( 64 + (i - 1) * 80; );
+function k_norm(i)
+(
+  i == 1 ? ( slider7 >= 0.5 ? slider8 / 8 : log(slider1 / 0.02) / log(10 / 0.02); ) :
+  i == 2 ? (slider2 - (0)) / (100) :
+  i == 3 ? log(max(0.1, slider3) / 0.1) / log(10 / 0.1) :
+  i == 4 ? (slider4 - (-95)) / (190) :
+  i == 5 ? (slider5 - (0)) / (180) :
+  i == 6 ? (slider6 - (0)) / (100) :
+  0;
+);
+function k_set(i, n)
+(
+  n = min(1, max(0, n));
+  i == 1 ? (
+    slider7 >= 0.5 ? ( slider8 = floor(n * 8 + 0.5); sliderchange(slider8); ) :
+    ( slider1 = floor(0.02 * exp(log(10 / 0.02) * n) * 1000 + 0.5) / 1000; sliderchange(slider1); );
+  );
+  i == 2 ? ( slider2 = floor((0 + n * 100) * 100 + 0.5) / 100; sliderchange(slider2); );
+  i == 3 ? ( slider3 = floor(0.1 * exp(log(10 / 0.1) * n) * 100 + 0.5) / 100; sliderchange(slider3); );
+  i == 4 ? ( slider4 = floor((-95 + n * 190) * 100 + 0.5) / 100; sliderchange(slider4); );
+  i == 5 ? ( slider5 = floor((0 + n * 180) * 100 + 0.5) / 100; sliderchange(slider5); );
+  i == 6 ? ( slider6 = floor((0 + n * 100) * 100 + 0.5) / 100; sliderchange(slider6); );
+);
+function k_default(i)
+(
+  i == 1 ? ( slider7 >= 0.5 ? ( slider8 = 5; sliderchange(slider8); ) : ( slider1 = 0.25; sliderchange(slider1); ); );
+  i == 2 ? ( slider2 = 60; sliderchange(slider2); );
+  i == 3 ? ( slider3 = 2; sliderchange(slider3); );
+  i == 4 ? ( slider4 = 50; sliderchange(slider4); );
+  i == 5 ? ( slider5 = 90; sliderchange(slider5); );
+  i == 6 ? ( slider6 = 50; sliderchange(slider6); );
+);
+function k_lab(i)
+(
+  i == 1 ? strcpy(#kl, "RATE");
+  i == 2 ? strcpy(#kl, "DEPTH");
+  i == 3 ? strcpy(#kl, "MANUAL");
+  i == 4 ? strcpy(#kl, "FEEDBACK");
+  i == 5 ? strcpy(#kl, "STEREO");
+  i == 6 ? strcpy(#kl, "MIX");
+);
+function k_str(i) local(v)
+(
+  strcpy(#va, "");
+  i == 1 && slider7 >= 0.5 ? (
+    floor(slider8 + 0.5) == 0 ? strcpy(#va, "8 BARS");
+    floor(slider8 + 0.5) == 1 ? strcpy(#va, "4 BARS");
+    floor(slider8 + 0.5) == 2 ? strcpy(#va, "2 BARS");
+    floor(slider8 + 0.5) == 3 ? strcpy(#va, "1/1");
+    floor(slider8 + 0.5) == 4 ? strcpy(#va, "1/2");
+    floor(slider8 + 0.5) == 5 ? strcpy(#va, "1/4");
+    floor(slider8 + 0.5) == 6 ? strcpy(#va, "1/8");
+    floor(slider8 + 0.5) == 7 ? strcpy(#va, "1/16");
+    floor(slider8 + 0.5) == 8 ? strcpy(#va, "1/32");
+  );
+  i == 1 && slider7 < 0.5 ? (
+    v = slider1;
+    v < 1 ? ( sprintf(#va, "%.2f Hz", v); ) : ( sprintf(#va, "%.1f Hz", v); );
+  );
+  i == 2 ? ( v = slider2;
+    sprintf(#va, "%d %%", floor(v + 0.5));
+  );
+  i == 3 ? ( v = slider3;
+    v < 10 ? ( sprintf(#va, "%.2f ms", v); ) : ( sprintf(#va, "%.1f ms", v); );
+  );
+  i == 4 ? ( v = slider4;
+    v > 0.5 ? ( sprintf(#va, "+%d %%", floor(v + 0.5)); ) : ( sprintf(#va, "%d %%", floor(v + 0.5)); );
+  );
+  i == 5 ? ( v = slider5;
+    sprintf(#va, "%d deg", floor(v + 0.5));
+  );
+  i == 6 ? ( v = slider6;
+    sprintf(#va, "%d %%", floor(v + 0.5));
+  );
+);
+
+function theme_set()
+(
+  slider10 >= 0.5 ? (
+    acR = 0.424; acG = 0.851; acB = 0.780;
+    adR = 0.03;  adG = 0.10;  adB = 0.09;
+  ) : (
+    acR = 1.00; acG = 0.58; acB = 0.12;
+    adR = 0.10; adG = 0.06; adB = 0.02;
+  );
+);
+
+function draw_knob(i) local(x, n, a1, z, qx, qy)
+(
+  x = k_x(i); n = min(1, max(0, k_norm(i)));
+  a1 = -2.36 + 4.72 * n;
+  qx = PX(x); qy = PY(KY);
+  col(0.22, 0.23, 0.25);
+  z = 0;
+  loop(ceil(4 * sc), gfx_arc(qx, qy, KR * sc - z * 0.9, -2.36, 2.36, 1); z += 1;);
+  acc();
+  n > 0.001 ? (
+    z = 0;
+    loop(ceil(4 * sc), gfx_arc(qx, qy, KR * sc - z * 0.9, -2.36, a1, 1); z += 1;);
+  );
+  col(0.16, 0.165, 0.18);
+  gfx_circle(qx, qy, (KR - 7) * sc, 1, 1);
+  col(0.26, 0.27, 0.29);
+  gfx_circle(qx, qy, (KR - 7) * sc, 0, 1);
+  col(0.92, 0.92, 0.92);
+  gfx_line(qx + sin(a1) * (KR - 17) * sc, qy - cos(a1) * (KR - 17) * sc,
+           qx + sin(a1) * (KR - 8) * sc,  qy - cos(a1) * (KR - 8) * sc, 1);
+  gfx_setfont(1);
+  i == 1 && slider7 >= 0.5 ? acc() : col(0.62, 0.63, 0.66);
+  k_lab(i);
+  text_c(x, KY - KR - 14, #kl);
+  gfx_setfont(6);
+  col(0.85, 0.85, 0.86);
+  k_str(i);
+  text_c(x, KY + KR + 15, #va);
+);
+
+// ---------- frame setup ----------
+theme_set();
+sz = floor(slider9 + 0.5);
+sc = sz >= 4 ? 2 : 0.75 + 0.25 * sz;
+sc != last_sc ? (
+  gfx_setfont(1, "Arial", 12 * sc, 'b');
+  gfx_setfont(2, "Arial", 24 * sc, 'b');
+  gfx_setfont(4, "Arial", 11 * sc);
+  gfx_setfont(6, "Arial", 12 * sc);
+  last_sc = sc;
+);
+ox = max(0, floor((gfx_w - LW * sc) / 2));
+oy = max(0, floor((gfx_h - LH * sc) / 2));
+mx = (mouse_x - ox) / sc;
+my = (mouse_y - oy) / sc;
+
+// ---------- background ----------
+col(0.07, 0.07, 0.075);
+gfx_rect(0, 0, gfx_w, gfx_h);
+col(0.115, 0.12, 0.13);
+rct(6, 6, LW - 12, 184);
+col(0.105, 0.11, 0.12);
+gi = 10;
+while (gi < 190) ( rct(6, gi, LW - 12, 1); gi += 4; );
+col(0.20, 0.205, 0.22);
+gfx_circle(PX(16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(16), PY(180), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(180), 3.5 * sc, 1, 1);
+
+// title
+gfx_setfont(2);
+acc();
+text_l(30, 32, "RM1982flanger");
+gfx_measurestr("RM1982flanger", t_w, t_h);
+th_x0 = 30; th_x1 = 30 + t_w / sc;
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_l(th_x1 + 14, 34, "F L A N G E R");
+text_r(LW - 30, 34, "ReNo Mellow");
+acc();
+rct(30, 48, LW - 60, 1);
+
+gi = 1;
+loop(NK, draw_knob(gi); gi += 1;);
+
+// LFO light + SYNC button
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_c(524 + 32, 74, "LFO");
+col(0.16, 0.165, 0.18);
+gfx_circle(PX(524 + 32), PY(90), 6 * sc, 1, 1);
+gfx_set(acR, acG, acB, 0.15 + 0.85 * (0.5 + 0.5 * d_lfol));
+gfx_circle(PX(524 + 32), PY(90), 5 * sc, 1, 1);
+slider7 >= 0.5 ? ( acc(); rct(524, 108, 64, 26); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(524, 108, 64, 26); col(0.80, 0.81, 0.83); );
+gfx_setfont(1);
+text_c(524 + 32, 121, "SYNC");
+
+// ---------- bottom bar : help + SIZE ----------
+col(0.045, 0.045, 0.05);
+rct(6, 196, LW - 12, 28);
+gfx_setfont(4);
+col(0.45, 0.46, 0.48);
+text_l(16, 210, "Drag   Shift: fine   Ctrl-click: default");
+col(0.55, 0.56, 0.58);
+text_r(LW - 202, 210, "SIZE");
+gi = 0;
+loop(5,
+  gx = LW - 194 + gi * 38;
+  gi == sz ? ( acc(); rct(gx, 199, 34, 22); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, 199, 34, 22); col(0.70, 0.71, 0.73); );
+  gi == 0 ? strcpy(#lb, "75");
+  gi == 1 ? strcpy(#lb, "100");
+  gi == 2 ? strcpy(#lb, "125");
+  gi == 3 ? strcpy(#lb, "150");
+  gi == 4 ? strcpy(#lb, "200");
+  text_c(gx + 17, 210, #lb);
+  gi += 1;
+);
+
+// ---------- mouse ----------
+m_l = mouse_cap & 1;
+m_pl = g_lcap & 1;
+
+m_l && !m_pl ? (
+  g_tg = 0;
+  my >= 199 && my < 221 ? (
+    gi = 0;
+    loop(5,
+      in_rect(LW - 194 + gi * 38, 199, 34, 22) ? ( slider9 = gi; sliderchange(slider9); );
+      gi += 1;
+    );
+  );
+  in_rect(th_x0, 18, th_x1 - th_x0, 28) ? (
+    time_precise() - th_t < 0.35 ? (
+      slider10 = slider10 >= 0.5 ? 0 : 1; sliderchange(slider10); th_t = 0;
+    ) : th_t = time_precise();
+  );
+  in_rect(524, 108, 64, 26) ? ( slider7 = slider7 >= 0.5 ? 0 : 1; sliderchange(slider7); );
+  gi = 1;
+  loop(NK,
+    sqr(mx - k_x(gi)) + sqr(my - KY) <= sqr(KR + 8) ? (
+      (mouse_cap & 4) || (time_precise() - g_kt < 0.3 && g_kl == gi) ? (
+        k_default(gi); g_kt = 0;
+      ) : (
+        g_tg = gi; g_kn = k_norm(gi); g_ly = mouse_y; g_kt = time_precise(); g_kl = gi;
+      );
+    );
+    gi += 1;
+  );
+);
+
+m_l && m_pl && g_tg > 0 ? (
+  mouse_y != g_ly ? (
+    g_kn -= (mouse_y - g_ly) / (200 * sc) * ((mouse_cap & 8) ? 0.1 : 1);
+    g_kn = min(1, max(0, g_kn));
+    k_set(g_tg, g_kn);
+    g_ly = mouse_y;
+  );
+);
+!m_l ? g_tg = 0;
+
+mouse_wheel != 0 ? (
+  g_w = mouse_wheel / 120;
+  gi = 1;
+  loop(NK,
+    sqr(mx - k_x(gi)) + sqr(my - KY) <= sqr(KR + 8) ? (
+      (gi == 1 && slider7 >= 0.5) ? (
+        k_set(gi, k_norm(gi) + (g_w > 0 ? 0.125 : -0.125));
+      ) : (
+        k_set(gi, k_norm(gi) + g_w * ((mouse_cap & 8) ? 0.002 : 0.02));
+      );
+    );
+    gi += 1;
+  );
+  mouse_wheel = 0;
+);
+
+g_lcap = mouse_cap;
+

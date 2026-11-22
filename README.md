@@ -61,6 +61,14 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 |---|---|
 | **RM90X** | Multi-effet numérique inspiré de la Yamaha SPX90II : les 30 programmes d'usine (réverbes calées sur des IR de l'appareil, early reflections, gate, delay, chorus, flanger, pitch, freeze…), mémoires 31 à 90, face avant opérationnelle, MIDI, traitement interne 31,25 kHz / 16 bits sans latence |
 
+## Modulation
+
+| Plugin | Description |
+|---|---|
+| **RM1982flanger** | Flanger : RATE ou SYNC au tempo, DEPTH, MANUAL 0,1-10 ms, FEEDBACK ±95 %, STEREO, MIX |
+| **RM1982chorus** | Chorus 1 à 4 voix : RATE ou SYNC au tempo, DEPTH, DELAY 5-30 ms, VOICES, STEREO, MIX |
+| **RM1982phaser** | Phaser 2 à 12 étages : RATE ou SYNC au tempo, DEPTH, CENTER 100 Hz-4 kHz, FEEDBACK ±95 %, STAGES, STEREO, MIX |
+
 ## MIDI
 
 | Plugin | Description |

@@ -18,7 +18,7 @@ import os, re, sys, glob, datetime
 from xml.sax.saxutils import escape, quoteattr
 
 REPO_NAME = "ReNo Mellow"
-CATEGORIES = ["Dynamics", "EQ", "Color", "Utility", "Instruments", "Reverb", "MIDI"]          # un dossier = une catégorie ReaPack
+CATEGORIES = ["Dynamics", "EQ", "Color", "Utility", "Instruments", "Reverb", "Modulation", "MIDI"]          # un dossier = une catégorie ReaPack
 
 
 def rtf(text):

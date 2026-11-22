@@ -10,7 +10,7 @@ import os, re, sys, zipfile, glob
 user = sys.argv[1] if len(sys.argv) > 1 else "renothestraws"
 repo = sys.argv[2] if len(sys.argv) > 2 else "reno-mellow"
 branch = sys.argv[3] if len(sys.argv) > 3 else "main"
-CATS = ["Dynamics", "EQ", "Color", "Utility", "Instruments", "Reverb", "MIDI"]
+CATS = ["Dynamics", "EQ", "Color", "Utility", "Instruments", "Reverb", "Modulation", "MIDI"]
 os.makedirs("packages", exist_ok=True)
 for old in glob.glob("packages/*.ReaperPkg"): os.remove(old)
 rows = []
