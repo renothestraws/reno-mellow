@@ -1,8 +1,8 @@
 desc:RM1982Bass - ReNo Mellow 1982Bass (Psychoacoustic Bass)
 //tags: bass enhancer psychoacoustic harmonics missing-fundamental subharmonic maxxbass
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.5
+//@changelog Factory presets: Kick Bumper, Kick Punch, Bass On iPhone, Bass Deep, Bass Dirt (presets do not change Size or color)
 //@about Basse psycho-acoustique : complète ou remplace le grave sous FREQ par des harmoniques qui recréent la fondamentale sur les petites enceintes ; intensité, grave d'origine In/Out, vumètres.
 //
 // ---------------------------------------------------------------------------

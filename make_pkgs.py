@@ -31,6 +31,8 @@ for cat in CATS:
             z.writestr("reaper-package-info.txt", meta)
             z.writestr(doc, info)
             z.write(f, "Effects/%s/%s/%s.jsfx" % (repo, cat, name))
+            if os.path.isfile(f + ".rpl"):   # presets d'usine
+                z.write(f + ".rpl", "Effects/%s/%s/%s.jsfx.rpl" % (repo, cat, name))
             ddir = os.path.join(cat, name)
             if os.path.isdir(ddir):
                 for root, _, files in os.walk(ddir):

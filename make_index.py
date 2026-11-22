@@ -86,6 +86,9 @@ def main():
             if "changelog" in t:
                 x.append('        <changelog><![CDATA[%s]]></changelog>' % t["changelog"])
             x.append('        <source>%s</source>' % escape(raw + cat + "/" + fn))
+            # presets d'usine : <plugin>.jsfx.rpl à côté du plugin -> installé dans le même dossier
+            if os.path.isfile(os.path.join(root, cat, fn + ".rpl")):
+                x.append('        <source file=%s>%s</source>' % (quoteattr(fn + ".rpl"), escape(raw + cat + "/" + fn + ".rpl")))
             # fichiers de données (dossier du même nom que le plugin) -> REAPER/Data/<nom>/
             ddir = os.path.join(root, cat, fn[:-5])
             if os.path.isdir(ddir):
