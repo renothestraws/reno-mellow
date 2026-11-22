@@ -47,6 +47,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Utility | RM1982Trig | 1.5 | [RM1982Trig.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Trig.ReaperPkg) |
 | Utility | RM1982gen | 1.5 | [RM1982gen.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982gen.ReaperPkg) |
 | Utility | RMstereoencode | 1.0 | [RMstereoencode.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMstereoencode.ReaperPkg) |
+| Utility | RMtimeadjust | 1.0 | [RMtimeadjust.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMtimeadjust.ReaperPkg) |
 | Instruments | RMdrumachine | 1.10 | [RMdrumachine.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumachine.ReaperPkg) |
 | Instruments | RMoneshot | 1.9 | [RMoneshot.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMoneshot.ReaperPkg) |
 | Instruments | RMsynth | 1.2 | [RMsynth.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMsynth.ReaperPkg) |

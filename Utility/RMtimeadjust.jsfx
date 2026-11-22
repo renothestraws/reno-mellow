@@ -1,0 +1,331 @@
+desc:RMtimeadjust - ReNo Mellow time adjustment (positive or negative delay)
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release: delay in ms + samples, negative delay through PDC, total in ms / samples / distance, polarity invert
+//@about
+//  # RMtimeadjust
+//  Time alignment delay: move a track later (positive delay) or earlier (negative delay).
+//  - Delay from -1000 to +1000 ms (0.01 ms steps) plus an additional amount in samples (-40000 to +40000).
+//  - A negative total is done with REAPER's plug-in delay compensation (PDC): the track is advanced
+//    and the rest of the project stays in sync (does not work on live input monitoring).
+//  - Total shown in ms, samples and equivalent distance (sound at 343 m/s), handy to align microphones.
+//  - Polarity invert.
+//  - Drag a display (Shift = fine), Ctrl-click = 0, double-click = type a value, mouse wheel.
+//  - Double-click the plug-in name to switch the colour (green / orange).
+//  Based on the Cockos "Time Adjustment Delay" JSFX.
+
+slider1:0<-1000,1000,0.01>-Delay (ms)
+slider2:0<-40000,40000,1>-Additional delay (samples)
+slider3:0<0,1,1{Normal,Inverted}>-Polarity
+slider4:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider5:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+ext_tail_size = srate;
+buf = 0;
+bufsize = floor(srate * 4);
+bpos = 0;
+d_last = -1000000000;
+pdc_top_ch = 2;
+pdc_bot_ch = 0;
+
+function update_delay()
+(
+  d_tot = floor(slider1 * srate * 0.001 + slider2 + 0.5);
+  d_tot != d_last ? (
+    d_last = d_tot;
+    d_tot < 0 ? (
+      pdc_delay = -d_tot;
+      d_len = 0;
+    ) : (
+      pdc_delay = 0;
+      d_len = min(d_tot, bufsize - 1);
+    );
+  );
+);
+update_delay();
+
+@slider
+update_delay();
+
+@block
+update_delay();
+d_pol = slider3 >= 0.5 ? -1 : 1;
+
+@sample
+buf[bpos * 2] = spl0;
+buf[bpos * 2 + 1] = spl1;
+d_rd = bpos - d_len;
+d_rd < 0 ? d_rd += bufsize;
+spl0 = buf[d_rd * 2] * d_pol;
+spl1 = buf[d_rd * 2 + 1] * d_pol;
+bpos += 1;
+bpos >= bufsize ? bpos = 0;
+
+@gfx 600 222
+LW = 600;
+LH = 222;
+
+function PX(x) ( ox + x * sc; );
+function PY(y) ( oy + y * sc; );
+function col(r, g, b) ( gfx_set(r, g, b, 1); );
+function acc() ( gfx_set(acR, acG, acB, 1); );
+function acc_d() ( gfx_set(adR, adG, adB, 1); );
+function rct(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc); );
+function text_c(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw / 2; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_l(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x); gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_r(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function in_rect(x, y, ww, hh) ( mx >= x && mx < x + ww && my >= y && my < y + hh; );
+
+function theme_set()
+(
+  slider5 >= 0.5 ? (
+    acR = 0.424; acG = 0.851; acB = 0.780;
+    adR = 0.03;  adG = 0.10;  adB = 0.09;
+  ) : (
+    acR = 1.00; acG = 0.58; acB = 0.12;
+    adR = 0.10; adG = 0.06; adB = 0.02;
+  );
+);
+
+// display boxes : 1 = ms, 2 = samples
+function bx(i) ( i == 1 ? 30 : 292; );
+function bw(i) ( i == 1 ? 250 : 180; );
+function in_box(i) ( in_rect(bx(i), 62, bw(i), 88); );
+
+function set_ms(v) ( slider1 = min(1000, max(-1000, floor(v * 100 + 0.5) / 100)); sliderchange(slider1); );
+function set_spl(v) ( slider2 = min(40000, max(-40000, floor(v + 0.5))); sliderchange(slider2); );
+
+// typed value (digits, '.', ',', '-')
+function parse_entry(i) local(k, n, c, v, frac, dv, neg, ok)
+(
+  n = strlen(#ed); k = 0; v = 0; frac = 0; dv = 1; neg = 0; ok = 0;
+  loop(n,
+    c = str_getchar(#ed, k);
+    c == '-' ? neg = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    k += 1;
+  );
+  ok ? (
+    neg ? v = -v;
+    i == 1 ? set_ms(v) : set_spl(v);
+  );
+);
+
+function draw_box(i, lab) local(x, w)
+(
+  x = bx(i); w = bw(i);
+  col(0.085, 0.09, 0.095);
+  rct(x, 62, w, 88);
+  in_box(i) || g_tg == i || g_ed == i ? acc() : col(0.22, 0.23, 0.25);
+  gfx_rect(PX(x), PY(62), w * sc, 88 * sc, 0);
+  gfx_setfont(i == 1 ? 3 : 5);
+  acc();
+  g_ed == i ? (
+    strcpy(#lb, #ed);
+    (time_precise() * 2) % 2 < 1 ? strcat(#lb, "_");
+  ) : (
+    i == 1 ? (
+      slider1 > 0.004 ? ( sprintf(#lb, "+%.2f ms", slider1); ) : ( sprintf(#lb, "%.2f ms", abs(slider1) < 0.005 ? 0 : slider1); );
+    ) : (
+      slider2 > 0 ? ( sprintf(#lb, "+%d spl", slider2); ) : ( sprintf(#lb, "%d spl", slider2); );
+    );
+  );
+  text_c(x + w / 2, 102, #lb);
+  gfx_setfont(4);
+  col(0.55, 0.56, 0.58);
+  text_c(x + w / 2, 138, lab);
+);
+
+// ---------- frame setup ----------
+theme_set();
+sz = floor(slider4 + 0.5);
+sc = sz >= 4 ? 2 : 0.75 + 0.25 * sz;
+sc != last_sc ? (
+  gfx_setfont(1, "Arial", 12 * sc, 'b');
+  gfx_setfont(2, "Arial", 24 * sc, 'b');
+  gfx_setfont(3, "Arial", 40 * sc);
+  gfx_setfont(4, "Arial", 11 * sc);
+  gfx_setfont(5, "Arial", 30 * sc);
+  gfx_setfont(6, "Arial", 13 * sc);
+  last_sc = sc;
+);
+ox = max(0, floor((gfx_w - LW * sc) / 2));
+oy = max(0, floor((gfx_h - LH * sc) / 2));
+mx = (mouse_x - ox) / sc;
+my = (mouse_y - oy) / sc;
+
+// ---------- background ----------
+col(0.07, 0.07, 0.075);
+gfx_rect(0, 0, gfx_w, gfx_h);
+col(0.115, 0.12, 0.13);
+rct(6, 6, LW - 12, 180);
+col(0.105, 0.11, 0.12);
+gi = 10;
+while (gi < 186) ( rct(6, gi, LW - 12, 1); gi += 4; );
+col(0.20, 0.205, 0.22);
+gfx_circle(PX(16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(16), PY(176), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(176), 3.5 * sc, 1, 1);
+
+// title
+gfx_setfont(2);
+acc();
+text_l(30, 32, "RMtimeadjust");
+gfx_measurestr("RMtimeadjust", t_w, t_h);
+th_x0 = 30; th_x1 = 30 + t_w / sc;
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_l(th_x1 + 14, 34, "T I M E    A D J U S T M E N T");
+text_r(LW - 30, 34, "ReNo Mellow");
+acc();
+rct(30, 48, LW - 60, 1);
+
+draw_box(1, "DELAY (ms)");
+draw_box(2, "ADDITIONAL (samples)");
+
+// polarity
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_c(526, 88, "POLARITY");
+slider3 >= 0.5 ? ( acc(); rct(484, 102, 84, 28); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(484, 102, 84, 28); col(0.80, 0.81, 0.83); );
+gfx_setfont(1);
+strcpy(#lb, "NORMAL");
+slider3 >= 0.5 ? ( strcpy(#lb, "INVERTED"); );
+text_c(526, 116, #lb);
+
+// total line
+g_ms = d_tot * 1000 / srate;
+g_m = abs(g_ms) * 0.343;
+g_ms > 0.004 ? ( sprintf(#t1, "+%.2f ms", g_ms); ) : ( sprintf(#t1, "%.2f ms", abs(g_ms) < 0.005 ? 0 : g_ms); );
+g_m < 1 ? ( sprintf(#t2, "%.1f cm", g_m * 100); ) : ( sprintf(#t2, "%.2f m", g_m); );
+d_tot < 0 ? ( sprintf(#t3, "EARLIER  -  PDC %d spl", -d_tot); ) : d_tot > 0 ? ( strcpy(#t3, "LATER"); ) : ( strcpy(#t3, "NO SHIFT"); );
+sprintf(#lb, "TOTAL   %s   =   %d spl   =   %s   ", #t1, d_tot, #t2);
+gfx_setfont(6);
+col(0.85, 0.85, 0.86);
+text_l(30, 168, #lb);
+gfx_measurestr(#lb, g_tw, g_th);
+d_tot < 0 ? acc() : col(0.55, 0.56, 0.58);
+text_l(30 + g_tw / sc, 168, #t3);
+
+// ---------- bottom bar : help + SIZE ----------
+col(0.045, 0.045, 0.05);
+rct(6, 188, LW - 12, 28);
+gfx_setfont(4);
+col(0.45, 0.46, 0.48);
+text_l(16, 202, "Drag: adjust   Shift: fine   Ctrl-click: 0   Dbl-click: type");
+col(0.55, 0.56, 0.58);
+text_r(398, 202, "SIZE");
+gi = 0;
+loop(5,
+  gx = 406 + gi * 38;
+  gi == sz ? ( acc(); rct(gx, 191, 34, 22); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, 191, 34, 22); col(0.70, 0.71, 0.73); );
+  gi == 0 ? strcpy(#lb, "75");
+  gi == 1 ? strcpy(#lb, "100");
+  gi == 2 ? strcpy(#lb, "125");
+  gi == 3 ? strcpy(#lb, "150");
+  gi == 4 ? strcpy(#lb, "200");
+  text_c(gx + 17, 202, #lb);
+  gi += 1;
+);
+
+// ---------- keyboard entry ----------
+g_ed ? (
+  g_c = gfx_getchar();
+  while (g_c > 0) (
+    g_c == 13 ? ( parse_entry(g_ed); g_ed = 0; ) :
+    g_c == 27 ? ( g_ed = 0; ) :
+    g_c == 8 ? ( strlen(#ed) > 0 ? str_delsub(#ed, strlen(#ed) - 1, 1); ) :
+    ((g_c >= '0' && g_c <= '9') || g_c == '.' || g_c == ',' || g_c == '-') ? (
+      strlen(#ed) < 10 ? ( sprintf(#ch, "%c", g_c); strcat(#ed, #ch); );
+    );
+    g_c = g_ed ? gfx_getchar() : 0;
+  );
+);
+
+// ---------- mouse ----------
+m_l = mouse_cap & 1;
+m_pl = g_lcap & 1;
+
+m_l && !m_pl ? (
+  g_tg = 0;
+  g_ed && !in_box(g_ed) ? ( parse_entry(g_ed); g_ed = 0; );
+  my >= 191 && my < 213 ? (
+    gi = 0;
+    loop(5,
+      in_rect(406 + gi * 38, 191, 34, 22) ? ( slider4 = gi; sliderchange(slider4); );
+      gi += 1;
+    );
+  );
+  in_rect(th_x0, 18, th_x1 - th_x0, 28) ? (
+    time_precise() - th_t < 0.35 ? (
+      slider5 = slider5 >= 0.5 ? 0 : 1; sliderchange(slider5); th_t = 0;
+    ) : th_t = time_precise();
+  );
+  in_rect(484, 102, 84, 28) ? ( slider3 = slider3 >= 0.5 ? 0 : 1; sliderchange(slider3); );
+  gi = 1;
+  loop(2,
+    in_box(gi) ? (
+      (mouse_cap & 4) ? (
+        gi == 1 ? set_ms(0) : set_spl(0);
+        g_ed = 0;
+      ) : time_precise() - g_dt < 0.35 && g_dl == gi ? (
+        g_ed = gi; strcpy(#ed, ""); g_dt = 0;
+      ) : (
+        g_ed = 0;
+        g_tg = gi; g_v = gi == 1 ? slider1 : slider2; g_ly = mouse_y; g_lx = mouse_x;
+        g_dt = time_precise(); g_dl = gi;
+      );
+    );
+    gi += 1;
+  );
+);
+
+m_l && m_pl && g_tg > 0 ? (
+  (mouse_y != g_ly || mouse_x != g_lx) ? (
+    g_d = ((mouse_x - g_lx) - (mouse_y - g_ly)) / sc;
+    g_tg == 1 ? (
+      g_v += g_d * ((mouse_cap & 8) ? 0.01 : 0.5);
+      set_ms(g_v);
+    ) : (
+      g_v += g_d * ((mouse_cap & 8) ? 1 : 10);
+      set_spl(g_v);
+    );
+    g_ly = mouse_y; g_lx = mouse_x;
+  );
+);
+!m_l ? g_tg = 0;
+
+mouse_wheel != 0 ? (
+  g_w = mouse_wheel / 120;
+  in_box(1) ? set_ms(slider1 + g_w * ((mouse_cap & 8) ? 0.01 : 1));
+  in_box(2) ? set_spl(slider2 + g_w * ((mouse_cap & 8) ? 1 : 10));
+  mouse_wheel = 0;
+);
+
+g_lcap = mouse_cap;

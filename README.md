@@ -85,6 +85,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Meter** | Mètre crête / RMS / plage dynamique avec seuils de couleur réglables |
 | **RM1982gen** | Tone gate : générateur (sinus, carré, scie, bruit rose / blanc) déclenché par l'entrée, avec glissement de pitch |
 | **RMstereoencode** | Encodeur / décodeur M/S (Blumlein) : entrée et sortie L/R, M/S ou S/M, gain et panoramique du Mid et du Side, polarité du Side, corrélomètre |
+| **RMtimeadjust** | Délai d'alignement : retard en ms + échantillons, retard négatif par compensation de latence (PDC), total en ms / échantillons / distance, inversion de polarité |
 
 Points communs : calibration 0 VU = +4 dBu = −18 dBFS, trim CALIB compensé en sortie,
 interface redimensionnable (75 / 100 / 125 / 150 %), interface en anglais.
