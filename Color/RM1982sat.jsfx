@@ -1,8 +1,8 @@
 desc:RM1982sat - ReNo Mellow analog saturation (5 styles, drive, fury, tone, filters, mix)
 //tags: saturation distortion drive color harmonics tube triode pentode transformer germanium tape tone filter mix vu
 //@author ReNo Mellow
-//@version 1.0
-//@changelog First release: 5 saturation styles (Silk, Iron, Germanium, Triode, Pentode), MELLOW mode (lows below 220 Hz stay clean), DRIVE + FURY (+20 dB), LOW CUT with BUMP, TONE tilt, HIGH CUT with STEEP, OUTPUT, AUTO gain, MIX, CALIB with VU and peak meters, optional HQ
+//@version 1.1
+//@changelog MELLOW + MIX: the dry signal is now the untouched original (no crossover phase shift), MIX 0 % = exact original, MIX 100 % = full MELLOW, the lows follow the MIX like the rest
 //@about
 //  # RM1982sat
 //  Analog-style saturation in the 1982 series, inspired by the classic "five flavours" saturation plug-ins (no copy: own curves, own controls).
@@ -69,10 +69,9 @@ C_LC = 100; C_TL = 110; C_MP = 120; C_MI = 130; C_P1 = 140; C_P2 = 150; C_H1 = 1
 ST_LCL = 500; ST_LCR = 504; ST_TLL = 508; ST_TLR = 512; ST_MPL = 516; ST_MPR = 520; ST_MIL = 524; ST_MIR = 528;
 ST_P1L = 532; ST_P1R = 536; ST_P2L = 540; ST_P2R = 544; ST_H1L = 548; ST_H1R = 552; ST_H2L = 556; ST_H2R = 560;
 ST_H3L = 564; ST_H3R = 568;
-// MELLOW : coefficients LR4 220 Hz et états (2 étages par branche ; voie humide et voie sèche)
+// MELLOW : coefficients LR4 220 Hz et états (2 étages par branche)
 C_XL = 190; C_XH = 200; XF = 220;
 SX_LL1 = 600; SX_LL2 = 604; SX_LR1 = 608; SX_LR2 = 612; SX_HL1 = 616; SX_HL2 = 620; SX_HR1 = 624; SX_HR2 = 628;
-SD_LL1 = 632; SD_LL2 = 636; SD_LR1 = 640; SD_LR2 = 644; SD_HL1 = 648; SD_HL2 = 652; SD_HR1 = 656; SD_HR2 = 660;
 DML = 1500; DMR = 1550;
 DLL = 1000; DLR = 1100; DRL = 1200; DRR = 1300; DLN = 64;
 HBF = 1400; UXL = 1600; UXR = 1800; DOL = 2000; DOR = 2200; DEL = 2400; DER = 2600;
@@ -549,11 +548,6 @@ dc0 += k_dc*(e0 - dc0); u0 += e0 - dc0;
 dc1 += k_dc*(e1 - dc1); u1 += e1 - dc1;
 // EQ miroir inverse exact, puis couleur fixe du style
 mir_on ? ( u0 = bq1(u0, C_MI, ST_MIL); u1 = bq1(u1, C_MI, ST_MIR); );
-// MELLOW : la voie sèche reçoit le même déphasage que l'humide (MIX cohérent)
-mellow ? (
-  xd0 = bq1(bq1(xd0, C_XL, SD_LL1), C_XL, SD_LL2) + bq1(bq1(xd0, C_XH, SD_HL1), C_XH, SD_HL2);
-  xd1 = bq1(bq1(xd1, C_XL, SD_LR1), C_XL, SD_LR2) + bq1(bq1(xd1, C_XH, SD_HR1), C_XH, SD_HR2);
-);
 u0 = bq1(u0, C_P1, ST_P1L); u1 = bq1(u1, C_P1, ST_P1R);
 u0 = bq1(u0, C_P2, ST_P2L); u1 = bq1(u1, C_P2, ST_P2R);
 // AUTO
