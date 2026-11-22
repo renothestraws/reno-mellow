@@ -47,7 +47,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | Plugin | Description |
 |---|---|
 | **RM1982REC** | Simulateur de supports d'enregistrement (cire, laque, bande 1/4", bande 2", numérique 16 bits, flottant) |
-| **RM1982Bass** | Basse psycho-acoustique (harmoniques qui recréent la fondamentale) |
+| **RM1982Bass** | Basse harmonique en parallèle : SUB (passe-bas résonant), DRIVE + CHARACTER (tube / hard), passe-haut résonant à FREQ, INTENSITY, POLARITY, grave d'origine In/Out ; OFF = signal intact |
 | **RM1982Pre** | Étage de préampli coloré : DRIVE + GAIN, 5 couleurs (1073, 512, 610, 4000, 32) |
 | **RMdrumsat** | Saturation pour la batterie : couleur 4000 encadrée par une EQ miroir (low shelf 1 kHz −12 dB avant, +12 dB après) pour colorer les attaques sans faire baver le grave ; DRIVE à volume constant, GAIN, VU-mètres, crête-mètre, HQ |
 | **RM1982Sat** | Saturation analogique en 5 styles (SILK, IRON, GERMANIUM, TRIODE, PENTODE) inspirée des saturateurs « cinq saveurs » : DRIVE + FURY (+20 dB), LOW CUT + BUMP, TONE, HIGH CUT + STEEP, AUTO, MIX, mode MELLOW (grave sous 220 Hz intact), CALIB, VU-mètres, crête-mètre, HQ |
