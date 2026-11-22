@@ -53,7 +53,6 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
 | **RM1982maximizer** | Sonic maximizer façon BBE : LOW CONTOUR + PROCESS (aigu dynamique piloté par CV), d'après Sonic Enhancer (GPL) |
 | **RM1982Inflat** | Inflator (comportement du Sonnox Oxford Inflator, Band Split compris), d'après RCInflator 2 de lewloiwc / RCJacH |
-| **RMfreqshifter** | Décaleur de fréquence sans latence (inspiré du Kilohearts Frequency Shifter) : ±5 kHz, réglage fin autour de 0 Hz, saisie au clavier, mix |
 
 ## Réverbération et multi-effet
 
@@ -68,6 +67,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982flanger** | Flanger : RATE ou SYNC au tempo, DEPTH, MANUAL 0,1-10 ms, FEEDBACK ±95 %, STEREO, MIX |
 | **RM1982chorus** | Chorus 1 à 4 voix : RATE ou SYNC au tempo, DEPTH, DELAY 5-30 ms, VOICES, STEREO, MIX |
 | **RM1982phaser** | Phaser 2 à 12 étages : RATE ou SYNC au tempo, DEPTH, CENTER 100 Hz-4 kHz, FEEDBACK ±95 %, STAGES, STEREO, MIX |
+| **RMfreqshifter** | Décaleur de fréquence sans latence (inspiré du Kilohearts Frequency Shifter) : ±5 kHz, réglage fin autour de 0 Hz, saisie au clavier, mix |
 
 ## MIDI
 

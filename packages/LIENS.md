@@ -41,7 +41,6 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Color | RM1982Sum | 1.3 | [RM1982Sum.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Sum.ReaperPkg) |
 | Color | RM1982maximizer | 1.2 | [RM1982maximizer.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982maximizer.ReaperPkg) |
 | Color | RMdrumsat | 1.0 | [RMdrumsat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumsat.ReaperPkg) |
-| Color | RMfreqshifter | 1.0 | [RMfreqshifter.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMfreqshifter.ReaperPkg) |
 | Utility | RM1982Gain | 1.7 | [RM1982Gain.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Gain.ReaperPkg) |
 | Utility | RM1982Meter | 1.5 | [RM1982Meter.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Meter.ReaperPkg) |
 | Utility | RM1982Trig | 1.5 | [RM1982Trig.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Trig.ReaperPkg) |
@@ -56,5 +55,6 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Modulation | RM1982chorus | 1.0 | [RM1982chorus.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982chorus.ReaperPkg) |
 | Modulation | RM1982flanger | 1.0 | [RM1982flanger.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982flanger.ReaperPkg) |
 | Modulation | RM1982phaser | 1.0 | [RM1982phaser.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982phaser.ReaperPkg) |
+| Modulation | RMfreqshifter | 1.1 | [RMfreqshifter.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMfreqshifter.ReaperPkg) |
 | MIDI | RMarpeggio | 1.0 | [RMarpeggio.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMarpeggio.ReaperPkg) |
 | MIDI | RMdrumhumanizer | 1.3 | [RMdrumhumanizer.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumhumanizer.ReaperPkg) |

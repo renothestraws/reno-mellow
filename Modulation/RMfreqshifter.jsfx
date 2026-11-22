@@ -1,7 +1,7 @@
 desc:RMfreqshifter - ReNo Mellow frequency shifter
 //@author ReNo Mellow
-//@version 1.0
-//@changelog First release: zero-latency frequency shifter (+/- 5 kHz), dry / wet mix
+//@version 1.1
+//@changelog Moved to the Modulation category (no change to the sound)
 //@about
 //  # RMfreqshifter
 //  Frequency shifter (inspired by the Kilohearts Frequency Shifter).
