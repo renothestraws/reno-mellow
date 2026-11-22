@@ -19,7 +19,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Dynamics | RM670 | 1.4 | [RM670.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM670.ReaperPkg) |
 | Dynamics | RM9000JDYN | 1.4 | [RM9000JDYN.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM9000JDYN.ReaperPkg) |
 | Dynamics | RMEL8 | 1.4 | [RMEL8.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMEL8.ReaperPkg) |
-| Dynamics | RMGbuss | 1.4 | [RMGbuss.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMGbuss.ReaperPkg) |
+| Dynamics | RMGbuss | 1.5 | [RMGbuss.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMGbuss.ReaperPkg) |
 | Dynamics | RMMultidyn | 1.3 | [RMMultidyn.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMMultidyn.ReaperPkg) |
 | Dynamics | RMsidekicker | 1.2 | [RMsidekicker.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMsidekicker.ReaperPkg) |
 | Dynamics | RMtrancegate | 1.1 | [RMtrancegate.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMtrancegate.ReaperPkg) |

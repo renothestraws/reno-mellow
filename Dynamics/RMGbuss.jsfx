@@ -1,8 +1,8 @@
 desc:RMGbuss - ReNo Mellow G Buss (VCA Bus Compressor)
 //tags: dynamics compressor bus VCA SSL G
 //@author ReNo Mellow
-//@version 1.4
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.5
+//@changelog Factory presets: Modern Buss, Classic Buss, Drums Buss, PheryPeri, Vintage Buss (presets do not change Size or color)
 //@about Compresseur de bus VCA inspiré du compresseur de bus SSL série G : détection feedback, Auto release, filtre side-chain, Mix, Modern.
 //
 // ---------------------------------------------------------------------------
