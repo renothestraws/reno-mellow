@@ -1,8 +1,8 @@
 desc:RMMultidyn - ReNo Mellow Multiband Dynamics (6-band clean compressor / expander with analyzer)
 //tags: multiband compressor expander dynamics mid-side sidechain analyzer
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.4
+//@changelog Factory presets: SC Kick to bass, Vocal Fixxer, Master (presets do not change the color)
 //@about Compresseur / expandeur multibande propre et transparent inspiré du FabFilter Pro-MB : 1 à 6 bandes, crossovers 6 à 48 dB/oct à somme parfaite, compression et expansion vers le bas ou vers le haut, attaque 0-50 ms, release 50-3000 ms + auto, Stereo/Dual/L/R/Mid/Side par bande, side-chain par bande (entrée 3/4, 5/6 ou une autre bande), sortie de chaque bande vers 1/2 à 11/12, analyseur, latence nulle.
 //
 // ---------------------------------------------------------------------------
