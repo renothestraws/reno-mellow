@@ -65,6 +65,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | Plugin | Description |
 |---|---|
 | **RMdrumhumanizer** | Humaniseur MIDI de batterie : vélocité et timing en trois groupes (Tight, Pocket, Loose), mode Laid Back (latence nulle) ou Rush (anticipation compensée) |
+| **RMarpeggio** | Arpégiateur MIDI synchronisé au tempo : 11 modes (Up, Down, Converge, Random, Walk, As Played, Chord…), 1/1 à 1/32 pointés et triolets, 1 à 4 octaves, séquenceur 16 pas (niveau, liaisons, octave par pas), swing, humanize, latch, 14 presets d'usine et 8 mémoires utilisateur |
 
 ## Instruments
 

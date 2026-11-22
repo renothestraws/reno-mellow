@@ -48,4 +48,5 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Instruments | RMdrumachine | 1.10 | [RMdrumachine.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumachine.ReaperPkg) |
 | Instruments | RMoneshot | 1.9 | [RMoneshot.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMoneshot.ReaperPkg) |
 | Reverb | RM90X | 1.4 | [RM90X.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM90X.ReaperPkg) |
+| MIDI | RMarpeggio | 1.0 | [RMarpeggio.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMarpeggio.ReaperPkg) |
 | MIDI | RMdrumhumanizer | 1.3 | [RMdrumhumanizer.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumhumanizer.ReaperPkg) |

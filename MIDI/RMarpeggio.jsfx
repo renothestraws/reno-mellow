@@ -1,0 +1,1008 @@
+desc:RMarpeggio - ReNo Mellow MIDI Arpeggiator
+//@author ReNo Mellow
+//@version 1.0
+//@changelog Première version : 11 modes, 14 cadences, 1 à 4 octaves, pas programmables (vélocité, liaison, octave), swing, humanize, latch, 14 presets d'usine et 8 mémoires utilisateur
+//@about Arpégiateur MIDI synchronisé au tempo de REAPER (ou en roue libre transport arrêté). Modes Up, Down, Up/Down, Down/Up, Up & Down, Converge, Diverge, Random, Walk, As Played, Chord ; cadences 1/1 à 1/32 (pointées et triolets) ; 1 à 4 octaves vers le haut, le bas ou les deux ; gate 5-200 % ; swing ; repeat ; humanize ; latch ; key sync ; thru ; canal de sortie. Séquenceur de 1 à 16 pas : on/off et vélocité, liaisons (TIE), transposition d'octave par pas. 14 presets d'usine et 8 mémoires utilisateur nommables (enregistrées avec le projet et dans les presets REAPER). Latence nulle.
+//tags: MIDI arpeggiator arp sequencer pattern
+//
+// Souris : pas = clic (on/off) ou glisser (vélocité) ; TIE / OCT = clic (clic droit = descendre) ;
+// potards : glisser / molette (Shift = fin), Ctrl + clic = valeur par défaut.
+// Mémoires USER : clic = charger (case vide = enregistrer), clic droit = menu (enregistrer, renommer, effacer).
+
+slider1:mode=0<0,10,1{Up,Down,Up/Down,Down/Up,Up & Down,Converge,Diverge,Random,Walk,As Played,Chord}>-Mode
+slider2:rate=11<0,13,1{1/1,1/2D,1/2,1/2T,1/4D,1/4,1/4T,1/8D,1/8,1/8T,1/16D,1/16,1/16T,1/32}>-Rate
+slider3:octs=1<1,4,1>-Octaves
+slider4:odir=0<0,2,1{Up,Down,Both}>-Octave Direction
+slider5:gate=80<5,200,1>-Gate (%)
+slider6:swing=0<0,100,1>-Swing (%)
+slider7:velmode=0<0,2,1{Played,Fixed,Steps}>-Velocity Mode
+slider8:fixvel=100<1,127,1>-Fixed Velocity
+slider9:steps=16<1,16,1>-Steps
+slider10:latch=0<0,1,1{Off,On}>-Latch
+slider11:keysync=1<0,1,1{Off,On}>-Key Sync
+slider12:rpt=1<1,4,1>-Repeat
+slider13:human=0<0,100,1>-Humanize (%)
+slider14:outch=0<0,16,1>-MIDI Out Channel (0 = as input)
+slider15:thru=0<0,1,1{Off,On}>-Thru
+slider16:arpon=1<0,1,1{Off,On}>-Arp On
+slider17:size_idx=1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider18:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+
+@init
+ext_noinit = 1;
+
+// ---- memory map ----
+HELD  = 0;      // held notes, in played order (32)
+HVEL  = 64;     // their velocities
+KEYDN = 128;    // physical key state per note (128)
+BL    = 256;    // sorted note list with octaves (256)
+BLV   = 512;
+SEQ   = 1024;   // arpeggio sequence (512)
+SEQV  = 1536;
+Q     = 4096;   // event queue : time, status, data1, data2, raw (5 values)
+QMAX  = 800;
+ACT   = 8192;   // active output notes per channel / note (2048)
+PAT   = 10240;  // pattern : 4 x 16 values
+STON  = 10240;  // step on
+STV   = 10256;  // step velocity 1..127
+STT   = 10272;  // step tie
+STO   = 10288;  // step octave -2..+2
+UB    = 10400;  // user memories
+SLOT  = 96;     // [0] used, [1..12] params, [16..79] pattern, [80..95] name
+NSLOT = 8;
+NFACT = 14;
+PMASK = 7679;   // sliders 1-9, 11-13 (musical parameters)
+
+function pat_reset() local(i) (
+  i = 0;
+  loop(16, STON[i] = 1; STV[i] = 127; STT[i] = 0; STO[i] = 0; i += 1;);
+);
+
+!inited ? (
+  inited = 1;
+  qn = 0; pos = 0; nheld = 0; nphys = 0; held_ver = 1; built_ver = 0;
+  pidx = 0; rep_cnt = 0; last_e = -1; korg = 0; korg_pending = 1; first_fire = 1;
+  cur_step = -1; disp_e = -1; fb = 0; in_ch = 0; last_arpon = 1; last_k = -1000000;
+  edit_k = -1; save_arm = 0; drag = 0;
+  pr_kind = 0; pr_idx = 0; pr_dirty = 0;
+  memset(KEYDN, 0, 128);
+  memset(ACT, 0, 2048);
+  memset(UB, 0, NSLOT*SLOT);
+  pat_reset();
+) : (
+  flush = 1;   // playback (re)start / samplerate change : release everything
+);
+
+// ---------- moteur ----------
+function rate_beats(i) (
+  i < 0.5 ? 4 : i < 1.5 ? 3 : i < 2.5 ? 2 : i < 3.5 ? 4/3 : i < 4.5 ? 1.5 : i < 5.5 ? 1 : i < 6.5 ? 2/3 :
+  i < 7.5 ? 0.75 : i < 8.5 ? 0.5 : i < 9.5 ? 1/3 : i < 10.5 ? 0.375 : i < 11.5 ? 0.25 : i < 12.5 ? 1/6 : 0.125;
+);
+
+function q_insert(tm, a, b, c, raw) local(i) (
+  qn < QMAX ? (
+    i = qn;
+    while (i > 0 && Q[(i-1)*5] > tm) (
+      memcpy(Q + i*5, Q + (i-1)*5, 5);
+      i -= 1;
+    );
+    Q[i*5] = tm; Q[i*5+1] = a; Q[i*5+2] = b; Q[i*5+3] = c; Q[i*5+4] = raw;
+    qn += 1;
+    1;
+  ) : 0;
+);
+
+function q_remove(i) (
+  i < qn - 1 ? memcpy(Q + i*5, Q + (i+1)*5, (qn - i - 1)*5);
+  qn -= 1;
+);
+
+function flush_all() local(i) (
+  i = 0;
+  loop(2048,
+    ACT[i] > 0 ? ( midisend(0, $x80 | (i >> 7), i & 127, 0); ACT[i] = 0; );
+    i += 1;
+  );
+  qn = 0;
+);
+
+// sends an arpeggiator note, never two note-ons of the same key at once
+function send_now(o, a, b, c, qi) local(k, j, fnd) (
+  k = (a & 15)*128 + b;
+  ((a & $xF0) == $x90 && c > 0) ? (
+    ACT[k] > 0 ? (
+      midisend(o, $x80 | (a & 15), b, 0);
+      ACT[k] = 0;
+      // the pending note-off of the old note must not cut the new one
+      j = qi + 1; fnd = 0;
+      while (!fnd && j < qn) (
+        (Q[j*5+4] == 0 && (Q[j*5+1] & $xF0) == $x80 && (Q[j*5+1] & 15) == (a & 15) && Q[j*5+2] == b) ? (
+          q_remove(j); fnd = 1;
+        ) : ( j += 1; );
+      );
+    );
+    midisend(o, a, b, c);
+    ACT[k] = 1;
+  ) : (
+    ACT[k] > 0 ? ( midisend(o, a, b, c); ACT[k] = 0; );
+  );
+);
+
+function held_find(n) local(i, r) (
+  r = -1; i = 0;
+  while (r < 0 && i < nheld) ( HELD[i] == n ? ( r = i; ); i += 1; );
+  r;
+);
+
+function held_add(n, v) local(i) (
+  i = held_find(n);
+  i >= 0 ? ( HVEL[i] = v; ) : nheld < 32 ? ( HELD[nheld] = n; HVEL[nheld] = v; nheld += 1; );
+  held_ver += 1;
+);
+
+function held_compact() local(i, j, chg) (
+  i = 0; j = 0; chg = 0;
+  loop(nheld,
+    KEYDN[HELD[i]] ? ( HELD[j] = HELD[i]; HVEL[j] = HVEL[i]; j += 1; ) : ( chg = 1; );
+    i += 1;
+  );
+  nheld = j;
+  chg ? ( held_ver += 1; );
+);
+
+function build_seq() local(i, j, o, n, nb, k, tmp, tv, ostart, oend, lo, hi)
+(
+  odir < 0.5 ? ( ostart = 0; oend = octs - 1; ) :
+  odir < 1.5 ? ( ostart = 1 - octs; oend = 0; ) :
+               ( ostart = 1 - octs; oend = octs - 1; );
+  nb = 0;
+  o = ostart;
+  loop(oend - ostart + 1,
+    i = 0;
+    loop(nheld,
+      n = HELD[i] + 12*o;
+      (n >= 0 && n <= 127 && nb < 256) ? ( BL[nb] = n; BLV[nb] = HVEL[i]; nb += 1; );
+      i += 1;
+    );
+    o += 1;
+  );
+  (mode >= 8.5 && mode < 9.5) ? (
+    // As Played : octave by octave, notes in played order
+    i = 0; loop(nb, SEQ[i] = BL[i]; SEQV[i] = BLV[i]; i += 1;);
+    seqn = nb;
+  );
+  // sorted list (ascending, no duplicates)
+  i = 1;
+  loop(max(nb - 1, 0),
+    tmp = BL[i]; tv = BLV[i]; j = i - 1;
+    while (j >= 0 && BL[j] > tmp) ( BL[j+1] = BL[j]; BLV[j+1] = BLV[j]; j -= 1; );
+    BL[j+1] = tmp; BLV[j+1] = tv;
+    i += 1;
+  );
+  j = 0; i = 0;
+  loop(nb,
+    (j == 0 || BL[i] != BL[j-1]) ? ( BL[j] = BL[i]; BLV[j] = BLV[i]; j += 1; );
+    i += 1;
+  );
+  nb = j;
+  blen = nb;
+  (mode < 8.5 || mode >= 9.5) ? (
+    k = 0;
+    (mode < 0.5 || mode >= 6.5) ? (
+      // Up, Random, Walk, Chord
+      i = 0; loop(nb, SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i += 1;);
+    ) : mode < 1.5 ? (
+      // Down
+      i = nb - 1; loop(nb, SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i -= 1;);
+    ) : mode < 2.5 ? (
+      // Up/Down
+      i = 0; loop(nb, SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i += 1;);
+      i = nb - 2; loop(max(nb - 2, 0), SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i -= 1;);
+    ) : mode < 3.5 ? (
+      // Down/Up
+      i = nb - 1; loop(nb, SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i -= 1;);
+      i = 1; loop(max(nb - 2, 0), SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i += 1;);
+    ) : mode < 4.5 ? (
+      // Up & Down (top and bottom notes repeated)
+      i = 0; loop(nb, SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i += 1;);
+      i = nb - 1; loop(nb, SEQ[k] = BL[i]; SEQV[k] = BLV[i]; k += 1; i -= 1;);
+    ) : (
+      // Converge / Diverge
+      lo = 0; hi = nb - 1;
+      while (lo <= hi) (
+        SEQ[k] = BL[lo]; SEQV[k] = BLV[lo]; k += 1;
+        lo < hi ? ( SEQ[k] = BL[hi]; SEQV[k] = BLV[hi]; k += 1; );
+        lo += 1; hi -= 1;
+      );
+      mode >= 5.5 ? (
+        i = 0; j = k - 1;
+        while (i < j) (
+          tmp = SEQ[i]; SEQ[i] = SEQ[j]; SEQ[j] = tmp;
+          tv = SEQV[i]; SEQV[i] = SEQV[j]; SEQV[j] = tv;
+          i += 1; j -= 1;
+        );
+      );
+    );
+    seqn = k;
+  );
+);
+
+function next_elem() local(el) (
+  seqn <= 0 ? ( el = -1; ) : (
+    (rep_cnt > 0 && last_e >= 0 && last_e < seqn) ? ( el = last_e; rep_cnt -= 1; ) : (
+      (mode >= 6.5 && mode < 7.5) ? (
+        // Random (never twice the same note in a row)
+        el = floor(rand(seqn));
+        (seqn > 1 && el == last_e) ? ( el = (el + 1 + floor(rand(seqn - 1))) % seqn; );
+      ) : (mode >= 7.5 && mode < 8.5) ? (
+        // Walk : one step up or down
+        el = last_e < 0 || last_e >= seqn ? 0 : last_e + (rand(1) < 0.5 ? -1 : 1);
+        el < 0 ? ( el = min(1, seqn - 1); );
+        el >= seqn ? ( el = max(seqn - 2, 0); );
+      ) : (
+        el = pidx % seqn;
+        pidx += 1;
+      );
+      rep_cnt = floor(rpt + 0.5) - 1;
+    );
+    last_e = el;
+  );
+  el;
+);
+
+function vel_calc(bv, sc) local(v) (
+  v = velmode < 0.5 ? bv*sc : velmode < 1.5 ? fixvel*sc : sc*127;
+  human > 0 ? ( v += (rand(2) - 1)*human*0.16; );
+  max(1, min(127, floor(v + 0.5)));
+);
+
+function play_note(t, ch, n, v, ln) (
+  (n >= 0 && n <= 127) ? (
+    q_insert(pos + t, $x90 | ch, n, v, 0);
+    q_insert(pos + t + ln, $x80 | ch, n, 0, 0);
+  );
+);
+
+function fire_step(kk, o) local(sidx, nst, nt, j, ln, ch, sc, d, i, n, el)
+(
+  nheld > 0 ? (
+    nst = max(1, floor(steps + 0.5));
+    korg_pending ? ( korg = kk; korg_pending = 0; );
+    keysync >= 0.5 ? ( sidx = (kk - korg) - nst*floor((kk - korg)/nst); ) : ( sidx = kk - nst*floor(kk/nst); );
+    cur_step = sidx;
+    (STON[sidx] && (!STT[sidx] || first_fire)) ? (
+      first_fire = 0;
+      // length : the note goes on through the following tied steps
+      nt = 0; j = sidx + 1; j >= nst ? ( j = 0; );
+      while (nt < nst - 1 && STT[j]) ( nt += 1; j += 1; j >= nst ? ( j = 0; ); );
+      ln = max(floor((nt + gate*0.01)*step_smp), floor(srate*0.002));
+      ch = outch >= 0.5 ? floor(outch + 0.5) - 1 : in_ch;
+      sc = STV[sidx]/127;
+      d = human > 0 ? floor(rand(1)*human*0.01*0.012*srate) : 0;
+      mode >= 9.5 ? (
+        i = 0;
+        loop(min(blen, 32),
+          n = BL[i] + 12*STO[sidx];
+          play_note(o + d, ch, n, vel_calc(BLV[i], sc), ln);
+          i += 1;
+        );
+        disp_e = -2;
+      ) : (
+        el = next_elem();
+        el >= 0 ? (
+          n = SEQ[el] + 12*STO[sidx];
+          play_note(o + d, ch, n, vel_calc(SEQV[el], sc), ln);
+          disp_e = el;
+        );
+      );
+      disp_t = time_precise();
+    );
+  );
+);
+
+// ---------- presets ----------
+// pattern : X = on 127, x = on 100, o = on 72, . = off, _ = tied (on, 100)
+// octaves : 0 1 2, a = -1, b = -2
+function pat_set(p, oc) local(i, c, lp, lo) (
+  lp = strlen(p); lo = strlen(oc);
+  i = 0;
+  loop(16,
+    i < lp ? (
+      c = str_getchar(p, i);
+      STON[i] = c != '.'; STT[i] = c == '_';
+      STV[i] = c == 'X' || c == '.' ? 127 : c == 'o' ? 72 : 100;
+    );
+    i < lo ? (
+      c = str_getchar(oc, i);
+      STO[i] = c == '1' ? 1 : c == '2' ? 2 : c == 'a' ? -1 : c == 'b' ? -2 : 0;
+    );
+    i += 1;
+  );
+);
+
+function load_factory(p) (
+  pat_reset();
+  mode = 0; rate = 11; octs = 1; odir = 0; gate = 80; swing = 0; velmode = 0; fixvel = 100;
+  steps = 16; keysync = 1; rpt = 1; human = 0;
+  p == 1 ? ( octs = 2; gate = 60; ) :
+  p == 2 ? ( mode = 2; rate = 8; octs = 2; gate = 70; ) :
+  p == 3 ? ( octs = 2; gate = 40; velmode = 2; pat_set("Xx.Xx.XxXx.Xx.Xo", ""); ) :
+  p == 4 ? ( mode = 10; gate = 50; velmode = 2; pat_set("X..x..X..x..X.x.", ""); ) :
+  p == 5 ? ( swing = 66; gate = 60; pat_set("XoXoXoXoXoXoXoXo", ""); ) :
+  p == 6 ? ( mode = 7; rate = 13; octs = 3; gate = 45; human = 30; ) :
+  p == 7 ? ( mode = 9; steps = 8; gate = 60; pat_set("", "01a01210"); ) :
+  p == 8 ? ( mode = 5; rate = 7; octs = 2; gate = 90; ) :
+  p == 9 ? ( mode = 8; octs = 2; odir = 2; gate = 70; human = 15; ) :
+  p == 10 ? ( rate = 12; octs = 3; gate = 150; human = 10; ) :
+  p == 11 ? ( mode = 2; rpt = 2; gate = 45; ) :
+  p == 12 ? ( mode = 1; octs = 2; gate = 90; pat_set("X_x.X_xoX_x.Xx_o", ""); ) :
+  p == 13 ? ( mode = 9; octs = 2; odir = 1; gate = 55; swing = 20; velmode = 2; pat_set("X.xX_xo.Xx.X_ox.", "01a0001a0010a001"); );
+  pr_kind = 0; pr_idx = p; pr_dirty = 0;
+  slider_automate(PMASK);
+);
+
+function fact_name(p) (
+  p == 0 ? strcpy(#fname, "Init") :
+  p == 1 ? strcpy(#fname, "Classic Up") :
+  p == 2 ? strcpy(#fname, "Up Down Eighths") :
+  p == 3 ? strcpy(#fname, "Trance Pulse") :
+  p == 4 ? strcpy(#fname, "Chord Stabs") :
+  p == 5 ? strcpy(#fname, "Swing Groove") :
+  p == 6 ? strcpy(#fname, "Random Sparkle") :
+  p == 7 ? strcpy(#fname, "Octave Jumper") :
+  p == 8 ? strcpy(#fname, "Converge") :
+  p == 9 ? strcpy(#fname, "Walker") :
+  p == 10 ? strcpy(#fname, "Harp Glide") :
+  p == 11 ? strcpy(#fname, "Double Trouble") :
+  p == 12 ? strcpy(#fname, "Tied Groove") :
+  strcpy(#fname, "Acid Line");
+  #fname;
+);
+
+function slot_name(k) local(b, i, c) (
+  b = UB + k*SLOT;
+  strcpy(#sname, "");
+  i = 0;
+  while (i < 16 && b[80 + i] > 0) (
+    c = b[80 + i];
+    sprintf(#schr, "%c", c); strcat(#sname, #schr);
+    i += 1;
+  );
+  strlen(#sname) == 0 ? sprintf(#sname, "User %d", k + 1);
+  #sname;
+);
+
+function slot_setname(k, str) local(b, i, n) (
+  b = UB + k*SLOT;
+  memset(b + 80, 0, 16);
+  n = min(strlen(str), 12);
+  i = 0; loop(n, b[80 + i] = str_getchar(str, i); i += 1;);
+);
+
+function slot_save(k) local(b) (
+  b = UB + k*SLOT;
+  b[0] = 1;
+  b[1] = mode; b[2] = rate; b[3] = octs; b[4] = odir; b[5] = gate; b[6] = swing;
+  b[7] = velmode; b[8] = fixvel; b[9] = steps; b[10] = keysync; b[11] = rpt; b[12] = human;
+  memcpy(b + 16, PAT, 64);
+  pr_kind = 1; pr_idx = k; pr_dirty = 0;
+);
+
+function slot_load(k) local(b) (
+  b = UB + k*SLOT;
+  b[0] ? (
+    mode = b[1]; rate = b[2]; octs = b[3]; odir = b[4]; gate = b[5]; swing = b[6];
+    velmode = b[7]; fixvel = b[8]; steps = b[9]; keysync = b[10]; rpt = b[11]; human = b[12];
+    memcpy(PAT, b + 16, 64);
+    pr_kind = 1; pr_idx = k; pr_dirty = 0;
+    slider_automate(PMASK);
+  );
+);
+
+function slot_clear(k) (
+  memset(UB + k*SLOT, 0, SLOT);
+  (pr_kind == 1 && pr_idx == k) ? ( pr_dirty = 1; );
+);
+
+// ---------- interface (fonctions) ----------
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function clampv(v, lo, hi) ( max(lo, min(hi, v)); );
+function touch() ( pr_dirty = 1; );
+
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.05,0.05,0.055); rct(x,y,w,h,0);
+  gfx_setfont(1); on ? col(thc5r,thc5g,thc5b) : col(0.78,0.79,0.82);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+
+function draw_sel(x, y, w, h, val)
+(
+  col(0.05,0.05,0.055); rct(x,y,w,h,1);
+  col(0.26,0.27,0.29); rct(x,y,w,h,0);
+  col(0.16,0.165,0.18); rct(x+1,y+1,18,h-2,1); rct(x+w-19,y+1,18,h-2,1);
+  gfx_setfont(1); col(0.62,0.63,0.66);
+  text_c(x + 10, y + h*0.5, "<"); text_c(x + w - 10, y + h*0.5, ">");
+  col(thc1r,thc1g,thc1b); text_c(x + w*0.5, y + h*0.5, val);
+);
+
+function draw_knob(cx, cy, r, v, lbl, val) local(a0, a1, rr, a)
+(
+  a0 = -2.35; a1 = 2.35;
+  gfx_setfont(3); col(0.62,0.63,0.66); text_c(cx, cy - r - 14, lbl);
+  col(0.05,0.05,0.055); gfx_circle(PX(cx), PY(cy), (r + 6)*S, 1, 1);
+  rr = r + 2;
+  loop(4,
+    col(0.20,0.21,0.23); gfx_arc(PX(cx), PY(cy), rr*S, a0, a1, 1);
+    v > 0.001 ? ( col(thc0r,thc0g,thc0b); gfx_arc(PX(cx), PY(cy), rr*S, a0, a0 + (a1 - a0)*v, 1); );
+    rr += 0.6;
+  );
+  col(0.21,0.22,0.24); gfx_circle(PX(cx), PY(cy), (r - 4)*S, 1, 1);
+  col(0.30,0.31,0.34); gfx_circle(PX(cx), PY(cy), (r - 4)*S, 0, 1);
+  a = a0 + (a1 - a0)*v;
+  col(0.92,0.93,0.95);
+  gfx_line(PX(cx + sin(a)*(r - 14)), PY(cy - cos(a)*(r - 14)), PX(cx + sin(a)*(r - 5)), PY(cy - cos(a)*(r - 5)), 1);
+  gfx_line(PX(cx + sin(a)*(r - 14)) + 1, PY(cy - cos(a)*(r - 14)), PX(cx + sin(a)*(r - 5)) + 1, PY(cy - cos(a)*(r - 5)), 1);
+  gfx_setfont(1); col(thc1r,thc1g,thc1b); text_c(cx, cy + r + 14, val);
+);
+
+function note_name(n)
+(
+  n < 0 ? strcpy(#nn, "--") : (
+    strcpy_substr(#nb, "C C#D D#E F F#G G#A A#B ", (n % 12)*2, 2);
+    str_getchar(#nb, 1) == ' ' ? str_setlen(#nb, 1);
+    sprintf(#nn, "%s%d", #nb, floor(n/12) - 1);
+  );
+  #nn;
+);
+
+function mode_name(m) (
+  m < 0.5 ? strcpy(#mname, "UP") : m < 1.5 ? strcpy(#mname, "DOWN") : m < 2.5 ? strcpy(#mname, "UP / DOWN") :
+  m < 3.5 ? strcpy(#mname, "DOWN / UP") : m < 4.5 ? strcpy(#mname, "UP & DOWN") : m < 5.5 ? strcpy(#mname, "CONVERGE") :
+  m < 6.5 ? strcpy(#mname, "DIVERGE") : m < 7.5 ? strcpy(#mname, "RANDOM") : m < 8.5 ? strcpy(#mname, "WALK") :
+  m < 9.5 ? strcpy(#mname, "AS PLAYED") : strcpy(#mname, "CHORD");
+  #mname;
+);
+
+function rate_name(i) (
+  i < 0.5 ? strcpy(#rname, "1/1") : i < 1.5 ? strcpy(#rname, "1/2 D") : i < 2.5 ? strcpy(#rname, "1/2") :
+  i < 3.5 ? strcpy(#rname, "1/2 T") : i < 4.5 ? strcpy(#rname, "1/4 D") : i < 5.5 ? strcpy(#rname, "1/4") :
+  i < 6.5 ? strcpy(#rname, "1/4 T") : i < 7.5 ? strcpy(#rname, "1/8 D") : i < 8.5 ? strcpy(#rname, "1/8") :
+  i < 9.5 ? strcpy(#rname, "1/8 T") : i < 10.5 ? strcpy(#rname, "1/16 D") : i < 11.5 ? strcpy(#rname, "1/16") :
+  i < 12.5 ? strcpy(#rname, "1/16 T") : strcpy(#rname, "1/32");
+  #rname;
+);
+
+function pat_rotate(dir) local(nst, i, t0, t1, t2, t3) (
+  nst = max(1, floor(steps + 0.5));
+  dir > 0 ? (
+    t0 = STON[nst-1]; t1 = STV[nst-1]; t2 = STT[nst-1]; t3 = STO[nst-1];
+    i = nst - 1;
+    loop(nst - 1, STON[i] = STON[i-1]; STV[i] = STV[i-1]; STT[i] = STT[i-1]; STO[i] = STO[i-1]; i -= 1;);
+    STON[0] = t0; STV[0] = t1; STT[0] = t2; STO[0] = t3;
+  ) : (
+    t0 = STON[0]; t1 = STV[0]; t2 = STT[0]; t3 = STO[0];
+    i = 0;
+    loop(nst - 1, STON[i] = STON[i+1]; STV[i] = STV[i+1]; STT[i] = STT[i+1]; STO[i] = STO[i+1]; i += 1;);
+    STON[nst-1] = t0; STV[nst-1] = t1; STT[nst-1] = t2; STO[nst-1] = t3;
+  );
+);
+
+function pat_random() local(i, r) (
+  i = 0;
+  loop(16,
+    STON[i] = i == 0 || rand(1) < 0.75;
+    STV[i] = 64 + floor(rand(64));
+    STT[i] = i > 0 && rand(1) < 0.1;
+    r = rand(1);
+    STO[i] = r < 0.8 ? 0 : r < 0.9 ? 1 : -1;
+    i += 1;
+  );
+);
+
+
+@slider
+// parameters are read directly in @block
+
+
+@block
+// ---------- arp on / off, flush ----------
+arpon != last_arpon ? (
+  flush_all();
+  nheld = 0; nphys = 0; memset(KEYDN, 0, 128); held_ver += 1;
+  last_arpon = arpon;
+);
+flush ? ( flush_all(); flush = 0; );
+
+step_beats = rate_beats(rate);
+bps = max(tempo, 1)/60;
+spb = srate/bps;
+step_smp = step_beats*spb;
+new_chord = 0;
+
+// ---------- input ----------
+while (midirecv(mofs, m1, m2, m3)) (
+  mst = m1 & $xF0;
+  is_on = mst == $x90 && m3 > 0;
+  is_off = mst == $x80 || (mst == $x90 && m3 == 0);
+  (arpon >= 0.5 && (is_on || is_off)) ? (
+    is_on ? (
+      nphys <= 0 ? (
+        nphys = 0;
+        latch >= 0.5 ? ( nheld = 0; held_ver += 1; );   // a new chord replaces the latched one
+        new_chord = 1; chord_ofs = mofs;
+      );
+      !KEYDN[m2] ? ( nphys += 1; );
+      KEYDN[m2] = 1;
+      held_add(m2, m3);
+      in_ch = m1 & 15;
+    ) : (
+      KEYDN[m2] ? ( KEYDN[m2] = 0; nphys -= 1; );
+    );
+    thru >= 0.5 ? ( !q_insert(pos + mofs, m1, m2, m3, 1) ? midisend(mofs, m1, m2, m3); );
+  ) : (
+    !q_insert(pos + mofs, m1, m2, m3, 1) ? midisend(mofs, m1, m2, m3);
+  );
+);
+
+latch < 0.5 ? held_compact();
+
+(held_ver != built_ver || mode != b_mode || octs != b_octs || odir != b_odir) ? (
+  build_seq();
+  built_ver = held_ver; b_mode = mode; b_octs = octs; b_odir = odir;
+);
+
+(new_chord && keysync >= 0.5) ? (
+  pidx = 0; rep_cnt = 0; last_e = -1; korg_pending = 1; first_fire = 1;
+);
+
+// ---------- clock : host grid when playing, free run when stopped ----------
+playing = play_state & 1;
+playing ? ( b0 = beat_position; ) : (
+  (new_chord && keysync >= 0.5) ? ( fb = -chord_ofs/spb; last_k = -1000000; );
+  b0 = fb;
+);
+b1 = b0 + samplesblock/spb;
+fb = b1;
+
+sh = swing*0.005*step_beats;
+(arpon >= 0.5 && nheld > 0) ? (
+  kk = floor(b0/step_beats) - 1;
+  kend = floor(b1/step_beats);
+  while (kk <= kend) (
+    tb = kk*step_beats + ((kk - 2*floor(kk/2)) ? sh : 0);
+    (tb >= b0 && tb < b1) ? (
+      so = floor((tb - b0)*spb + 0.001);
+      so < 0 ? ( so = 0; );
+      so > samplesblock - 1 ? ( so = samplesblock - 1; );
+      (!(kk == last_k && abs(tb - last_tb) < 0.000001) && (!new_chord || so >= chord_ofs)) ? (
+        fire_step(kk, so);
+        last_k = kk; last_tb = tb;
+      );
+    );
+    kk += 1;
+  );
+);
+arp_run = arpon >= 0.5 && nheld > 0;
+
+// ---------- output ----------
+endt = pos + samplesblock;
+qi = 0;
+while (qi < qn && Q[qi*5] < endt) (
+  qo = floor(Q[qi*5] - pos);
+  qo < 0 ? ( qo = 0; );
+  qo > samplesblock - 1 ? ( qo = samplesblock - 1; );
+  Q[qi*5+4] ? midisend(qo, Q[qi*5+1], Q[qi*5+2], Q[qi*5+3]) : send_now(qo, Q[qi*5+1], Q[qi*5+2], Q[qi*5+3], qi);
+  qi += 1;
+);
+qi > 0 ? (
+  qi < qn ? memcpy(Q, Q + qi*5, (qn - qi)*5);
+  qn -= qi;
+);
+pos = endt;
+
+
+@serialize
+ser_ver = 1;
+file_var(0, ser_ver);
+file_var(0, pr_kind);
+file_var(0, pr_idx);
+file_var(0, pr_dirty);
+file_mem(0, PAT, 64);
+file_mem(0, UB, NSLOT*SLOT);
+
+
+@gfx 980 544
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider18
+slider18 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc1r = 0.6; thc1g = 0.92; thc1b = 0.86;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+  thc6r = 0.26; thc6g = 0.52; thc6b = 0.48;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+  thc6r = 0.6; thc6g = 0.36; thc6b = 0.09;
+);
+S  = floor(size_idx + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(size_idx + 0.5);
+ox = max(0, floor((gfx_w - 980*S)/2));
+oy = max(0, floor((gfx_h - 544*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+
+now = time_precise();
+lclick = (mouse_cap & 1) && !(last_cap & 1);
+rclick = (mouse_cap & 2) && !(last_cap & 2);
+lrel   = !(mouse_cap & 1) && (last_cap & 1);
+g_shift = mouse_cap & 8; g_ctrl = mouse_cap & 4;
+wh = mouse_wheel; mouse_wheel = 0;
+whs = wh > 0 ? 1 : wh < 0 ? -1 : 0;
+hover_s = -1;
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0, 0, gfx_w, gfx_h);
+col(0.115,0.12,0.13); rct(6, 6, 968, 494, 1);
+ui = 0; loop(49, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 968, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6, 6, 968, 2, 1);
+col(0.04,0.04,0.045); rct(6, 498, 968, 2, 1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);  gfx_circle(PX(18), PY(486), 4*S, 1, 1);
+gfx_circle(PX(962), PY(20), 4*S, 1, 1); gfx_circle(PX(962), PY(486), 4*S, 1, 1);
+
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RMarpeggio"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RMarpeggio", th_w, th_h); th_x0 = th_x1 - th_w; t_w = th_w; t_x = 34 + t_w/S + 14;
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(t_x, 38, "MIDI  ARPEGGIATOR");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(946, 34, "ReNo Mellow");
+col(thc0r,thc0g,thc0b); rct(34, 56, 912, 2, 1);
+
+// ---- Presets ------------------------------------------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(34, 81, "PRESET");
+draw_btn(104, 68, 24, 26, 0, "<");
+draw_btn(336, 68, 24, 26, 0, ">");
+col(0.05,0.05,0.055); rct(132, 68, 200, 26, 1);
+col(0.26,0.27,0.29); rct(132, 68, 200, 26, 0);
+pr_kind == 1 ? ( strcpy(#pn, slot_name(pr_idx)); ) : ( strcpy(#pn, fact_name(pr_idx)); );
+pr_dirty ? strcat(#pn, " *");
+gfx_setfont(1); col(thc1r,thc1g,thc1b); text_c(232, 81, #pn);
+lclick ? (
+  in_rect(104, 68, 24, 26) ? ( load_factory(pr_kind == 0 ? (pr_idx + NFACT - 1) % NFACT : NFACT - 1); );
+  in_rect(336, 68, 24, 26) ? ( load_factory(pr_kind == 0 ? (pr_idx + 1) % NFACT : 0); );
+  in_rect(132, 68, 200, 26) ? (
+    gfx_x = mouse_x; gfx_y = mouse_y;
+    pm = gfx_showmenu("#FACTORY PRESETS|Init|Classic Up|Up Down Eighths|Trance Pulse|Chord Stabs|Swing Groove|Random Sparkle|Octave Jumper|Converge|Walker|Harp Glide|Double Trouble|Tied Groove|Acid Line");
+    pm >= 2 ? load_factory(pm - 2);
+  );
+);
+
+// ---- Mémoires utilisateur -----------------------------------------------------------
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(388, 81, "USER");
+k = 0;
+loop(NSLOT,
+  sx = 432 + k*58;
+  used = UB[k*SLOT];
+  cur = pr_kind == 1 && pr_idx == k && used;
+  blink = save_arm && (floor(now*4) % 2 == 0);
+  cur ? col(thc0r,thc0g,thc0b) : blink ? col(0.42,0.16,0.14) : used ? col(0.19,0.195,0.21) : col(0.13,0.135,0.145);
+  rct(sx, 68, 54, 26, 1);
+  edit_k == k ? col(1,0.35,0.3) : col(0.05,0.05,0.055); rct(sx, 68, 54, 26, 0);
+  gfx_setfont(3);
+  edit_k == k ? (
+    col(1,0.75,0.7); strcpy(#lbl, #ed); (floor(now*2) % 2 == 0) ? strcat(#lbl, "_");
+  ) : used ? (
+    cur ? col(thc5r,thc5g,thc5b) : col(0.85,0.86,0.88);
+    strcpy(#lbl, slot_name(k));
+  ) : (
+    col(0.40,0.41,0.44); sprintf(#lbl, "%d  +", k + 1);
+  );
+  gfx_measurestr(#lbl, lw, lh);
+  while (lw > 50*S && strlen(#lbl) > 1) ( str_setlen(#lbl, strlen(#lbl) - 1); gfx_measurestr(#lbl, lw, lh); );
+  text_c(sx + 27, 81, #lbl);
+  in_rect(sx, 68, 54, 26) ? (
+    lclick ? (
+      edit_k >= 0 ? ( slot_setname(edit_k, #ed); edit_k = -1; );
+      (save_arm || !used) ? ( slot_save(k); save_arm = 0; ) : ( slot_load(k); );
+    );
+    rclick ? (
+      gfx_x = mouse_x; gfx_y = mouse_y;
+      used ? ( pm = gfx_showmenu("Load|Save here (overwrite)|Rename|Clear"); ) : ( pm = gfx_showmenu("Save here|#Rename|#Clear"); pm = pm == 1 ? 2 : 0; );
+      pm == 1 ? slot_load(k);
+      pm == 2 ? slot_save(k);
+      pm == 3 ? ( edit_k = k; strcpy(#ed, slot_name(k)); );
+      pm == 4 ? slot_clear(k);
+    );
+  );
+  k += 1;
+);
+draw_btn(898, 68, 48, 26, save_arm, "SAVE");
+lclick && in_rect(898, 68, 48, 26) ? ( save_arm = !save_arm; );
+
+// renommage au clavier
+edit_k >= 0 ? (
+  ch_in = gfx_getchar();
+  while (ch_in > 0 && edit_k >= 0) (
+    ch_in == 13 ? ( slot_setname(edit_k, #ed); edit_k = -1; ) :
+    ch_in == 27 ? ( edit_k = -1; ) :
+    ch_in == 8 ? ( strlen(#ed) > 0 ? str_setlen(#ed, strlen(#ed) - 1); ) :
+    (ch_in >= 32 && ch_in < 127 && strlen(#ed) < 12) ? ( sprintf(#chs, "%c", ch_in); strcat(#ed, #chs); );
+    ch_in = edit_k >= 0 ? gfx_getchar() : 0;
+  );
+);
+
+// ---- Mode, cadence, octaves ---------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66);
+text_l(34, 112, "MODE"); text_l(224, 112, "RATE"); text_l(344, 112, "OCTAVES"); text_l(482, 112, "DIRECTION");
+draw_sel(34, 120, 180, 28, mode_name(mode));
+draw_sel(224, 120, 110, 28, rate_name(rate));
+i = 0;
+loop(4, sprintf(#bt, "%d", i + 1); draw_btn(344 + i*33, 120, 30, 28, floor(octs + 0.5) == i + 1, #bt); i += 1;);
+draw_btn(482, 120, 38, 28, odir < 0.5, "UP");
+draw_btn(522, 120, 38, 28, odir >= 0.5 && odir < 1.5, "DN");
+draw_btn(562, 120, 38, 28, odir >= 1.5, "BOTH");
+
+lclick ? (
+  in_rect(34, 120, 20, 28) ? ( mode = (floor(mode + 0.5) + 10) % 11; slider_automate(1); touch(); ) :
+  in_rect(194, 120, 20, 28) ? ( mode = (floor(mode + 0.5) + 1) % 11; slider_automate(1); touch(); ) :
+  in_rect(54, 120, 140, 28) ? (
+    gfx_x = mouse_x; gfx_y = mouse_y;
+    pm = gfx_showmenu("Up|Down|Up / Down|Down / Up|Up & Down (repeat ends)|Converge|Diverge|Random|Walk|As Played|Chord");
+    pm > 0 ? ( mode = pm - 1; slider_automate(1); touch(); );
+  ) :
+  in_rect(224, 120, 20, 28) ? ( rate = max(0, rate - 1); slider_automate(2); touch(); ) :
+  in_rect(314, 120, 20, 28) ? ( rate = min(13, rate + 1); slider_automate(2); touch(); ) :
+  in_rect(244, 120, 70, 28) ? (
+    gfx_x = mouse_x; gfx_y = mouse_y;
+    pm = gfx_showmenu("1/1|1/2 dotted|1/2|1/2 triplet|1/4 dotted|1/4|1/4 triplet|1/8 dotted|1/8|1/8 triplet|1/16 dotted|1/16|1/16 triplet|1/32");
+    pm > 0 ? ( rate = pm - 1; slider_automate(2); touch(); );
+  );
+  i = 0; loop(4, in_rect(344 + i*33, 120, 30, 28) ? ( octs = i + 1; slider_automate(4); touch(); ); i += 1;);
+  in_rect(482, 120, 38, 28) ? ( odir = 0; slider_automate(8); touch(); );
+  in_rect(522, 120, 38, 28) ? ( odir = 1; slider_automate(8); touch(); );
+  in_rect(562, 120, 38, 28) ? ( odir = 2; slider_automate(8); touch(); );
+);
+whs != 0 ? (
+  in_rect(34, 120, 180, 28) ? ( mode = clampv(floor(mode + 0.5) - whs, 0, 10); slider_automate(1); touch(); );
+  in_rect(224, 120, 110, 28) ? ( rate = clampv(floor(rate + 0.5) - whs, 0, 13); slider_automate(2); touch(); );
+  in_rect(344, 120, 129, 28) ? ( octs = clampv(floor(octs + 0.5) + whs, 1, 4); slider_automate(4); touch(); );
+);
+
+// ---- Potards --------------------------------------------------------------------------
+sprintf(#kv, "%d %%", gate); draw_knob(62, 208, 24, (gate - 5)/195, "GATE", #kv);
+sprintf(#kv, "%d %%", swing); draw_knob(142, 208, 24, swing/100, "SWING", #kv);
+sprintf(#kv, "%d %%", human); draw_knob(222, 208, 24, human/100, "HUMANIZE", #kv);
+
+// ---- Vélocité, repeat, canal ----------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66);
+text_l(290, 170, "VELOCITY"); text_l(290, 218, "REPEAT"); text_l(490, 218, "MIDI OUT");
+draw_btn(290, 180, 62, 24, velmode < 0.5, "PLAYED");
+draw_btn(356, 180, 62, 24, velmode >= 0.5 && velmode < 1.5, "FIXED");
+draw_btn(422, 180, 62, 24, velmode >= 1.5, "STEPS");
+col(0.05,0.05,0.055); rct(490, 180, 110, 24, 1);
+col(0.26,0.27,0.29); rct(490, 180, 110, 24, 0);
+gfx_setfont(1); velmode >= 0.5 && velmode < 1.5 ? col(thc1r,thc1g,thc1b) : col(0.40,0.41,0.44);
+sprintf(#kv, "FIXED  %d", fixvel); text_c(545, 192, #kv);
+i = 0;
+loop(4, sprintf(#bt, "x%d", i + 1); draw_btn(290 + i*36, 228, 32, 24, floor(rpt + 0.5) == i + 1, #bt); i += 1;);
+outch >= 0.5 ? sprintf(#kv, "CH %d", floor(outch + 0.5)) : strcpy(#kv, "AS INPUT");
+draw_sel(490, 228, 110, 24, #kv);
+
+lclick ? (
+  in_rect(290, 180, 62, 24) ? ( velmode = 0; slider_automate(64); touch(); );
+  in_rect(356, 180, 62, 24) ? ( velmode = 1; slider_automate(64); touch(); );
+  in_rect(422, 180, 62, 24) ? ( velmode = 2; slider_automate(64); touch(); );
+  i = 0; loop(4, in_rect(290 + i*36, 228, 32, 24) ? ( rpt = i + 1; slider_automate(2048); touch(); ); i += 1;);
+  in_rect(490, 228, 20, 24) ? ( outch = max(0, outch - 1); slider_automate(8192); );
+  in_rect(580, 228, 20, 24) ? ( outch = min(16, outch + 1); slider_automate(8192); );
+);
+whs != 0 ? (
+  in_rect(490, 228, 110, 24) ? ( outch = clampv(floor(outch + 0.5) + whs, 0, 16); slider_automate(8192); );
+  in_rect(290, 228, 140, 24) ? ( rpt = clampv(floor(rpt + 0.5) + whs, 1, 4); slider_automate(2048); touch(); );
+);
+
+// ---- Affichage de la séquence -----------------------------------------------------------
+col(0.05,0.052,0.058); rct(616, 104, 330, 154, 1);
+col(0.26,0.27,0.29); rct(616, 104, 330, 154, 0);
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(626, 116, "SEQUENCE");
+playing ? sprintf(#st, "HOST  %.1f BPM", tempo) : sprintf(#st, "FREE  %.1f BPM", tempo);
+text_r(936, 116, #st);
+col(0.14,0.145,0.16); rct(626, 128, 310, 1, 1); rct(626, 226, 310, 1, 1);
+chordm = mode >= 9.5;
+dn = chordm ? blen : seqn;
+(arpon >= 0.5 && nheld > 0 && dn > 0) ? (
+  lo = 127; hi = 0;
+  j = 0; loop(dn, p = chordm ? BL[j] : SEQ[j]; lo = min(lo, p); hi = max(hi, p); j += 1;);
+  cw = min(24, 310/dn);
+  x0 = 626 + (310 - cw*dn)*0.5;
+  lit_all = chordm && (now - disp_t) < max(0.05, step_smp/srate*gate*0.01);
+  j = 0;
+  loop(dn,
+    p = chordm ? BL[j] : SEQ[j];
+    yy = hi > lo ? 218 - (p - lo)/(hi - lo)*82 : 177;
+    (lit_all || (!chordm && j == disp_e)) ? col(thc0r,thc0g,thc0b) : col(thc6r,thc6g,thc6b);
+    rct(x0 + j*cw + 1, yy - 4, max(2, cw - 2), 8, 1);
+    j += 1;
+  );
+  gfx_setfont(5); col(0.55,0.56,0.6);
+  text_l(626, 136, note_name(hi)); text_l(626, 219, note_name(lo));
+) : (
+  gfx_setfont(4); col(0.40,0.41,0.44);
+  arpon >= 0.5 ? text_c(781, 177, "PLAY SOME NOTES") : text_c(781, 177, "ARP OFF  -  MIDI THRU");
+);
+gfx_setfont(5); col(0.75,0.76,0.79);
+(latch >= 0.5 && nphys <= 0 && nheld > 0) ? strcpy(#hl, "LATCHED :") : strcpy(#hl, "HELD :");
+j = 0;
+loop(min(nheld, 10), strcat(#hl, " "); strcat(#hl, note_name(HELD[j])); j += 1;);
+nheld > 10 ? strcat(#hl, " ...");
+nheld == 0 ? strcat(#hl, " -");
+text_l(626, 243, #hl);
+
+// ---- Pas ---------------------------------------------------------------------------------
+col(0.20,0.21,0.23); rct(34, 266, 912, 1, 1);
+gfx_setfont(4); col(0.92,0.93,0.95); text_l(34, 284, "STEPS");
+sprintf(#kv, "LENGTH %d", floor(steps + 0.5)); draw_sel(100, 272, 110, 24, #kv);
+draw_btn(762, 272, 56, 24, 0, "RAND");
+draw_btn(822, 272, 56, 24, 0, "CLEAR");
+draw_btn(882, 272, 30, 24, 0, "<");
+draw_btn(916, 272, 30, 24, 0, ">");
+gfx_setfont(3); col(0.62,0.63,0.66);
+velmode >= 1.5 ? strcpy(#vl, "VELOCITY") : strcpy(#vl, "LEVEL");
+text_l(34, 349, #vl); text_l(34, 402, "TIE"); text_l(34, 429, "OCTAVE");
+nst = max(1, floor(steps + 0.5));
+i = 0;
+loop(16,
+  sx = 104 + i*52.6;
+  inl = i < nst;
+  ph = arp_run && i == cur_step;
+  gfx_setfont(3); ph ? col(thc1r,thc1g,thc1b) : inl ? col(0.62,0.63,0.66) : col(0.32,0.33,0.36);
+  sprintf(#bt, "%d", i + 1); text_c(sx + 24, 305, #bt);
+  ph ? ( col(thc0r,thc0g,thc0b); rct(sx, 309, 48, 2, 1); );
+  // vélocité / niveau
+  col(0.05,0.05,0.055); rct(sx, 314, 48, 70, 1);
+  STON[i] ? (
+    bh = max(3, 70*STV[i]/127);
+    inl ? ( STT[i] ? col(thc6r,thc6g,thc6b) : col(thc0r,thc0g,thc0b); ) : col(0.26,0.27,0.29);
+    rct(sx + 3, 384 - bh, 42, bh - 2, 1);
+  ) : (
+    col(0.22,0.23,0.25); rct(sx + 3, 379, 42, 3, 1);
+  );
+  ph ? col(0.92,0.93,0.95) : col(0.26,0.27,0.29); rct(sx, 314, 48, 70, 0);
+  // liaison
+  col(0.05,0.05,0.055); rct(sx, 392, 48, 20, 1);
+  STT[i] ? (
+    inl ? col(thc0r,thc0g,thc0b) : col(0.30,0.31,0.34);
+    rct(sx - 6, 397, 54, 10, 1);
+  );
+  col(0.26,0.27,0.29); rct(sx, 392, 48, 20, 0);
+  // octave
+  STO[i] != 0 ? col(0.19,0.195,0.21) : col(0.05,0.05,0.055); rct(sx, 418, 48, 22, 1);
+  col(0.26,0.27,0.29); rct(sx, 418, 48, 22, 0);
+  gfx_setfont(1);
+  STO[i] != 0 ? ( inl ? col(thc1r,thc1g,thc1b) : col(0.45,0.46,0.5); ) : col(0.36,0.37,0.4);
+  STO[i] > 0 ? sprintf(#bt, "+%d", STO[i]) : sprintf(#bt, "%d", STO[i]);
+  text_c(sx + 24, 429, #bt);
+  in_rect(sx, 300, 52.6, 140) ? ( hover_s = i; );
+  i += 1;
+);
+
+// souris : pas
+lclick ? (
+  i = floor((mx - 104)/52.6);
+  (i >= 0 && i < 16 && mx - 104 - i*52.6 < 48) ? (
+    in_rect(104, 314, 840, 70) ? (
+      g_ctrl ? ( STON[i] = 1; STV[i] = 127; touch(); ) : ( drag = 100; st_i0 = i; st_mv = 0; st_y0 = my; );
+    ) : in_rect(104, 392, 840, 20) ? ( STT[i] = !STT[i]; touch(); )
+      : in_rect(104, 418, 840, 22) ? ( STO[i] = g_ctrl ? 0 : STO[i] >= 2 ? -2 : STO[i] + 1; touch(); );
+  );
+  in_rect(100, 272, 20, 24) ? ( steps = max(1, steps - 1); slider_automate(256); touch(); );
+  in_rect(190, 272, 20, 24) ? ( steps = min(16, steps + 1); slider_automate(256); touch(); );
+  in_rect(762, 272, 56, 24) ? ( pat_random(); touch(); );
+  in_rect(822, 272, 56, 24) ? ( pat_reset(); touch(); );
+  in_rect(882, 272, 30, 24) ? ( pat_rotate(-1); touch(); );
+  in_rect(916, 272, 30, 24) ? ( pat_rotate(1); touch(); );
+);
+rclick ? (
+  i = floor((mx - 104)/52.6);
+  (i >= 0 && i < 16 && in_rect(104, 418, 840, 22)) ? ( STO[i] = STO[i] <= -2 ? 2 : STO[i] - 1; touch(); );
+  (i >= 0 && i < 16 && in_rect(104, 314, 840, 70)) ? ( STON[i] = !STON[i]; touch(); );
+);
+(drag == 100 && (mouse_cap & 1)) ? (
+  abs(my - st_y0) > 2 ? ( st_mv = 1; );
+  st_mv ? (
+    i = clampv(floor((mx - 104)/52.6), 0, 15);
+    STON[i] = 1;
+    STV[i] = clampv(floor((384 - my)/70*127 + 0.5), 1, 127);
+    touch();
+  );
+);
+(drag == 100 && lrel) ? ( !st_mv ? ( STON[st_i0] = !STON[st_i0]; touch(); ); );
+whs != 0 && hover_s >= 0 ? (
+  in_rect(104, 314, 840, 70) ? ( STON[hover_s] = 1; STV[hover_s] = clampv(STV[hover_s] + whs*(g_shift ? 1 : 8), 1, 127); touch(); );
+  in_rect(104, 418, 840, 22) ? ( STO[hover_s] = clampv(STO[hover_s] + whs, -2, 2); touch(); );
+);
+whs != 0 && in_rect(100, 272, 110, 24) ? ( steps = clampv(floor(steps + 0.5) + whs, 1, 16); slider_automate(256); touch(); );
+
+// ---- Boutons du bas ---------------------------------------------------------------------
+draw_btn(34, 456, 74, 26, arpon >= 0.5, "ARP");
+draw_btn(112, 456, 74, 26, latch >= 0.5, "LATCH");
+draw_btn(190, 456, 90, 26, keysync >= 0.5, "KEY SYNC");
+draw_btn(284, 456, 64, 26, thru >= 0.5, "THRU");
+draw_btn(872, 456, 74, 26, 0, "PANIC");
+lclick ? (
+  in_rect(34, 456, 74, 26) ? ( arpon = arpon < 0.5; slider_automate(32768); );
+  in_rect(112, 456, 74, 26) ? ( latch = latch < 0.5; slider_automate(512); );
+  in_rect(190, 456, 90, 26) ? ( keysync = keysync < 0.5; slider_automate(1024); touch(); );
+  in_rect(284, 456, 64, 26) ? ( thru = thru < 0.5; slider_automate(16384); );
+  in_rect(872, 456, 74, 26) ? ( flush = 1; nheld = 0; nphys = 0; memset(KEYDN, 0, 128); held_ver += 1; );
+);
+gfx_setfont(5); col(0.62,0.63,0.66);
+hover_s >= 0 ? (
+  velmode >= 1.5 ? sprintf(#vv, "VELOCITY %d", STV[hover_s]) : sprintf(#vv, "LEVEL %d %%", floor(STV[hover_s]/127*100 + 0.5));
+  STO[hover_s] > 0 ? sprintf(#ov, "+%d", STO[hover_s]) : sprintf(#ov, "%d", STO[hover_s]);
+  STT[hover_s] ? strcpy(#tie, "  -  TIED") : strcpy(#tie, "");
+  STON[hover_s] ? sprintf(#hs, "STEP %d  -  %s  -  OCTAVE %s%s", hover_s + 1, #vv, #ov, #tie) : sprintf(#hs, "STEP %d  -  REST", hover_s + 1);
+  text_l(364, 469, #hs);
+) : (
+  text_l(364, 469, "USER: CLICK = LOAD (EMPTY SLOT = SAVE)  -  RIGHT-CLICK = MENU");
+);
+
+// ---- Potards et valeurs : souris -------------------------------------------------------
+lclick ? (
+  kd = 0;
+  in_rect(34, 176, 56, 60) ? ( g_ctrl ? ( gate = 80; slider_automate(16); touch(); ) : ( kd = 1; v0 = gate; ); ) :
+  in_rect(114, 176, 56, 60) ? ( g_ctrl ? ( swing = 0; slider_automate(32); touch(); ) : ( kd = 2; v0 = swing; ); ) :
+  in_rect(194, 176, 56, 60) ? ( g_ctrl ? ( human = 0; slider_automate(4096); touch(); ) : ( kd = 3; v0 = human; ); ) :
+  in_rect(490, 180, 110, 24) ? ( g_ctrl ? ( fixvel = 100; slider_automate(128); touch(); ) : ( kd = 4; v0 = fixvel; ); );
+  kd > 0 ? ( drag = kd; dy0 = my; );
+);
+(mouse_cap & 1) && drag > 0 && drag < 100 ? (
+  dv = (dy0 - my)*(g_shift ? 0.1 : 1);
+  drag == 1 ? ( gate = clampv(floor(v0 + dv*195/200 + 0.5), 5, 200); slider_automate(16); touch(); );
+  drag == 2 ? ( swing = clampv(floor(v0 + dv*0.5 + 0.5), 0, 100); slider_automate(32); touch(); );
+  drag == 3 ? ( human = clampv(floor(v0 + dv*0.5 + 0.5), 0, 100); slider_automate(4096); touch(); );
+  drag == 4 ? ( fixvel = clampv(floor(v0 + dv*0.6 + 0.5), 1, 127); slider_automate(128); touch(); );
+);
+lrel ? ( drag = 0; );
+whs != 0 ? (
+  in_rect(34, 176, 56, 60) ? ( gate = clampv(gate + whs*(g_shift ? 1 : 5), 5, 200); slider_automate(16); touch(); );
+  in_rect(114, 176, 56, 60) ? ( swing = clampv(swing + whs*(g_shift ? 1 : 5), 0, 100); slider_automate(32); touch(); );
+  in_rect(194, 176, 56, 60) ? ( human = clampv(human + whs*(g_shift ? 1 : 5), 0, 100); slider_automate(4096); touch(); );
+  in_rect(490, 180, 110, 24) ? ( fixvel = clampv(fixvel + whs*(g_shift ? 1 : 5), 1, 127); slider_automate(128); touch(); );
+);
+
+// ---- Barre du bas -------------------------------------------------------------------
+gfx_setfont(5); col(0.45,0.46,0.5);
+text_l(12, 523, "STEP: CLICK = ON/OFF, DRAG = LEVEL   TIE / OCT: CLICK (RIGHT = DOWN)   KNOBS: DRAG / WHEEL, CTRL+CLICK = DEFAULT");
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(758, 523, "SIZE");
+sz = floor(size_idx + 0.5);
+draw_btn(782, 511, 34.4, 24, sz == 0, "75");
+draw_btn(820.4, 511, 34.4, 24, sz == 1, "100");
+draw_btn(858.8, 511, 34.4, 24, sz == 2, "125");
+draw_btn(897.2, 511, 34.4, 24, sz == 3, "150");
+draw_btn(935.6, 511, 34.4, 24, sz == 4, "200");
+lclick ? (
+  ui = 0; loop(5, in_rect(782 + ui*38.4, 511, 34.4, 24) ? ( size_idx = ui; slider_automate(65536); ); ui += 1;);
+);
+last_cap = mouse_cap;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider18 = slider18 >= 0.5 ? 0 : 1; sliderchange(slider18); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;
