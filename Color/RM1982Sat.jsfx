@@ -1,10 +1,10 @@
-desc:RM1982sat - ReNo Mellow analog saturation (5 styles, drive, fury, tone, filters, mix)
+desc:RM1982Sat - ReNo Mellow analog saturation (5 styles, drive, fury, tone, filters, mix)
 //tags: saturation distortion drive color harmonics tube triode pentode transformer germanium tape tone filter mix vu
 //@author ReNo Mellow
-//@version 1.1
-//@changelog MELLOW + MIX: the dry signal is now the untouched original (no crossover phase shift), MIX 0 % = exact original, MIX 100 % = full MELLOW, the lows follow the MIX like the rest
+//@version 1.2
+//@changelog Renamed RM1982Sat (capital S)
 //@about
-//  # RM1982sat
+//  # RM1982Sat
 //  Analog-style saturation in the 1982 series, inspired by the classic "five flavours" saturation plug-ins (no copy: own curves, own controls).
 //  - STYLE: SILK (smooth tape-preamp tube, highs saturate gently), IRON (transformer console, the lows saturate first, airy top),
 //    GERMANIUM (soft, sputtery germanium transistors, focused mids, weighty lows), TRIODE (even harmonics, warm, punchy),
@@ -23,7 +23,7 @@ desc:RM1982sat - ReNo Mellow analog saturation (5 styles, drive, fury, tone, fil
 //  - Double-click the plug-in name: orange / green.
 //
 // ---------------------------------------------------------------------------
-// RM1982sat - saturation analogique, série 1982.
+// RM1982Sat - saturation analogique, série 1982.
 //
 // Chaîne : entrée -> /ref (0 VU = 1) -> LOW CUT (+BUMP) -> TONE -> DRIVE (+FURY)
 //          (MELLOW : séparation LR4 220 Hz avant le DRIVE, seul l'aigu est poussé et saturé)
@@ -618,7 +618,7 @@ col(0.06,0.06,0.065);
 gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(402), 4*S, 1, 1);
 gfx_circle(PX(1142), PY(20), 4*S, 1, 1); gfx_circle(PX(1142), PY(402), 4*S, 1, 1);
 
-gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RM1982sat"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982sat", th_w, th_h); th_x0 = th_x1 - th_w;
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RM1982Sat"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982Sat", th_w, th_h); th_x0 = th_x1 - th_w;
 t_x = 34 + th_w/S + 14;
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(t_x, 38, "ANALOG  SATURATION");
 gfx_setfont(4); col(0.85,0.86,0.88); text_r(1126, 34, "ReNo Mellow");
