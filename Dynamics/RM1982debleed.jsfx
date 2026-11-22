@@ -1,8 +1,8 @@
 desc:RM1982debleed - ReNo Mellow 1982 (De-Bleeder)
 //tags: dynamics debleeder gate expander multiband crossover bleed
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.6
+//@changelog Factory presets: Kick Magic, Snare My Clean, Tom, Live Vocal, Buzzy Bass, Room Sidechain from Snare (presets do not change Size or color)
 //@about Débleeder : gate/expandeur appliqué au-dessus d'un crossover réglable (200 Hz-5 kHz), le grave reste intact ; ratio, range, knee, hold, close, lookahead, side-chain filtré ou externe.
 //
 // ---------------------------------------------------------------------------

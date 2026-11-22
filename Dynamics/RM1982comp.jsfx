@@ -1,8 +1,8 @@
 desc:RM1982comp - ReNo Mellow 1982 (Versatile Compressor)
 //tags: dynamics compressor feedback feedforward rms sidechain transparent
 //@author ReNo Mellow
-//@version 1.7
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.8
+//@changelog Factory presets: All Around, Kick Control, Snare Control, In Your face, Low Rider, Vocals Clean Rider (presets do not change Size or color)
 //@about Compresseur polyvalent et transparent : feedforward/feedback, attaque 0,1-50 ms et release 25 ms-3 s avec 3 courbes chacune, auto-release, fenêtre RMS 0-500 ms, knee, side-chain externe avec HPF, make-up, mix, mètre de réduction et courbe de transfert.
 //
 // ---------------------------------------------------------------------------

@@ -10,8 +10,8 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Dynamics | RM1982Gate | 1.7 | [RM1982Gate.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Gate.ReaperPkg) |
 | Dynamics | RM1982Transient | 1.7 | [RM1982Transient.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Transient.ReaperPkg) |
 | Dynamics | RM1982clip | 1.5 | [RM1982clip.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982clip.ReaperPkg) |
-| Dynamics | RM1982comp | 1.7 | [RM1982comp.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982comp.ReaperPkg) |
-| Dynamics | RM1982debleed | 1.5 | [RM1982debleed.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982debleed.ReaperPkg) |
+| Dynamics | RM1982comp | 1.8 | [RM1982comp.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982comp.ReaperPkg) |
+| Dynamics | RM1982debleed | 1.6 | [RM1982debleed.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982debleed.ReaperPkg) |
 | Dynamics | RM1982dynawindow | 1.4 | [RM1982dynawindow.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982dynawindow.ReaperPkg) |
 | Dynamics | RM2A | 1.3 | [RM2A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM2A.ReaperPkg) |
 | Dynamics | RM33609 | 1.3 | [RM33609.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM33609.ReaperPkg) |
