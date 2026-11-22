@@ -29,7 +29,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | EQ | RM550b | 1.5 | [RM550b.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM550b.ReaperPkg) |
 | EQ | RM9000JEQ | 1.9 | [RM9000JEQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM9000JEQ.ReaperPkg) |
 | EQ | RMcleanEQ | 1.4 | [RMcleanEQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMcleanEQ.ReaperPkg) |
-| EQ | RMdevilQ | 1.6 | [RMdevilQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdevilQ.ReaperPkg) |
+| EQ | RMdevilQ | 1.7 | [RMdevilQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdevilQ.ReaperPkg) |
 | EQ | RMeq4 | 1.7 | [RMeq4.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMeq4.ReaperPkg) |
 | EQ | RMeqp1A | 1.9 | [RMeqp1A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMeqp1A.ReaperPkg) |
 | EQ | RMtownQ | 1.4 | [RMtownQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMtownQ.ReaperPkg) |
@@ -52,7 +52,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Instruments | RMdrumachine | 1.10 | [RMdrumachine.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumachine.ReaperPkg) |
 | Instruments | RMoneshot | 1.10 | [RMoneshot.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMoneshot.ReaperPkg) |
 | Instruments | RMsynth | 1.2 | [RMsynth.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMsynth.ReaperPkg) |
-| Reverb | RM1982Delay | 1.0 | [RM1982Delay.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Delay.ReaperPkg) |
+| Reverb | RM1982Delay | 1.1 | [RM1982Delay.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Delay.ReaperPkg) |
 | Reverb | RM90X | 1.4 | [RM90X.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM90X.ReaperPkg) |
 | Modulation | RM1982chorus | 1.2 | [RM1982chorus.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982chorus.ReaperPkg) |
 | Modulation | RM1982flanger | 1.2 | [RM1982flanger.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982flanger.ReaperPkg) |

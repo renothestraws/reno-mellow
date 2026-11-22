@@ -1,8 +1,8 @@
 desc:RMdevilQ - ReNo Mellow devil Q (Colored British 4-Band EQ)
 //tags: equalizer EQ inductor saturation colored 500-series british chandler-style
 //@author ReNo Mellow
-//@version 1.6
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.7
+//@changelog 12 factory presets: Vocal Silk, Vocal Forward, Kick Thump, Snare Fat Crack, Toms Round, Overheads Sheen, Bass Growl, Electric Guitar Bite, Acoustic Sparkle, Piano Clarity, Mix Bus Glue, Hot & Dirty (presets do not change Size)
 //@about Égaliseur 4 bandes à l'anglaise inspiré du Chandler Little Devil : shelfs à condensateur, médiums à inductance avec Q hi/lo, low cut, et une couleur riche et épaisse réglable (HEAT).
 //
 // ---------------------------------------------------------------------------

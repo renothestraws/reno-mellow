@@ -1,7 +1,7 @@
 desc:RM1982Delay - ReNo Mellow multi-model multi-tap delay
 //@author ReNo Mellow
-//@version 1.0
-//@changelog First release: 23 delay models, 6 independent taps (input, sync + ms time, feedback, vintage, filters, mod, age, pan, volume)
+//@version 1.1
+//@changelog 12 classic factory presets: slapback, dotted eighth, vocal throw, ping pong, bucket brigade, dark analog, 80s digital, old radio, doubler, Haas widener, tape runaway, dub (presets do not change Size or color)
 //@about
 //  # RM1982Delay
 //  Multi-model, multi-tap delay: 23 characters from 1940s tape to telephone lines, up to 6 taps.
