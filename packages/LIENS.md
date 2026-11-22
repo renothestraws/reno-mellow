@@ -40,6 +40,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Color | RM1982REC | 1.4 | [RM1982REC.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982REC.ReaperPkg) |
 | Color | RM1982Sum | 1.4 | [RM1982Sum.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Sum.ReaperPkg) |
 | Color | RM1982maximizer | 1.2 | [RM1982maximizer.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982maximizer.ReaperPkg) |
+| Color | RM1982sat | 1.0 | [RM1982sat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982sat.ReaperPkg) |
 | Color | RMdrumsat | 1.1 | [RMdrumsat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumsat.ReaperPkg) |
 | Utility | RM1982Gain | 1.8 | [RM1982Gain.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Gain.ReaperPkg) |
 | Utility | RM1982Meter | 1.6 | [RM1982Meter.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Meter.ReaperPkg) |
