@@ -1,0 +1,300 @@
+desc:RM1982width - ReNo Mellow stereo width (mid / side levels)
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release: mid and side level knobs, width readout, correlation meter
+//@about
+//  # RM1982width
+//  Stereo width control: the signal is split into mid (L+R) and side (L-R),
+//  each one gets its own level, then it goes back to left / right.
+//  - MID and SIDE knobs from -60 dB (off) to +12 dB, 0 dB = untouched.
+//  - Side down = narrower (side off = mono), side up = wider ; mid down = wider, mid off = side only.
+//  - Width readout (side level relative to mid) and correlation meter.
+//  - Drag (Shift = fine), Ctrl-click or double-click = 0 dB, mouse wheel. Zero latency, no clipper.
+//  - Double-click the plug-in name to switch the colour (green / orange).
+
+slider1:0<-60,12,0.1>-Mid (dB)
+slider2:0<-60,12,0.1>-Side (dB)
+slider3:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider4:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+ext_noinit = 1;
+pdc_delay = 0;
+d_mg = 1; d_sg = 1;
+d_cll = 0; d_crr = 0; d_clr = 0;
+
+@block
+d_tmg = slider1 <= -59.95 ? 0 : 10 ^ (slider1 / 20);
+d_tsg = slider2 <= -59.95 ? 0 : 10 ^ (slider2 / 20);
+d_sm = 1 - exp(-1 / (0.01 * srate));
+d_ca = 1 - exp(-1 / (0.3 * srate));
+
+@sample
+d_mg += (d_tmg - d_mg) * d_sm;
+d_sg += (d_tsg - d_sg) * d_sm;
+d_m = (spl0 + spl1) * 0.5 * d_mg;
+d_s = (spl0 - spl1) * 0.5 * d_sg;
+spl0 = d_m + d_s;
+spl1 = d_m - d_s;
+d_cll += (spl0 * spl0 - d_cll) * d_ca;
+d_crr += (spl1 * spl1 - d_crr) * d_ca;
+d_clr += (spl0 * spl1 - d_clr) * d_ca;
+
+@gfx 420 230
+LW = 420;
+LH = 230;
+KY = 112; KR = 30;
+
+function PX(x) ( ox + x * sc; );
+function PY(y) ( oy + y * sc; );
+function col(r, g, b) ( gfx_set(r, g, b, 1); );
+function acc() ( gfx_set(acR, acG, acB, 1); );
+function acc_d() ( gfx_set(adR, adG, adB, 1); );
+function rct(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc); );
+function text_c(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw / 2; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_l(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x); gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_r(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function in_rect(x, y, ww, hh) ( mx >= x && mx < x + ww && my >= y && my < y + hh; );
+
+function theme_set()
+(
+  slider4 >= 0.5 ? (
+    acR = 0.424; acG = 0.851; acB = 0.780;
+    adR = 0.03;  adG = 0.10;  adB = 0.09;
+  ) : (
+    acR = 1.00; acG = 0.58; acB = 0.12;
+    adR = 0.10; adG = 0.06; adB = 0.02;
+  );
+);
+
+function k_x(i) ( i == 1 ? 100 : 210; );
+function k_val(i) ( i == 1 ? slider1 : slider2; );
+function k_norm(i) ( (k_val(i) + 60) / 72; );
+function k_set(i, n)
+(
+  n = min(1, max(0, n));
+  i == 1 ? ( slider1 = floor((n * 72 - 60) * 10 + 0.5) / 10; sliderchange(slider1); );
+  i == 2 ? ( slider2 = floor((n * 72 - 60) * 10 + 0.5) / 10; sliderchange(slider2); );
+);
+function k_default(i)
+(
+  i == 1 ? ( slider1 = 0; sliderchange(slider1); );
+  i == 2 ? ( slider2 = 0; sliderchange(slider2); );
+);
+
+function gain_str(v)
+(
+  strcpy(#va, "OFF");
+  v > 0.04 ? ( sprintf(#va, "+%.1f dB", v); );
+  v <= 0.04 && v > -59.95 ? ( sprintf(#va, "%.1f dB", v); );
+);
+
+function draw_knob(i, lab) local(x, n, a1, z, qx, qy)
+(
+  x = k_x(i); n = min(1, max(0, k_norm(i)));
+  a1 = -2.36 + 4.72 * n;
+  qx = PX(x); qy = PY(KY);
+  col(0.22, 0.23, 0.25);
+  z = 0;
+  loop(ceil(5 * sc), gfx_arc(qx, qy, KR * sc - z * 0.9, -2.36, 2.36, 1); z += 1;);
+  acc();
+  n > 0.001 ? (
+    z = 0;
+    loop(ceil(5 * sc), gfx_arc(qx, qy, KR * sc - z * 0.9, -2.36, a1, 1); z += 1;);
+  );
+  // 0 dB tick
+  col(0.55, 0.56, 0.58);
+  z = -2.36 + 4.72 * 60 / 72;
+  gfx_line(qx + sin(z) * (KR + 3) * sc, qy - cos(z) * (KR + 3) * sc, qx + sin(z) * (KR + 7) * sc, qy - cos(z) * (KR + 7) * sc, 1);
+  col(0.16, 0.165, 0.18);
+  gfx_circle(qx, qy, (KR - 8) * sc, 1, 1);
+  col(0.26, 0.27, 0.29);
+  gfx_circle(qx, qy, (KR - 8) * sc, 0, 1);
+  col(0.92, 0.92, 0.92);
+  gfx_line(qx + sin(a1) * (KR - 19) * sc, qy - cos(a1) * (KR - 19) * sc,
+           qx + sin(a1) * (KR - 9) * sc,  qy - cos(a1) * (KR - 9) * sc, 1);
+  gfx_setfont(1);
+  acc();
+  text_c(x, KY - KR - 16, lab);
+  gfx_setfont(6);
+  col(0.85, 0.85, 0.86);
+  gain_str(k_val(i));
+  text_c(x, KY + KR + 16, #va);
+);
+
+// ---------- frame setup ----------
+theme_set();
+sz = floor(slider3 + 0.5);
+sc = sz >= 4 ? 2 : 0.75 + 0.25 * sz;
+sc != last_sc ? (
+  gfx_setfont(1, "Arial", 13 * sc, 'b');
+  gfx_setfont(2, "Arial", 24 * sc, 'b');
+  gfx_setfont(3, "Arial", 30 * sc);
+  gfx_setfont(4, "Arial", 11 * sc);
+  gfx_setfont(6, "Arial", 13 * sc);
+  last_sc = sc;
+);
+ox = max(0, floor((gfx_w - LW * sc) / 2));
+oy = max(0, floor((gfx_h - LH * sc) / 2));
+mx = (mouse_x - ox) / sc;
+my = (mouse_y - oy) / sc;
+
+// ---------- background ----------
+col(0.07, 0.07, 0.075);
+gfx_rect(0, 0, gfx_w, gfx_h);
+col(0.115, 0.12, 0.13);
+rct(6, 6, LW - 12, 184);
+col(0.105, 0.11, 0.12);
+gi = 10;
+while (gi < 190) ( rct(6, gi, LW - 12, 1); gi += 4; );
+col(0.20, 0.205, 0.22);
+gfx_circle(PX(16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(16), PY(180), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(180), 3.5 * sc, 1, 1);
+
+// title
+gfx_setfont(2);
+acc();
+text_l(30, 32, "RM1982width");
+gfx_measurestr("RM1982width", t_w, t_h);
+th_x0 = 30; th_x1 = 30 + t_w / sc;
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_l(th_x1 + 14, 34, "W I D T H");
+text_r(LW - 30, 34, "ReNo Mellow");
+acc();
+rct(30, 48, LW - 60, 1);
+
+draw_knob(1, "MID");
+draw_knob(2, "SIDE");
+
+// width readout
+g_mg = slider1 <= -59.95 ? 0 : 10 ^ (slider1 / 20);
+g_sg = slider2 <= -59.95 ? 0 : 10 ^ (slider2 / 20);
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_c(330, 82, "WIDTH");
+gfx_setfont(3);
+acc();
+g_sg <= 0 ? (
+  strcpy(#lb, "MONO");
+) : g_mg <= 0 ? (
+  strcpy(#lb, "SIDE");
+) : (
+  sprintf(#lb, "%d %%", floor(100 * g_sg / g_mg + 0.5));
+);
+text_c(330, 112, #lb);
+
+// correlation meter
+g_den = sqrt(d_cll * d_crr);
+g_corr = g_den > 0.0000001 ? min(1, max(-1, d_clr / g_den)) : 0;
+g_corr_s += (g_corr - g_corr_s) * 0.35;
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_c(330, 142, "CORRELATION");
+col(0.085, 0.09, 0.095);
+rct(274, 152, 112, 10);
+col(0.40, 0.41, 0.43);
+rct(329, 150, 2, 14);
+g_corr_s >= 0 ? acc() : gfx_set(0.95, 0.30, 0.25, 1);
+g_corr_s >= 0 ? rct(330, 154, 55 * g_corr_s, 6) : rct(330 + 55 * g_corr_s, 154, -55 * g_corr_s, 6);
+col(0.55, 0.56, 0.58);
+text_r(270, 157, "-1");
+text_l(390, 157, "+1");
+
+// ---------- bottom bar : help + SIZE ----------
+col(0.045, 0.045, 0.05);
+rct(6, 196, LW - 12, 28);
+gfx_setfont(4);
+col(0.45, 0.46, 0.48);
+text_l(16, 210, "Ctrl-click: 0 dB");
+col(0.55, 0.56, 0.58);
+text_r(218, 210, "SIZE");
+gi = 0;
+loop(5,
+  gx = 226 + gi * 38;
+  gi == sz ? ( acc(); rct(gx, 199, 34, 22); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, 199, 34, 22); col(0.70, 0.71, 0.73); );
+  gi == 0 ? strcpy(#lb, "75");
+  gi == 1 ? strcpy(#lb, "100");
+  gi == 2 ? strcpy(#lb, "125");
+  gi == 3 ? strcpy(#lb, "150");
+  gi == 4 ? strcpy(#lb, "200");
+  text_c(gx + 17, 210, #lb);
+  gi += 1;
+);
+
+// ---------- mouse ----------
+m_l = mouse_cap & 1;
+m_pl = g_lcap & 1;
+
+m_l && !m_pl ? (
+  g_tg = 0;
+  my >= 199 && my < 221 ? (
+    gi = 0;
+    loop(5,
+      in_rect(226 + gi * 38, 199, 34, 22) ? ( slider3 = gi; sliderchange(slider3); );
+      gi += 1;
+    );
+  );
+  in_rect(th_x0, 18, th_x1 - th_x0, 28) ? (
+    time_precise() - th_t < 0.35 ? (
+      slider4 = slider4 >= 0.5 ? 0 : 1; sliderchange(slider4); th_t = 0;
+    ) : th_t = time_precise();
+  );
+  gi = 1;
+  loop(2,
+    sqr(mx - k_x(gi)) + sqr(my - KY) <= sqr(KR + 8) ? (
+      (mouse_cap & 4) || (time_precise() - g_kt < 0.3 && g_kl == gi) ? (
+        k_default(gi); g_kt = 0;
+      ) : (
+        g_tg = gi; g_kn = k_norm(gi); g_ly = mouse_y; g_kt = time_precise(); g_kl = gi;
+      );
+    );
+    gi += 1;
+  );
+);
+
+m_l && m_pl && g_tg > 0 ? (
+  mouse_y != g_ly ? (
+    g_kn -= (mouse_y - g_ly) / (200 * sc) * ((mouse_cap & 8) ? 0.1 : 1);
+    g_kn = min(1, max(0, g_kn));
+    k_set(g_tg, g_kn);
+    g_ly = mouse_y;
+  );
+);
+!m_l ? g_tg = 0;
+
+mouse_wheel != 0 ? (
+  g_w = mouse_wheel / 120;
+  gi = 1;
+  loop(2,
+    sqr(mx - k_x(gi)) + sqr(my - KY) <= sqr(KR + 8) ? (
+      k_set(gi, k_norm(gi) + g_w * ((mouse_cap & 8) ? 0.0014 : 0.0139));
+    );
+    gi += 1;
+  );
+  mouse_wheel = 0;
+);
+
+g_lcap = mouse_cap;

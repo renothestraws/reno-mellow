@@ -84,6 +84,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Trig** | Trigger to MIDI (transitoires audio -> notes MIDI) |
 | **RM1982Meter** | Mètre crête / RMS / plage dynamique avec seuils de couleur réglables |
 | **RM1982gen** | Tone gate : générateur (sinus, carré, scie, bruit rose / blanc) déclenché par l'entrée, avec glissement de pitch |
+| **RM1982width** | Largeur stéréo : potards MID et SIDE (−60 dB = coupé à +12 dB), affichage de la largeur et corrélomètre |
 | **RMstereoencode** | Encodeur / décodeur M/S (Blumlein) : entrée et sortie L/R, M/S ou S/M, gain et panoramique du Mid et du Side, polarité du Side, corrélomètre |
 | **RMtimeadjust** | Délai d'alignement : retard en ms + échantillons, retard négatif par compensation de latence (PDC), total en ms / échantillons / distance, inversion de polarité |
 
