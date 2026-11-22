@@ -1,7 +1,7 @@
 desc:RM1982phaser - ReNo Mellow phaser
 //@author ReNo Mellow
-//@version 1.0
-//@changelog First release
+//@version 1.1
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about
 //  # RM1982phaser
 //  Classic all-pass phaser: a chain of 2 to 12 swept all-pass stages mixed with the dry signal.
@@ -347,6 +347,182 @@ loop(5,
 );
 
 // ---------- mouse ----------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0; kbx_pl = 0; kbx_pr = 0; kbx_pc0 = 0; kbx_sl2 = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    c == 'l' ? kbx_pl = 1;
+    c == 'r' ? kbx_pr = 1;
+    c == 'c' ? kbx_pc0 = 1;
+    c == '/' ? kbx_sl2 = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( slider(idx) = v; slider_automate(2 ^ (idx - 1)); );
+function kbx_ic(cx, cy, r) ( sqr(mx - cx) + sqr(my - cy) <= r * r; );
+function kbx_ir(x, y, w, h) ( mx >= x && mx < x + w && my >= y && my < y + h; );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  kbx_ic(64, 112, 26) ? 1 :
+  kbx_ir(18, 142, 92, 22) ? 1 :
+  kbx_ic(144, 112, 26) ? 2 :
+  kbx_ir(98, 142, 92, 22) ? 2 :
+  kbx_ic(224, 112, 26) ? 3 :
+  kbx_ir(178, 142, 92, 22) ? 3 :
+  kbx_ic(304, 112, 26) ? 4 :
+  kbx_ir(258, 142, 92, 22) ? 4 :
+  kbx_ic(384, 112, 26) ? 5 :
+  kbx_ir(338, 142, 92, 22) ? 5 :
+  kbx_ic(464, 112, 26) ? 6 :
+  kbx_ir(418, 142, 92, 22) ? 6 :
+  kbx_ic(544, 112, 26) ? 7 :
+  kbx_ir(498, 142, 92, 22) ? 7 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? 64 :
+  i == 2 ? 144 :
+  i == 3 ? 224 :
+  i == 4 ? 304 :
+  i == 5 ? 384 :
+  i == 6 ? 464 :
+  i == 7 ? 544 :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? 153 :
+  i == 2 ? 153 :
+  i == 3 ? 153 :
+  i == 4 ? 153 :
+  i == 5 ? 153 :
+  i == 6 ? 153 :
+  i == 7 ? 153 :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 ? (
+    slider8 >= 0.5 ? ( kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "8bars") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "4bars") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "2bars") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "1/1") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "1/2") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "1/4") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "1/8") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "1/16") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "1/32") == 0 ? kbx_b = 8;
+    kbx_b < 0 && kbx_ok && !kbx_sl2 ? (
+      min(abs(v - (8)), abs(v * 1000 - (8))) < kbx_bd ? ( kbx_bd = min(abs(v - (8)), abs(v * 1000 - (8))); kbx_b = 0; );
+      min(abs(v - (4)), abs(v * 1000 - (4))) < kbx_bd ? ( kbx_bd = min(abs(v - (4)), abs(v * 1000 - (4))); kbx_b = 1; );
+      min(abs(v - (2)), abs(v * 1000 - (2))) < kbx_bd ? ( kbx_bd = min(abs(v - (2)), abs(v * 1000 - (2))); kbx_b = 2; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 3; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 4; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 5; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 6; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 7; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 8; );
+    );
+    kbx_b >= 0 ? kbx_setsl(9, kbx_b); ) : ( kbx_ok ? kbx_put(1, v * 1, 0.02, 10, 0.01); );
+  );
+  i == 2 ? (
+    kbx_ok ? kbx_put(2, v * 1, 0, 100, 0.01);
+  );
+  i == 3 ? (
+    kbx_ok ? kbx_put(3, v * ((kbx_kil || abs(v) < 10) ? 1000 : 1), 100, 4000, 0.01);
+  );
+  i == 4 ? (
+    kbx_ok ? kbx_put(4, v * 1, -95, 95, 0.01);
+  );
+  i == 5 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "2") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "4") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "6") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "8") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "10") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "12") == 0 ? kbx_b = 5;
+    kbx_b < 0 && kbx_ok && !kbx_sl2 ? (
+      min(abs(v - (2)), abs(v * 1000 - (2))) < kbx_bd ? ( kbx_bd = min(abs(v - (2)), abs(v * 1000 - (2))); kbx_b = 0; );
+      min(abs(v - (4)), abs(v * 1000 - (4))) < kbx_bd ? ( kbx_bd = min(abs(v - (4)), abs(v * 1000 - (4))); kbx_b = 1; );
+      min(abs(v - (6)), abs(v * 1000 - (6))) < kbx_bd ? ( kbx_bd = min(abs(v - (6)), abs(v * 1000 - (6))); kbx_b = 2; );
+      min(abs(v - (8)), abs(v * 1000 - (8))) < kbx_bd ? ( kbx_bd = min(abs(v - (8)), abs(v * 1000 - (8))); kbx_b = 3; );
+      min(abs(v - (10)), abs(v * 1000 - (10))) < kbx_bd ? ( kbx_bd = min(abs(v - (10)), abs(v * 1000 - (10))); kbx_b = 4; );
+      min(abs(v - (12)), abs(v * 1000 - (12))) < kbx_bd ? ( kbx_bd = min(abs(v - (12)), abs(v * 1000 - (12))); kbx_b = 5; );
+    );
+    kbx_b >= 0 ? kbx_setsl(5, kbx_b);
+  );
+  i == 6 ? (
+    kbx_ok ? kbx_put(6, v * 1, 0, 180, 0.01);
+  );
+  i == 7 ? (
+    kbx_ok ? kbx_put(7, v * 1, 0, 100, 0.01);
+  );
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 m_l = mouse_cap & 1;
 m_pl = g_lcap & 1;
 
@@ -406,3 +582,17 @@ mouse_wheel != 0 ? (
 
 g_lcap = mouse_cap;
 
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);
