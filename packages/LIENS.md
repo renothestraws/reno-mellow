@@ -36,9 +36,9 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | EQ | RMvioletQ | 1.3 | [RMvioletQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMvioletQ.ReaperPkg) |
 | Color | RM1982Bass | 1.5 | [RM1982Bass.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Bass.ReaperPkg) |
 | Color | RM1982Inflat | 1.2 | [RM1982Inflat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Inflat.ReaperPkg) |
-| Color | RM1982Pre | 1.5 | [RM1982Pre.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Pre.ReaperPkg) |
+| Color | RM1982Pre | 1.6 | [RM1982Pre.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Pre.ReaperPkg) |
 | Color | RM1982REC | 1.4 | [RM1982REC.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982REC.ReaperPkg) |
-| Color | RM1982Sat | 1.2 | [RM1982Sat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Sat.ReaperPkg) |
+| Color | RM1982Sat | 1.3 | [RM1982Sat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Sat.ReaperPkg) |
 | Color | RM1982Sum | 1.4 | [RM1982Sum.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Sum.ReaperPkg) |
 | Color | RM1982maximizer | 1.3 | [RM1982maximizer.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982maximizer.ReaperPkg) |
 | Color | RMdrumsat | 1.1 | [RMdrumsat.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdrumsat.ReaperPkg) |

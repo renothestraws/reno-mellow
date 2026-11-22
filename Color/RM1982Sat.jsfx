@@ -1,8 +1,8 @@
 desc:RM1982Sat - ReNo Mellow analog saturation (5 styles, drive, fury, tone, filters, mix)
 //tags: saturation distortion drive color harmonics tube triode pentode transformer germanium tape tone filter mix vu
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Renamed RM1982Sat (capital S)
+//@version 1.3
+//@changelog Factory presets: Edge Rounder, Snare Explode, Mid Bite, The Kick U Want, Try this on your Rooms, Rock n' Roll Vox (presets do not change Size or color)
 //@about
 //  # RM1982Sat
 //  Analog-style saturation in the 1982 series, inspired by the classic "five flavours" saturation plug-ins (no copy: own curves, own controls).

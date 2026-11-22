@@ -1,8 +1,8 @@
 desc:RM1982Pre - ReNo Mellow 1982Pre (Colored Preamp Gain Stage + VU / Peak meters)
 //tags: preamp gain saturation color harmonics meter vu peak calibration
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.6
+//@changelog Factory presets: SSL My Snare, Neve My Voice, API Drums, UniBass, X32 Align, Acoustic G Classic Shine, Gtr Bite, Tube Depth (presets do not change Size or color)
 //@about Étage de gain de préampli coloré : DRIVE (couleur à volume constant) et GAIN propre, 5 couleurs (1073, 512, 610, 4000, 32), VU-mètres calibrables, crête-mètre, clipper interne, HQ.
 //
 // ---------------------------------------------------------------------------
