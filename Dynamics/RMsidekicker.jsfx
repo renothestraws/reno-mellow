@@ -1,0 +1,1019 @@
+desc:RMsidekicker - ReNo Mellow sidechain shaper
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release: sync / free rate, auto / MIDI / audio trigger, threshold, delay, Natural / Extreme / Special shapes (click again to invert), morph, depth, 8 effect types (Gain M/S, High duck, Low duck, Sample rate, HP, LP, HP+LP, HP-LP) with tweak, in / out trim, meters, bypass
+//@about
+//  # RMsidekicker
+//  Sidechain-style ducking / pumping shaper (inspired by Slate Digital Submerge).
+//  - Tempo: SYNC (2/1 to 1/32, dotted and triplets) or FREE (0.1 to 20 Hz).
+//  - Trigger: AUTO (runs on its own), MIDI (each note-on starts one cycle), AUDIO (sidechain on inputs 3/4, or the main input, with threshold).
+//  - Delay: lets the transient through before the shape starts (percentage of the cycle).
+//  - Shapes: NATURAL (compressor-like, morph = release), EXTREME (hard switch, morph = transition point), SPECIAL (swell into the downbeat, sine, double sine). Click the active shape again to invert it (duck <-> push).
+//  - Depth sets the intensity. Effect types: Gain M/S (tweak = mid / side balance), High duck and Low duck (tweak = shelf frequency), Sample rate (tweak = smoothing), HP, LP, HP+LP band-pass, HP-LP notch (tweak = resonance).
+//  - In / out trim with meters, bypass in the centre of the OUT knob.
+//  - Zero latency. Double-click the plug-in name to switch the colour (green / orange).
+
+slider1:0<0,1,1{Sync,Free}>-Tempo mode
+slider2:6<0,13,1{2/1,1/1,1/2D,1/2,1/2T,1/4D,1/4,1/4T,1/8D,1/8,1/8T,1/16,1/16T,1/32}>-Rate (sync)
+slider3:2<0.1,20,0.01>-Rate (Hz)
+slider4:0<0,2,1{Auto,MIDI,Audio}>-Trigger
+slider5:-24<-60,0,0.1>-Threshold (dB)
+slider6:0<0,100,0.1>-Delay (%)
+slider7:0<0,2,1{Natural,Extreme,Special}>-Shape
+slider8:0<0,1,1{Normal,Inverted}>-Invert
+slider9:50<0,100,0.1>-Morph
+slider10:100<0,100,0.1>-Depth (%)
+slider11:0<0,7,1{Gain M/S,High duck,Low duck,Sample rate,HP filter,LP filter,HP+LP filter,HP-LP filter}>-Type
+slider12:50<0,100,0.1>-Tweak
+slider13:0<-24,24,0.1>-Input trim (dB)
+slider14:0<-24,24,0.1>-Output trim (dB)
+slider15:0<0,1,1{Off,On}>-Bypass
+slider16:0<0,1,1{Sidechain 3/4,Main input}>-Audio trigger source
+slider17:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider18:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:left input
+in_pin:right input
+in_pin:sidechain left
+in_pin:sidechain right
+out_pin:left output
+out_pin:right output
+
+@init
+ext_noinit = 1;
+pdc_delay = 0;
+
+mq = 0;     // MIDI note-on offsets of the current block (256)
+
+function smoothst(u) ( u <= 0 ? 0 : (u >= 1 ? 1 : u * u * (3 - 2 * u)); );
+
+// effect amount 0..1 at cycle position t (0..1)
+function shape_val(t, sh, m, iv) local(e, a, r, p, w, ea, es, ed)
+(
+  t = min(1, max(0, t));
+  sh < 0.5 ? (
+    a = 0.012;
+    r = 0.06 + 0.92 * m;
+    e = t < a ? t / a : 1 - smoothst((t - a) / r);
+  ) : sh < 1.5 ? (
+    w = 0.012;
+    p = 0.06 + 0.88 * m;
+    e = t < w ? t / w : (t < p ? 1 : (t < p + w ? 1 - (t - p) / w : 0));
+  ) : (
+    ea = t * t * t;
+    es = 0.5 + 0.5 * cos(2 * $pi * t);
+    ed = 0.5 + 0.5 * cos(4 * $pi * t);
+    m < 0.5 ? (
+      w = m * 2; e = ea + (es - ea) * w;
+    ) : (
+      w = (m - 0.5) * 2; e = es + (ed - es) * w;
+    );
+  );
+  iv > 0.5 ? 1 - e : e;
+);
+
+function lerpf(a, b, u) ( a * exp(log(b / a) * u); );
+
+// filter cutoffs for the filter types (u = depth x shape)
+function cut_a(ty, u)
+(
+  ty == 4 ? lerpf(20, 8000, u) :
+  ty == 5 ? lerpf(20000, 150, u) :
+  ty == 6 ? lerpf(20, 700, u) :
+  lerpf(20000, 120, u);
+);
+function cut_b(ty, u)
+(
+  ty == 6 ? lerpf(20000, 1400, u) : lerpf(20000, 4000, u);
+);
+function shelf_f(ty, tw) ( ty == 1 ? 500 * exp(log(24) * tw) : 40 * exp(log(25) * tw); );
+function res_q(tw) ( 0.5 * exp(log(20) * tw); );
+function sr_freq(u) ( srate * exp(log(600 / srate) * u); );
+
+function rate_beats(i)
+(
+  i == 0 ? 8 : i == 1 ? 4 : i == 2 ? 3 : i == 3 ? 2 : i == 4 ? 4/3 :
+  i == 5 ? 1.5 : i == 6 ? 1 : i == 7 ? 2/3 : i == 8 ? 0.75 : i == 9 ? 0.5 :
+  i == 10 ? 1/3 : i == 11 ? 0.25 : i == 12 ? 1/6 : 0.125;
+);
+
+// TPT state-variable filter
+function svf_c(fc, q) instance(a1, a2, a3, kk) local(g)
+(
+  g = tan($pi * max(10, min(fc, 0.45 * srate)) / srate);
+  kk = 1 / q;
+  a1 = 1 / (1 + g * (g + kk));
+  a2 = g * a1;
+  a3 = g * a2;
+);
+function svf_r(x) instance(ic1, ic2, a1, a2, a3, kk, lp, hp) local(v1, v2, v3)
+(
+  v3 = x - ic2;
+  v1 = a1 * ic1 + a2 * v3;
+  v2 = ic2 + a2 * ic1 + a3 * v3;
+  ic1 = 2 * v1 - ic1;
+  ic2 = 2 * v2 - ic2;
+  lp = v2;
+  hp = x - kk * v1 - v2;
+);
+
+// RBJ shelf (S = 1)
+function bq_shelf(f, gdb, hi) instance(c0, c1, c2, c3, c4) local(aa, w0, cs, al, sq, a0)
+(
+  aa = pow(10, gdb / 40);
+  w0 = 2 * $pi * min(f, 0.45 * srate) / srate;
+  cs = cos(w0);
+  al = sin(w0) / 2 * sqrt(2);
+  sq = 2 * sqrt(aa) * al;
+  hi ? (
+    a0 = (aa + 1) - (aa - 1) * cs + sq;
+    c0 = aa * ((aa + 1) + (aa - 1) * cs + sq) / a0;
+    c1 = -2 * aa * ((aa - 1) + (aa + 1) * cs) / a0;
+    c2 = aa * ((aa + 1) + (aa - 1) * cs - sq) / a0;
+    c3 = 2 * ((aa - 1) - (aa + 1) * cs) / a0;
+    c4 = ((aa + 1) - (aa - 1) * cs - sq) / a0;
+  ) : (
+    a0 = (aa + 1) + (aa - 1) * cs + sq;
+    c0 = aa * ((aa + 1) - (aa - 1) * cs + sq) / a0;
+    c1 = 2 * aa * ((aa - 1) - (aa + 1) * cs) / a0;
+    c2 = aa * ((aa + 1) - (aa - 1) * cs - sq) / a0;
+    c3 = -2 * ((aa - 1) + (aa + 1) * cs) / a0;
+    c4 = ((aa + 1) + (aa - 1) * cs - sq) / a0;
+  );
+);
+function bq_r(x) instance(c0, c1, c2, c3, c4, x1, x2, y1, y2) local(y)
+(
+  y = c0 * x + c1 * x1 + c2 * x2 - c3 * y1 - c4 * y2;
+  x2 = x1; x1 = x; y2 = y1; y1 = y;
+  y;
+);
+
+d_ph = 0;
+d_tph = 100;
+d_es = 0;
+d_arm = 1;
+d_hold = 0;
+d_cc = 0;
+d_bx = 1;
+d_sph = 0;
+
+@block
+d_qn = 0;
+while (midirecv(mi_o, mi_1, mi_2, mi_3)) (
+  ((mi_1 & 240) == 144 && mi_3 > 0) ? ( mq[d_qn] = mi_o; d_qn = min(255, d_qn + 1); );
+  midisend(mi_o, mi_1, mi_2, mi_3);
+);
+d_qi = 0;
+d_si = 0;
+
+d_sync = slider1 < 0.5;
+d_beats = rate_beats(floor(slider2 + 0.5));
+d_cyc = d_sync ? d_beats * 60 / max(1, tempo) : 1 / max(0.1, slider3);
+d_inc = 1 / (d_cyc * srate);
+d_trg = floor(slider4 + 0.5);
+d_thr = pow(10, slider5 / 20);
+d_del = min(1, max(0, slider6 / 100));
+d_shp = floor(slider7 + 0.5);
+d_inv = slider8 >= 0.5;
+d_mph = min(1, max(0, slider9 / 100));
+d_dep = min(1, max(0, slider10 / 100));
+d_typ = floor(slider11 + 0.5);
+d_tw = min(1, max(0, slider12 / 100));
+d_q = res_q(d_tw);
+d_wm = min(1, 2 * (1 - d_tw));
+d_ws = min(1, 2 * d_tw);
+d_shf = shelf_f(d_typ, d_tw);
+d_gin = pow(10, slider13 / 20);
+d_gout = pow(10, slider14 / 20);
+d_on = slider15 < 0.5 ? 1 : 0;
+d_scs = slider16 >= 0.5;
+d_idle = shape_val(1, d_shp, d_mph, d_inv);
+
+d_sm = 1 - exp(-1 / (0.0015 * srate));
+d_bsm = 1 - exp(-1 / (0.01 * srate));
+d_mdc = exp(-1 / (0.3 * srate));
+d_lrc = exp(-1 / (0.06 * srate));
+
+(d_trg == 0 && d_sync && (play_state & 1)) ? d_ph = beat_position / d_beats;
+
+d_typ != d_ltyp ? (
+  fAL.ic1 = fAL.ic2 = fAR.ic1 = fAR.ic2 = 0;
+  fBL.ic1 = fBL.ic2 = fBR.ic1 = fBR.ic2 = 0;
+  shL.x1 = shL.x2 = shL.y1 = shL.y2 = 0;
+  shR.x1 = shR.x2 = shR.y1 = shR.y2 = 0;
+  d_cc = 0;
+  d_ltyp = d_typ;
+);
+
+@sample
+d_inL = spl0 * d_gin;
+d_inR = spl1 * d_gin;
+mt_il = max(abs(d_inL), mt_il * d_mdc);
+mt_ir = max(abs(d_inR), mt_ir * d_mdc);
+
+// trigger detection
+d_scx = d_scs ? max(abs(d_inL), abs(d_inR)) : max(abs(spl2), abs(spl3));
+d_lev = max(d_scx, d_lev * d_lrc);
+d_tr = 0;
+d_trg == 1 ? (
+  while (d_qi < d_qn && mq[d_qi] <= d_si) ( d_tr = 1; d_qi += 1; );
+);
+d_trg == 2 ? (
+  (d_arm && d_lev >= d_thr && d_hold <= 0) ? ( d_tr = 1; d_arm = 0; d_hold = floor(0.03 * srate); );
+  d_lev < d_thr * 0.7 ? d_arm = 1;
+  d_hold -= 1;
+);
+
+// shape position
+d_trg == 0 ? (
+  d_ph -= floor(d_ph);
+  d_tt = d_ph - d_del;
+  d_tt < 0 ? d_tt += 1;
+  d_e = shape_val(d_tt, d_shp, d_mph, d_inv);
+  d_disp = d_ph;
+  d_ph += d_inc;
+) : (
+  d_tr ? ( d_tph = 0; );
+  d_tt = d_tph - d_del;
+  d_e = (d_tt < 0 || d_tt >= 1) ? d_idle : shape_val(d_tt, d_shp, d_mph, d_inv);
+  d_disp = min(1, d_tph);
+  d_tph = min(100, d_tph + d_inc);
+);
+d_si += 1;
+
+d_es += (d_e - d_es) * d_sm;
+d_u = d_dep * d_es;
+
+d_cc -= 1;
+d_upd = d_cc <= 0;
+d_upd ? ( d_cc = 8; );
+
+d_oL = d_inL;
+d_oR = d_inR;
+
+d_typ == 0 ? (
+  d_m = (d_inL + d_inR) * 0.5;
+  d_s = (d_inL - d_inR) * 0.5;
+  d_m *= 1 - d_u * d_wm;
+  d_s *= 1 - d_u * d_ws;
+  d_oL = d_m + d_s;
+  d_oR = d_m - d_s;
+) : (d_typ == 1 || d_typ == 2) ? (
+  d_upd ? (
+    shL.bq_shelf(d_shf, -24 * d_u, d_typ == 1);
+    shR.bq_shelf(d_shf, -24 * d_u, d_typ == 1);
+  );
+  d_oL = shL.bq_r(d_inL);
+  d_oR = shR.bq_r(d_inR);
+) : d_typ == 3 ? (
+  d_upd ? (
+    d_sfr = sr_freq(d_u);
+    d_sri = d_sfr / srate;
+    d_slc = 1 - exp(-2 * $pi * min(0.45 * srate, d_sfr * 0.5) / srate);
+  );
+  d_sri >= 0.999 ? (
+    d_hL = d_inL; d_hR = d_inR; d_sph = 0;
+  ) : (
+    d_sph += d_sri;
+    d_sph >= 1 ? ( d_sph -= 1; d_hL = d_inL; d_hR = d_inR; );
+  );
+  d_lpL += (d_hL - d_lpL) * d_slc;
+  d_lpR += (d_hR - d_lpR) * d_slc;
+  d_w = min(1, d_u * 20);
+  d_oL = d_inL + (d_hL + (d_lpL - d_hL) * d_tw - d_inL) * d_w;
+  d_oR = d_inR + (d_hR + (d_lpR - d_hR) * d_tw - d_inR) * d_w;
+) : (
+  d_upd ? (
+    d_qq = 0.707 + (d_q - 0.707) * min(1, d_u * 4);
+    d_fa = cut_a(d_typ, d_u);
+    fAL.svf_c(d_fa, d_qq);
+    fAR.svf_c(d_fa, d_qq);
+    d_typ >= 6 ? (
+      d_fb = cut_b(d_typ, d_u);
+      fBL.svf_c(d_fb, d_qq);
+      fBR.svf_c(d_fb, d_qq);
+    );
+  );
+  fAL.svf_r(d_inL);
+  fAR.svf_r(d_inR);
+  d_typ == 4 ? ( d_fL = fAL.hp; d_fR = fAR.hp; );
+  d_typ == 5 ? ( d_fL = fAL.lp; d_fR = fAR.lp; );
+  d_typ == 6 ? (
+    fBL.svf_r(fAL.hp); fBR.svf_r(fAR.hp);
+    d_fL = fBL.lp; d_fR = fBR.lp;
+  );
+  d_typ == 7 ? (
+    fBL.svf_r(d_inL); fBR.svf_r(d_inR);
+    d_fL = fAL.lp + fBL.hp; d_fR = fAR.lp + fBR.hp;
+  );
+  d_w = min(1, d_u * 20);
+  d_oL = d_inL + (d_fL - d_inL) * d_w;
+  d_oR = d_inR + (d_fR - d_inR) * d_w;
+);
+
+d_bx += (d_on - d_bx) * d_bsm;
+spl0 = (d_inL + (d_oL - d_inL) * d_bx) * d_gout;
+spl1 = (d_inR + (d_oR - d_inR) * d_bx) * d_gout;
+mt_ol = max(abs(spl0), mt_ol * d_mdc);
+mt_or = max(abs(spl1), mt_or * d_mdc);
+
+@gfx 900 470
+LW = 900;
+LH = 470;
+SX = 86;  SY = 120; SW = 354; SH = 166;    // shape display
+EX = 466; EY = 120; EW = 354; EH = 166;    // effect display
+BX = 664; BW = 156;                        // thresh / delay bars
+
+function PX(x) ( ox + x * sc; );
+function PY(y) ( oy + y * sc; );
+function col(r, g, b) ( gfx_set(r, g, b, 1); );
+function acc() ( gfx_set(acR, acG, acB, 1); );
+function acc_l() ( gfx_set(alR, alG, alB, 1); );
+function acc_d() ( gfx_set(adR, adG, adB, 1); );
+function rct(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc); );
+function frm(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc, 0); );
+function text_c(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw / 2; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_l(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x); gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_r(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function in_rect(x, y, ww, hh) ( mx >= x && mx < x + ww && my >= y && my < y + hh; );
+
+function theme_set()
+(
+  slider18 >= 0.5 ? (
+    acR = 0.424; acG = 0.851; acB = 0.780;
+    alR = 0.70;  alG = 0.95;  alB = 0.90;
+    adR = 0.03;  adG = 0.10;  adB = 0.09;
+  ) : (
+    acR = 1.00; acG = 0.58; acB = 0.12;
+    alR = 1.00; alG = 0.70; alB = 0.35;
+    adR = 0.10; adG = 0.06; adB = 0.02;
+  );
+);
+
+function btn(x, y, ww, hh, on, str)
+(
+  on ? ( acc(); rct(x, y, ww, hh); acc_d(); ) : (
+    col(0.16, 0.165, 0.18); rct(x, y, ww, hh);
+    in_rect(x, y, ww, hh) ? col(0.92, 0.92, 0.93) : col(0.76, 0.77, 0.79);
+  );
+  text_c(x + ww / 2, y + hh / 2, str);
+);
+
+function draw_knob(x, y, r, n, lab, val) local(i, a0, a1, qx, qy)
+(
+  a0 = -2.36; a1 = a0 + 4.72 * min(1, max(0, n));
+  qx = PX(x); qy = PY(y);
+  col(0.22, 0.23, 0.25);
+  i = 0;
+  loop(ceil(4 * sc), gfx_arc(qx, qy, r * sc - i * 0.9, -2.36, 2.36, 1); i += 1;);
+  acc();
+  n > 0.001 ? (
+    i = 0;
+    loop(ceil(4 * sc), gfx_arc(qx, qy, r * sc - i * 0.9, a0, a1, 1); i += 1;);
+  );
+  col(0.16, 0.165, 0.18);
+  gfx_circle(qx, qy, (r - 6) * sc, 1, 1);
+  col(0.26, 0.27, 0.29);
+  gfx_circle(qx, qy, (r - 6) * sc, 0, 1);
+  col(0.92, 0.92, 0.92);
+  gfx_line(qx + sin(a1) * (r - 6 - r * 0.35) * sc, qy - cos(a1) * (r - 6 - r * 0.35) * sc,
+           qx + sin(a1) * (r - 7) * sc,  qy - cos(a1) * (r - 7) * sc, 1);
+  gfx_setfont(4);
+  col(0.62, 0.63, 0.66);
+  text_c(x, y - r - 12, lab);
+  col(0.85, 0.85, 0.86);
+  text_c(x, y + r + 11, val);
+);
+
+// stereo meter, v = peak (linear)
+function meter(x, y, hh, v) local(db, n, n0)
+(
+  db = 20 * log10(max(0.000001, v));
+  n = min(1, max(0, (db + 60) / 66));
+  n0 = 60 / 66;
+  col(0.085, 0.09, 0.095);
+  rct(x, y, 12, hh);
+  acc();
+  rct(x, y + hh * (1 - min(n, n0)), 12, hh * min(n, n0));
+  n > n0 ? ( col(0.95, 0.30, 0.25); rct(x, y + hh * (1 - n), 12, hh * (n - n0)); );
+  col(0.30, 0.31, 0.33);
+  rct(x, y + hh * (1 - n0), 12, 1);
+);
+
+function rate_name(i)
+(
+  strcpy(#rn, "1/4");
+  i == 0 ? strcpy(#rn, "2/1");
+  i == 1 ? strcpy(#rn, "1/1");
+  i == 2 ? strcpy(#rn, "1/2 D");
+  i == 3 ? strcpy(#rn, "1/2");
+  i == 4 ? strcpy(#rn, "1/2 T");
+  i == 5 ? strcpy(#rn, "1/4 D");
+  i == 7 ? strcpy(#rn, "1/4 T");
+  i == 8 ? strcpy(#rn, "1/8 D");
+  i == 9 ? strcpy(#rn, "1/8");
+  i == 10 ? strcpy(#rn, "1/8 T");
+  i == 11 ? strcpy(#rn, "1/16");
+  i == 12 ? strcpy(#rn, "1/16 T");
+  i == 13 ? strcpy(#rn, "1/32");
+);
+
+function type_name(i)
+(
+  strcpy(#tn, "GAIN M/S");
+  i == 1 ? strcpy(#tn, "HIGH DUCK");
+  i == 2 ? strcpy(#tn, "LOW DUCK");
+  i == 3 ? strcpy(#tn, "SAMPLE RATE");
+  i == 4 ? strcpy(#tn, "HP FILTER");
+  i == 5 ? strcpy(#tn, "LP FILTER");
+  i == 6 ? strcpy(#tn, "HP + LP");
+  i == 7 ? strcpy(#tn, "HP - LP");
+);
+
+function fmt_hz(f)
+(
+  f >= 1000 ? ( sprintf(#hz, "%.2f kHz", f / 1000); ) : ( sprintf(#hz, "%d Hz", floor(f + 0.5)); );
+);
+
+function rate_menu() local(r, i)
+(
+  strcpy(#mn, "");
+  i = 0;
+  loop(14,
+    rate_name(i);
+    i == floor(slider2 + 0.5) ? strcat(#mn, "!");
+    strcat(#mn, #rn);
+    i < 13 ? strcat(#mn, "|");
+    i += 1;
+  );
+  gfx_x = PX(156); gfx_y = PY(96);
+  r = gfx_showmenu(#mn);
+  r > 0 ? ( slider2 = r - 1; sliderchange(slider2); );
+);
+
+// magnitude helpers for the effect display
+function lp2(w, q) ( 1 / sqrt(sqr(1 - w * w) + sqr(w / q)); );
+function hp2(w, q) ( w * w * lp2(w, q); );
+
+// knobs : 1 morph, 2 depth, 3 tweak, 4 in trim, 5 out trim
+function k_x(i) ( i == 1 ? 180 : i == 2 ? 346 : i == 3 ? 744 : i == 4 ? 44 : 856; );
+function k_y(i) ( i <= 3 ? 376 : 380; );
+function k_r(i) ( i <= 3 ? 30 : 17; );
+function k_norm(i)
+(
+  i == 1 ? slider9 / 100 :
+  i == 2 ? slider10 / 100 :
+  i == 3 ? slider12 / 100 :
+  i == 4 ? (slider13 + 24) / 48 :
+  (slider14 + 24) / 48;
+);
+function k_set(i, n)
+(
+  n = min(1, max(0, n));
+  i == 1 ? ( slider9 = floor(n * 1000 + 0.5) / 10; sliderchange(slider9); );
+  i == 2 ? ( slider10 = floor(n * 1000 + 0.5) / 10; sliderchange(slider10); );
+  i == 3 ? ( slider12 = floor(n * 1000 + 0.5) / 10; sliderchange(slider12); );
+  i == 4 ? ( slider13 = floor((n * 48 - 24) * 10 + 0.5) / 10; sliderchange(slider13); );
+  i == 5 ? ( slider14 = floor((n * 48 - 24) * 10 + 0.5) / 10; sliderchange(slider14); );
+);
+function k_default(i)
+(
+  i == 1 ? ( slider9 = 50; sliderchange(slider9); );
+  i == 2 ? ( slider10 = 100; sliderchange(slider10); );
+  i == 3 ? ( slider12 = 50; sliderchange(slider12); );
+  i == 4 ? ( slider13 = 0; sliderchange(slider13); );
+  i == 5 ? ( slider14 = 0; sliderchange(slider14); );
+);
+
+function set_thr(v) ( slider5 = floor(min(0, max(-60, v)) * 10 + 0.5) / 10; sliderchange(slider5); );
+function set_del(v) ( slider6 = floor(min(100, max(0, v)) * 10 + 0.5) / 10; sliderchange(slider6); );
+function set_hz(v) ( slider3 = floor(min(20, max(0.1, v)) * 100 + 0.5) / 100; sliderchange(slider3); );
+function set_rate(i) ( slider2 = min(13, max(0, i)); sliderchange(slider2); );
+
+// ---------- frame setup ----------
+theme_set();
+sz = floor(slider17 + 0.5);
+sc = sz >= 4 ? 2 : 0.75 + 0.25 * sz;
+sc != last_sc ? (
+  gfx_setfont(1, "Arial", 13 * sc);
+  gfx_setfont(2, "Arial", 24 * sc, 'b');
+  gfx_setfont(3, "Arial", 15 * sc, 'b');
+  gfx_setfont(4, "Arial", 11 * sc);
+  gfx_setfont(5, "Arial", 12 * sc, 'b');
+  last_sc = sc;
+);
+ox = max(0, floor((gfx_w - LW * sc) / 2));
+oy = max(0, floor((gfx_h - LH * sc) / 2));
+mx = (mouse_x - ox) / sc;
+my = (mouse_y - oy) / sc;
+
+g_sync = slider1 < 0.5;
+g_trg = floor(slider4 + 0.5);
+g_shp = floor(slider7 + 0.5);
+g_inv = slider8 >= 0.5;
+g_mph = slider9 / 100;
+g_dep = slider10 / 100;
+g_typ = floor(slider11 + 0.5);
+g_tw = slider12 / 100;
+g_del = slider6 / 100;
+g_byp = slider15 >= 0.5;
+
+// ---------- background ----------
+col(0.07, 0.07, 0.075);
+gfx_rect(0, 0, gfx_w, gfx_h);
+col(0.115, 0.12, 0.13);
+rct(6, 4, LW - 12, LH - 8);
+col(0.105, 0.11, 0.12);
+gi = 8;
+while (gi < LH - 6) ( rct(6, gi, LW - 12, 1); gi += 4; );
+col(0.20, 0.205, 0.22);
+gfx_circle(PX(16), PY(14), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(14), 3.5 * sc, 1, 1);
+gfx_circle(PX(16), PY(LH - 14), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(LH - 14), 3.5 * sc, 1, 1);
+
+// title
+gfx_setfont(2);
+acc();
+text_l(34, 30, "RMsidekicker");
+gfx_measurestr("RMsidekicker", t_w, t_h);
+th_x0 = 34; th_x1 = 34 + t_w / sc;
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_l(th_x1 + 14, 32, "S I D E C H A I N    S H A P E R");
+text_r(LW - 34, 30, "ReNo Mellow");
+acc();
+rct(34, 46, LW - 68, 1);
+
+// ---------- top row ----------
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_l(26, 79, "TEMPO");
+gfx_setfont(5);
+col(0.085, 0.09, 0.095);
+rct(74, 64, 76, 30);
+in_rect(74, 64, 76, 30) ? acc() : col(0.22, 0.23, 0.25);
+frm(74, 64, 76, 30);
+acc();
+strcpy(#lb, "FREE"); g_sync ? strcpy(#lb, "SYNC");
+text_c(112, 79, #lb);
+col(0.45, 0.46, 0.48);
+gfx_triangle(PX(82), PY(79), PX(87), PY(75), PX(87), PY(83));
+gfx_triangle(PX(142), PY(79), PX(137), PY(75), PX(137), PY(83));
+
+col(0.085, 0.09, 0.095);
+rct(156, 64, 84, 30);
+in_rect(156, 64, 84, 30) ? acc() : col(0.22, 0.23, 0.25);
+frm(156, 64, 84, 30);
+acc();
+g_sync ? ( rate_name(floor(slider2 + 0.5)); ) : ( sprintf(#rn, "%.2f Hz", slider3); );
+text_c(198, 79, #rn);
+
+btn(254, 64, 86, 30, g_trg == 0, "AUTO");
+btn(342, 64, 86, 30, g_trg == 1, "MIDI");
+btn(430, 64, 86, 30, g_trg == 2, "AUDIO");
+
+gfx_setfont(4);
+col(0.16, 0.165, 0.18);
+rct(524, 64, 66, 30);
+g_trg == 2 ? acc() : col(0.45, 0.46, 0.48);
+text_c(557, 73, "SC SOURCE");
+strcpy(#lb, "INPUT 3/4"); slider16 >= 0.5 ? strcpy(#lb, "MAIN IN");
+g_trg == 2 ? col(0.88, 0.88, 0.89) : col(0.45, 0.46, 0.48);
+text_c(557, 86, #lb);
+
+// thresh / delay
+col(0.20, 0.205, 0.22);
+rct(600, 62, 1, 34);
+gfx_setfont(4);
+g_trg == 2 ? col(0.70, 0.71, 0.73) : col(0.42, 0.43, 0.45);
+text_r(BX - 10, 71, "THRESH");
+col(0.70, 0.71, 0.73);
+text_r(BX - 10, 89, "DELAY");
+col(0.085, 0.09, 0.095);
+rct(BX, 67, BW, 8);
+rct(BX, 85, BW, 8);
+gfx_set(acR, acG, acB, 0.35);
+g_lv = 20 * log10(max(0.000001, d_lev));
+g_n = min(1, max(0, (g_lv + 60) / 60));
+rct(BX, 67, BW * g_n, 8);
+g_n = (slider5 + 60) / 60;
+g_trg == 2 ? acc() : col(0.45, 0.46, 0.48);
+rct(BX + BW * g_n - 1.5, 64, 3, 14);
+acc();
+rct(BX, 85, BW * g_del, 8);
+acc_l();
+rct(BX + BW * g_del - 1.5, 82, 3, 14);
+col(0.85, 0.85, 0.86);
+sprintf(#va, "%.1f dB", slider5);
+text_r(LW - 26, 71, #va);
+sprintf(#va, "%.1f %%", slider6);
+text_r(LW - 26, 89, #va);
+
+col(0.20, 0.205, 0.22);
+rct(26, 104, LW - 52, 1);
+
+// ---------- meters ----------
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_c(44, 116, "IN");
+text_c(856, 116, "OUT");
+meter(30, 128, 206, mt_il);
+meter(46, 128, 206, mt_ir);
+meter(842, 128, 206, mt_ol);
+meter(858, 128, 206, mt_or);
+
+sprintf(#va, "%.1f dB", slider13);
+draw_knob(k_x(4), k_y(4), k_r(4), k_norm(4), "TRIM", #va);
+sprintf(#va, "%.1f dB", slider14);
+draw_knob(k_x(5), k_y(5), k_r(5), k_norm(5), "TRIM", #va);
+// bypass (centre of the OUT knob)
+g_byp ? col(0.40, 0.41, 0.43) : acc();
+gfx_arc(PX(856), PY(380), 5 * sc, 0.6, 5.68, 1);
+gfx_line(PX(856), PY(373), PX(856), PY(379), 1);
+
+// ---------- SHAPE ----------
+gfx_setfont(5);
+col(0.62, 0.63, 0.66);
+text_c(SX + SW / 2, 112, "S H A P E");
+col(0.085, 0.09, 0.095);
+rct(SX, SY, SW, SH);
+col(0.13, 0.135, 0.145);
+gi = 1; loop(3, rct(SX + SW * gi / 4, SY, 1, SH); gi += 1;);
+gi = 1; loop(3, rct(SX, SY + SH * gi / 4, SW, 1); gi += 1;);
+
+g_idle = shape_val(1, g_shp, g_mph, g_inv);
+g_np = floor(SW * sc);
+gi = 0;
+loop(g_np + 1,
+  g_t = gi / g_np;
+  g_trg == 0 ? (
+    g_tt = g_t - g_del; g_tt < 0 ? g_tt += 1;
+    g_e = shape_val(g_tt, g_shp, g_mph, g_inv);
+  ) : (
+    g_tt = g_t - g_del;
+    g_e = g_tt < 0 ? g_idle : shape_val(g_tt, g_shp, g_mph, g_inv);
+  );
+  g_x = PX(SX) + gi;
+  g_y = PY(SY + 6) + g_e * g_dep * (SH - 12) * sc;
+  gfx_set(acR, acG, acB, 0.16);
+  gfx_line(g_x, g_y, g_x, PY(SY + SH - 1), 1);
+  acc();
+  gi > 0 ? (
+    gfx_line(g_px, g_py, g_x, g_y, 1);
+    gfx_line(g_px, g_py + 1, g_x, g_y + 1, 1);
+  );
+  g_px = g_x; g_py = g_y;
+  gi += 1;
+);
+// playhead
+g_ph = min(1, max(0, d_disp));
+g_x = PX(SX + SW * g_ph);
+g_y = PY(SY + 6) + min(1, max(0, d_es)) * g_dep * (SH - 12) * sc;
+gfx_set(alR, alG, alB, 0.35);
+gfx_line(g_x, PY(SY), g_x, PY(SY + SH - 1), 1);
+acc_l();
+gfx_circle(g_x, g_y, 4.5 * sc, 1, 1);
+in_rect(SX, SY, SW, SH) ? acc() : col(0.20, 0.205, 0.22);
+frm(SX, SY, SW, SH);
+
+// shape buttons
+gfx_setfont(5);
+gi = 0;
+loop(3,
+  gx = SX + gi * 119;
+  gi == 0 ? strcpy(#lb, "NATURAL");
+  gi == 1 ? strcpy(#lb, "EXTREME");
+  gi == 2 ? strcpy(#lb, "SPECIAL");
+  (gi == g_shp && g_inv) ? strcat(#lb, "  INV");
+  btn(gx, 298, 116, 26, gi == g_shp, #lb);
+  gi == g_shp ? (
+    acc_l();
+    g_inv ? ( rct(gx + 30, 326, 56, 2); ) : ( rct(gx + 30, 294, 56, 2); );
+  );
+  gi += 1;
+);
+
+sprintf(#va, "%.1f", slider9);
+strcpy(#lb, "MORPH  (VARIANT)"); g_shp == 0 ? strcpy(#lb, "MORPH  (RELEASE)"); g_shp == 1 ? strcpy(#lb, "MORPH  (POINT)");
+draw_knob(k_x(1), k_y(1), k_r(1), k_norm(1), #lb, #va);
+sprintf(#va, "%.1f %%", slider10);
+draw_knob(k_x(2), k_y(2), k_r(2), k_norm(2), "DEPTH", #va);
+
+col(0.20, 0.205, 0.22);
+rct(453, 112, 1, 306);
+
+// ---------- EFFECT ----------
+gfx_setfont(5);
+col(0.62, 0.63, 0.66);
+text_c(EX + EW / 2, 112, "E F F E C T");
+col(0.085, 0.09, 0.095);
+rct(EX, EY, EW, EH);
+g_u = g_dep * min(1, max(0, d_es));
+g_byp ? ( g_u = 0; );
+gfx_setfont(4);
+
+g_typ == 0 ? (
+  // mid / side gain bars
+  g_gm = 1 - g_u * min(1, 2 * (1 - g_tw));
+  g_gs = 1 - g_u * min(1, 2 * g_tw);
+  col(0.13, 0.135, 0.145);
+  rct(EX + 90, EY + 24, 60, SH - 56);
+  rct(EX + 204, EY + 24, 60, SH - 56);
+  acc();
+  rct(EX + 90, EY + 24 + (SH - 56) * (1 - g_gm), 60, (SH - 56) * g_gm);
+  acc_l();
+  rct(EX + 204, EY + 24 + (SH - 56) * (1 - g_gs), 60, (SH - 56) * g_gs);
+  col(0.70, 0.71, 0.73);
+  text_c(EX + 120, EY + 12, "MID");
+  text_c(EX + 234, EY + 12, "SIDE");
+  g_gm < 0.0001 ? ( strcpy(#va, "-inf dB"); ) : ( sprintf(#va, "%.1f dB", 20 * log10(g_gm)); );
+  text_c(EX + 120, EY + EH - 18, #va);
+  g_gs < 0.0001 ? ( strcpy(#va, "-inf dB"); ) : ( sprintf(#va, "%.1f dB", 20 * log10(g_gs)); );
+  text_c(EX + 234, EY + EH - 18, #va);
+) : g_typ == 3 ? (
+  // sample-rate staircase
+  g_fr = sr_freq(g_u);
+  g_stp = max(1, floor((1 - g_fr / srate) * 34 * sc) + 1);
+  acc();
+  gi = 0;
+  g_np = floor(EW * sc);
+  loop(g_np,
+    g_q = floor(gi / g_stp) * g_stp;
+    g_y = PY(EY + EH / 2) - sin(2 * $pi * 2 * g_q / g_np) * (EH / 2 - 22) * sc;
+    gi > 0 ? gfx_line(PX(EX) + gi - 1, g_py, PX(EX) + gi, g_y, 1);
+    g_py = g_y;
+    gi += 1;
+  );
+  col(0.70, 0.71, 0.73);
+  fmt_hz(g_fr);
+  text_l(EX + 10, EY + 12, #hz);
+) : (
+  // frequency response
+  col(0.13, 0.135, 0.145);
+  g_y0 = EY + 10 + 18 / 54 * (EH - 20);
+  rct(EX, g_y0, EW, 1);
+  gi = 0;
+  loop(3, g_x = EX + EW * log(100 * pow(10, gi) / 20) / log(1000); rct(g_x, EY, 1, EH); gi += 1;);
+  g_q0 = res_q(g_tw);
+  g_qq = 0.707 + (g_q0 - 0.707) * min(1, g_u * 4);
+  g_shf = shelf_f(g_typ, g_tw);
+  g_fa = cut_a(g_typ, g_u);
+  g_fb = cut_b(g_typ, g_u);
+  g_w = min(1, g_u * 20);
+  g_np = floor(EW * sc / 2);
+  gi = 0;
+  loop(g_np + 1,
+    g_f = 20 * pow(1000, gi / g_np);
+    g_typ == 1 ? (
+      g_db = -24 * g_u * sqr(g_f / g_shf) / (1 + sqr(g_f / g_shf));
+    ) : g_typ == 2 ? (
+      g_db = -24 * g_u / (1 + sqr(g_f / g_shf));
+    ) : (
+      g_m = sqrt(sqr(lp2(g_f / g_fa, g_qq)) + sqr(hp2(g_f / g_fb, g_qq)));
+      g_typ == 4 ? ( g_m = hp2(g_f / g_fa, g_qq); );
+      g_typ == 5 ? ( g_m = lp2(g_f / g_fa, g_qq); );
+      g_typ == 6 ? ( g_m = hp2(g_f / g_fa, g_qq) * lp2(g_f / g_fb, g_qq); );
+      g_m = 1 + (g_m - 1) * g_w;
+      g_db = 20 * log10(max(0.00001, g_m));
+    );
+    g_db = min(18, max(-36, g_db));
+    g_x = PX(EX) + gi * 2;
+    g_y = PY(EY + 10 + (18 - g_db) / 54 * (EH - 20));
+    gfx_set(acR, acG, acB, 0.14);
+    gfx_line(g_x, g_y, g_x, PY(EY + EH - 1), 1);
+    gfx_line(g_x + 1, g_y, g_x + 1, PY(EY + EH - 1), 1);
+    acc();
+    gi > 0 ? (
+      gfx_line(g_px, g_py, g_x, g_y, 1);
+      gfx_line(g_px, g_py + 1, g_x, g_y + 1, 1);
+    );
+    g_px = g_x; g_py = g_y;
+    gi += 1;
+  );
+  col(0.70, 0.71, 0.73);
+  (g_typ == 1 || g_typ == 2) ? (
+    sprintf(#va, "%.1f dB", -24 * g_u);
+    text_l(EX + 10, EY + 12, #va);
+  ) : (
+    fmt_hz(g_fa);
+    strcpy(#va, "LP "); (g_typ == 4 || g_typ == 6) ? strcpy(#va, "HP ");
+    strcat(#va, #hz);
+    g_typ >= 6 ? (
+      fmt_hz(g_fb);
+      g_typ == 6 ? ( strcat(#va, "   LP "); ) : ( strcat(#va, "   HP "); );
+      strcat(#va, #hz);
+    );
+    text_l(EX + 10, EY + 12, #va);
+  );
+);
+g_byp ? ( gfx_setfont(5); col(0.95, 0.30, 0.25); text_r(EX + EW - 10, EY + 12, "BYPASS"); );
+col(0.20, 0.205, 0.22);
+frm(EX, EY, EW, EH);
+
+// type grid
+gfx_setfont(4);
+gi = 0;
+loop(8,
+  gx = EX + (gi >= 4 ? 94 : 0);
+  gy = 298 + (gi % 4) * 29;
+  type_name(gi);
+  btn(gx, gy, 92, 27, gi == g_typ, #tn);
+  gi += 1;
+);
+
+g_typ == 0 ? (
+  sprintf(#va, "M %d  /  S %d", floor(min(1, 2 * (1 - g_tw)) * 100 + 0.5), floor(min(1, 2 * g_tw) * 100 + 0.5));
+  strcpy(#lb, "MID  <>  SIDE");
+) : (g_typ == 1 || g_typ == 2) ? (
+  fmt_hz(shelf_f(g_typ, g_tw)); strcpy(#va, #hz);
+  strcpy(#lb, "FREQUENCY");
+) : g_typ == 3 ? (
+  sprintf(#va, "%.1f %%", slider12);
+  strcpy(#lb, "SMOOTH");
+) : (
+  sprintf(#va, "Q %.2f", res_q(g_tw));
+  strcpy(#lb, "RESONANCE");
+);
+draw_knob(k_x(3), k_y(3), k_r(3), k_norm(3), #lb, #va);
+
+// ---------- bottom bar ----------
+col(0.045, 0.045, 0.05);
+rct(12, 436, LW - 24, 26);
+gfx_setfont(4);
+col(0.45, 0.46, 0.48);
+text_l(22, 449, "Click the active shape: invert   Shift: fine   Ctrl-click: default   OUT knob centre: bypass");
+col(0.55, 0.56, 0.58);
+text_r(632, 449, "SIZE");
+gi = 0;
+loop(5,
+  gx = 640 + gi * 48;
+  gi == sz ? ( acc(); rct(gx, 439, 46, 20); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, 439, 46, 20); col(0.70, 0.71, 0.73); );
+  gi == 0 ? strcpy(#lb, "75%");
+  gi == 1 ? strcpy(#lb, "100%");
+  gi == 2 ? strcpy(#lb, "125%");
+  gi == 3 ? strcpy(#lb, "150%");
+  gi == 4 ? strcpy(#lb, "200%");
+  text_c(gx + 23, 449, #lb);
+  gi += 1;
+);
+
+// ---------- mouse ----------
+m_l = mouse_cap & 1;
+m_pl = g_lcap & 1;
+m_ctl = mouse_cap & 4;
+m_fine = (mouse_cap & 8) ? 0.1 : 1;
+
+m_l && !m_pl ? (
+  g_tg = 0;
+  // size
+  my >= 439 && my < 459 ? (
+    gi = 0;
+    loop(5,
+      in_rect(640 + gi * 48, 439, 46, 20) ? ( slider17 = gi; sliderchange(slider17); );
+      gi += 1;
+    );
+  );
+  // title double-click : theme
+  in_rect(th_x0, 16, th_x1 - th_x0, 28) ? (
+    time_precise() - th_t < 0.35 ? (
+      slider18 = slider18 >= 0.5 ? 0 : 1; sliderchange(slider18); th_t = 0;
+    ) : th_t = time_precise();
+  );
+  // tempo mode
+  in_rect(74, 64, 76, 30) ? ( slider1 = g_sync ? 1 : 0; sliderchange(slider1); );
+  // rate
+  in_rect(156, 64, 84, 30) ? (
+    m_ctl ? (
+      g_sync ? ( set_rate(6); ) : ( set_hz(2); );
+    ) : (
+      g_tg = 10; g_ly = mouse_y; g_mv = 0; g_acc = 0;
+    );
+  );
+  // trigger
+  gi = 0;
+  loop(3,
+    in_rect(254 + gi * 88, 64, 86, 30) ? ( slider4 = gi; sliderchange(slider4); );
+    gi += 1;
+  );
+  in_rect(524, 64, 66, 30) ? ( slider16 = slider16 >= 0.5 ? 0 : 1; sliderchange(slider16); );
+  // bars
+  in_rect(BX - 6, 61, BW + 12, 18) ? (
+    m_ctl ? ( set_thr(-24); ) : ( g_tg = 11; set_thr(-60 + 60 * (mx - BX) / BW); );
+  );
+  in_rect(BX - 6, 80, BW + 12, 18) ? (
+    m_ctl ? ( set_del(0); ) : ( g_tg = 12; set_del(100 * (mx - BX) / BW); );
+  );
+  // shapes
+  gi = 0;
+  loop(3,
+    in_rect(SX + gi * 119, 298, 116, 26) ? (
+      gi == g_shp ? (
+        slider8 = g_inv ? 0 : 1; sliderchange(slider8);
+      ) : (
+        slider7 = gi; sliderchange(slider7);
+        slider8 = 0; sliderchange(slider8);
+      );
+    );
+    gi += 1;
+  );
+  // types
+  gi = 0;
+  loop(8,
+    in_rect(EX + (gi >= 4 ? 94 : 0), 298 + (gi % 4) * 29, 92, 27) ? ( slider11 = gi; sliderchange(slider11); );
+    gi += 1;
+  );
+  // knobs
+  gi = 1;
+  loop(5,
+    g_d2 = sqr(mx - k_x(gi)) + sqr(my - k_y(gi));
+    g_d2 <= sqr(k_r(gi) + 6) ? (
+      (gi == 5 && g_d2 <= 49) ? (
+        slider15 = g_byp ? 0 : 1; sliderchange(slider15);
+      ) : (m_ctl || (time_precise() - g_kt < 0.3 && g_kl == gi)) ? (
+        k_default(gi); g_kt = 0;
+      ) : (
+        g_tg = gi; g_kn = k_norm(gi); g_ly = mouse_y; g_kt = time_precise(); g_kl = gi;
+      );
+    );
+    gi += 1;
+  );
+);
+
+// dragging
+m_l && m_pl ? (
+  g_tg >= 1 && g_tg <= 5 ? (
+    mouse_y != g_ly ? (
+      g_kn -= (mouse_y - g_ly) / (200 * sc) * m_fine;
+      g_kn = min(1, max(0, g_kn));
+      k_set(g_tg, g_kn);
+      g_ly = mouse_y;
+    );
+  );
+  g_tg == 10 ? (
+    mouse_y != g_ly ? (
+      g_mv = 1;
+      g_sync ? (
+        g_acc -= mouse_y - g_ly;
+        g_acc >= 12 * sc ? ( set_rate(floor(slider2 + 0.5) + 1); g_acc = 0; );
+        g_acc <= -12 * sc ? ( set_rate(floor(slider2 + 0.5) - 1); g_acc = 0; );
+      ) : (
+        g_n = log(max(0.1, slider3) / 0.1) / log(200);
+        g_n -= (mouse_y - g_ly) / (200 * sc) * m_fine;
+        set_hz(0.1 * pow(200, min(1, max(0, g_n))));
+      );
+      g_ly = mouse_y;
+    );
+  );
+  g_tg == 11 ? (
+    (mouse_cap & 8) ? ( set_thr(slider5 + (mx - g_lx) * 60 / BW * 0.1); ) : ( set_thr(-60 + 60 * (mx - BX) / BW); );
+  );
+  g_tg == 12 ? (
+    (mouse_cap & 8) ? ( set_del(slider6 + (mx - g_lx) * 100 / BW * 0.1); ) : ( set_del(100 * (mx - BX) / BW); );
+  );
+);
+g_lx = mx;
+
+// release
+!m_l && m_pl ? (
+  (g_tg == 10 && !g_mv && g_sync) ? rate_menu();
+  g_tg = 0;
+);
+
+// mouse wheel
+mouse_wheel != 0 ? (
+  g_w = mouse_wheel / 120;
+  in_rect(156, 64, 84, 30) ? (
+    g_sync ? ( set_rate(floor(slider2 + 0.5) + (g_w > 0 ? 1 : -1)); ) : ( set_hz(slider3 * pow(1.06, g_w * m_fine)); );
+  ) : in_rect(BX - 6, 61, BW + 12, 18) ? (
+    set_thr(slider5 + g_w * m_fine);
+  ) : in_rect(BX - 6, 80, BW + 12, 18) ? (
+    set_del(slider6 + g_w * m_fine);
+  ) : (
+    gi = 1;
+    loop(5,
+      sqr(mx - k_x(gi)) + sqr(my - k_y(gi)) <= sqr(k_r(gi) + 6) ? (
+        k_set(gi, k_norm(gi) + g_w * 0.02 * m_fine);
+      );
+      gi += 1;
+    );
+  );
+  mouse_wheel = 0;
+);
+
+g_lcap = mouse_cap;
