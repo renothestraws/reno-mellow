@@ -1,8 +1,8 @@
 desc:RM1982REC - ReNo Mellow 1982REC (Recording Media Simulator)
 //tags: saturation tape wax lacquer acetate vinyl lofi digital media color
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.4
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Simulateur de supports d'enregistrement : cire, disque laqué, bande 1/4", bande 2" multipiste, numérique 16 bits et virgule flottante ; drive compensé en sortie, bruit du support, usure des disques, HQ.
 //
 // ---------------------------------------------------------------------------
@@ -526,6 +526,101 @@ draw_btn(1002, 377, 36.0, 24, sz == 4, "200");
 gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 389, "Ctrl-click: default value   -   Shift: fine adjust");
 
 // ---- Souris ----------------------------------------------------------------------------------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  set_sl(idx, min(hi, max(lo, v)));
+);
+function kbx_hit()
+(
+  in_circ(140, 172, 66) ? 1 :
+  in_rect(94, 253, 92, 22) ? 1 :
+  in_circ(870, 128, 40) ? 2 :
+  in_rect(824, 169, 92, 22) ? 2 :
+  in_circ(980, 128, 40) ? 3 :
+  in_rect(934, 169, 92, 22) ? 3 :
+  in_circ(870, 276, 40) ? 4 :
+  in_rect(824, 317, 92, 22) ? 4 :
+  in_circ(980, 276, 40) ? 5 :
+  in_rect(934, 317, 92, 22) ? 5 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? 140 :
+  i == 2 ? 870 :
+  i == 3 ? 980 :
+  i == 4 ? 870 :
+  i == 5 ? 980 :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? 264 :
+  i == 2 ? 180 :
+  i == 3 ? 180 :
+  i == 4 ? 328 :
+  i == 5 ? 328 :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 && kbx_ok ? kbx_put(1, v * 1, -18, 18, 0.1);
+  i == 2 ? ( kbx_off ? kbx_put(3, -30, -30, 12, 0.1) : kbx_ok ? kbx_put(3, v * 1, -30, 12, 0.1); );
+  i == 3 && kbx_ok ? kbx_put(4, v * 1, 0, 100, 0.1);
+  i == 4 && kbx_ok ? kbx_put(5, v * 1, -28, -6, 0.1);
+  i == 5 && kbx_ok ? kbx_put(6, v * 1, -12, 12, 0.1);
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 mb1 = mouse_cap & 1;
 (mb1 && !last_mb) ? (
   drag = 0;
@@ -569,3 +664,18 @@ th_mb = mouse_cap & 1;
   );
 );
 th_lmb = th_mb;
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);
