@@ -58,6 +58,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 
 | Plugin | Description |
 |---|---|
+| **RM1982Delay** | Delay multi-modèles et multi-taps : 23 modèles (bandes, analogiques, numériques, lo-fi), 6 taps indépendants (entrée L / L+R / R, SYNC + ms, feedback, vintage, filtres, mod, age, pan, volume), fader ALL TAPS, mix, valeurs modifiables au clavier |
 | **RM90X** | Multi-effet numérique inspiré de la Yamaha SPX90II : les 30 programmes d'usine (réverbes calées sur des IR de l'appareil, early reflections, gate, delay, chorus, flanger, pitch, freeze…), mémoires 31 à 90, face avant opérationnelle, MIDI, traitement interne 31,25 kHz / 16 bits sans latence |
 
 ## Modulation
