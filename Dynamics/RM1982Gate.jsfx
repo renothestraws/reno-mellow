@@ -1,8 +1,8 @@
 desc:RM1982Gate - ReNo Mellow 1982 (Gate / Expander)
 //tags: dynamics gate expander noise-gate downward-expander lookahead
 //@author ReNo Mellow
-//@version 1.7
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.8
+//@changelog Factory presets: Snare Start, Kick Start, Tom Start, All Around Expander (presets do not change Size or color)
 //@about Gate/expandeur inspiré du FabFilter Pro-G : ratio jusqu'à l'infini, range, knee, attack/hold/release, hystérésis (close), lookahead, side-chain filtré ou externe, audition, mix.
 //
 // ---------------------------------------------------------------------------
