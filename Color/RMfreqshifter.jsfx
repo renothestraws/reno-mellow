@@ -1,0 +1,371 @@
+desc:RMfreqshifter - ReNo Mellow frequency shifter
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release: zero-latency frequency shifter (+/- 5 kHz), dry / wet mix
+//@about
+//  # RMfreqshifter
+//  Frequency shifter (inspired by the Kilohearts Frequency Shifter).
+//  Every frequency of the input is moved up or down by the same amount in Hz,
+//  which breaks the harmonic relationships: from subtle detune and phasing to metallic, dissonant tones.
+//  - Shift from -5 kHz to +5 kHz, fine resolution around 0 Hz.
+//  - Drag the display (Shift = fine), Ctrl-click = 0 Hz, double-click = type a value (e.g. 120, -35.5, 1.2k).
+//  - Dry / wet mix (a mix around 50 % gives classic phasing / barber-pole effects with small shifts).
+//  - Zero latency (IIR Hilbert transformer). Double-click the plug-in name to switch the colour (green / orange).
+
+slider1:0<-5000,5000,0.01>-Shift (Hz)
+slider2:100<0,100,0.1>-Mix (%)
+slider3:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider4:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+ext_noinit = 1;
+pdc_delay = 0;
+
+// 90 degree phase splitter (two allpass chains, 4 x 2nd order each)
+ha1 = 0.6923878 * 0.6923878;
+ha2 = 0.9360654322959 * 0.9360654322959;
+ha3 = 0.9882295226860 * 0.9882295226860;
+ha4 = 0.9987488452737 * 0.9987488452737;
+hb1 = 0.4021921162426 * 0.4021921162426;
+hb2 = 0.8561710882420 * 0.8561710882420;
+hb3 = 0.9722909545651 * 0.9722909545651;
+hb4 = 0.9952884791278 * 0.9952884791278;
+
+// one allpass section: y = a*(x + y[n-2]) - x[n-2] ; state in memory (4 values per section)
+function ap(x, a, m) local(y)
+(
+  y = a * (x + m[3]) - m[1];
+  m[1] = m[0]; m[0] = x;
+  m[3] = m[2]; m[2] = y;
+  y;
+);
+
+// state memory: left A 0..15, left B 16..31, right A 32..47, right B 48..63
+memset(0, 0, 64);
+d_ph = 0;
+d_dl = 0; d_dr = 0;
+d_f = slider1;
+
+@block
+d_ft = slider1;
+d_mix = min(1, max(0, slider2 * 0.01));
+d_sm = 1 - exp(-1 / (0.02 * srate));
+
+@sample
+d_f += (d_ft - d_f) * d_sm;
+d_ph += 2 * $pi * d_f / srate;
+d_ph > $pi ? d_ph -= 2 * $pi;
+d_ph < -$pi ? d_ph += 2 * $pi;
+d_c = cos(d_ph);
+d_s = sin(d_ph);
+
+// left (path A delayed one sample = 90 degrees behind path B)
+d_ia = ap(ap(ap(ap(spl0, ha1, 0), ha2, 4), ha3, 8), ha4, 12);
+d_qb = ap(ap(ap(ap(spl0, hb1, 16), hb2, 20), hb3, 24), hb4, 28);
+d_q = d_dl; d_dl = d_ia;
+d_wl = d_qb * d_c - d_q * d_s;
+
+// right
+d_ia = ap(ap(ap(ap(spl1, ha1, 32), ha2, 36), ha3, 40), ha4, 44);
+d_qb = ap(ap(ap(ap(spl1, hb1, 48), hb2, 52), hb3, 56), hb4, 60);
+d_q = d_dr; d_dr = d_ia;
+d_wr = d_qb * d_c - d_q * d_s;
+
+spl0 = spl0 * (1 - d_mix) + d_wl * d_mix;
+spl1 = spl1 * (1 - d_mix) + d_wr * d_mix;
+
+@gfx 520 212
+LW = 520;
+LH = 212;
+FMAX = 5000;
+
+function PX(x) ( ox + x * sc; );
+function PY(y) ( oy + y * sc; );
+function col(r, g, b) ( gfx_set(r, g, b, 1); );
+function acc() ( gfx_set(acR, acG, acB, 1); );
+function acc_d() ( gfx_set(adR, adG, adB, 1); );
+function rct(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc); );
+function text_c(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw / 2; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_l(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x); gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_r(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function in_rect(x, y, ww, hh) ( mx >= x && mx < x + ww && my >= y && my < y + hh; );
+
+function theme_set()
+(
+  slider4 >= 0.5 ? (
+    acR = 0.424; acG = 0.851; acB = 0.780;
+    adR = 0.03;  adG = 0.10;  adB = 0.09;
+  ) : (
+    acR = 1.00; acG = 0.58; acB = 0.12;
+    adR = 0.10; adG = 0.06; adB = 0.02;
+  );
+);
+
+// shift <-> normalised position (-1..1), cubic for fine control near 0
+function f_norm() local(a) ( a = abs(slider1) / FMAX; (slider1 < 0 ? -1 : 1) * a ^ (1/3); );
+function f_set(n) local(f)
+(
+  n = min(1, max(-1, n));
+  f = FMAX * abs(n) * abs(n) * abs(n) * (n < 0 ? -1 : 1);
+  slider1 = floor(f * 100 + 0.5) / 100;
+  sliderchange(slider1);
+);
+
+function draw_knob(x, y, rr, n, lab, val) local(i, a0, a1, qx, qy)
+(
+  a0 = -2.36; a1 = a0 + 4.72 * min(1, max(0, n));
+  qx = PX(x); qy = PY(y);
+  col(0.22, 0.23, 0.25);
+  i = 0;
+  loop(ceil(4 * sc), gfx_arc(qx, qy, rr * sc - i * 0.9, -2.36, 2.36, 1); i += 1;);
+  acc();
+  n > 0.001 ? (
+    i = 0;
+    loop(ceil(4 * sc), gfx_arc(qx, qy, rr * sc - i * 0.9, a0, a1, 1); i += 1;);
+  );
+  col(0.16, 0.165, 0.18);
+  gfx_circle(qx, qy, (rr - 6) * sc, 1, 1);
+  col(0.26, 0.27, 0.29);
+  gfx_circle(qx, qy, (rr - 6) * sc, 0, 1);
+  col(0.92, 0.92, 0.92);
+  gfx_line(qx + sin(a1) * (rr - 15) * sc, qy - cos(a1) * (rr - 15) * sc,
+           qx + sin(a1) * (rr - 7) * sc,  qy - cos(a1) * (rr - 7) * sc, 1);
+  gfx_setfont(4);
+  col(0.62, 0.63, 0.66);
+  text_c(x, y - rr - 12, lab);
+  col(0.85, 0.85, 0.86);
+  text_c(x, y + rr + 12, val);
+);
+
+// typed value -> Hz (digits, '.', '-', optional 'k')
+function parse_entry() local(i, n, c, v, frac, dv, neg, kk, ok)
+(
+  n = strlen(#ed); i = 0; v = 0; frac = 0; dv = 1; neg = 0; kk = 1; ok = 0;
+  loop(n,
+    c = str_getchar(#ed, i);
+    c == '-' ? neg = 1;
+    (c == 'k' || c == 'K') ? kk = 1000;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  ok ? (
+    v *= kk; neg ? v = -v;
+    slider1 = min(FMAX, max(-FMAX, floor(v * 100 + 0.5) / 100));
+    sliderchange(slider1);
+  );
+);
+
+// ---------- frame setup ----------
+theme_set();
+sz = floor(slider3 + 0.5);
+sc = sz >= 4 ? 2 : 0.75 + 0.25 * sz;
+sc != last_sc ? (
+  gfx_setfont(1, "Arial", 13 * sc);
+  gfx_setfont(2, "Arial", 24 * sc, 'b');
+  gfx_setfont(3, "Arial", 46 * sc);
+  gfx_setfont(4, "Arial", 11 * sc);
+  last_sc = sc;
+);
+ox = max(0, floor((gfx_w - LW * sc) / 2));
+oy = max(0, floor((gfx_h - LH * sc) / 2));
+mx = (mouse_x - ox) / sc;
+my = (mouse_y - oy) / sc;
+
+// ---------- background ----------
+col(0.07, 0.07, 0.075);
+gfx_rect(0, 0, gfx_w, gfx_h);
+col(0.115, 0.12, 0.13);
+rct(6, 6, LW - 12, 166);
+col(0.105, 0.11, 0.12);
+gi = 10;
+while (gi < 172) ( rct(6, gi, LW - 12, 1); gi += 4; );
+col(0.20, 0.205, 0.22);
+gfx_circle(PX(16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(16), 3.5 * sc, 1, 1);
+gfx_circle(PX(16), PY(162), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(162), 3.5 * sc, 1, 1);
+
+// title
+gfx_setfont(2);
+acc();
+text_l(30, 32, "RMfreqshifter");
+gfx_measurestr("RMfreqshifter", t_w, t_h);
+th_x0 = 30; th_x1 = 30 + t_w / sc;
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_l(th_x1 + 14, 34, "F R E Q U E N C Y    S H I F T E R");
+text_r(LW - 30, 34, "ReNo Mellow");
+acc();
+rct(30, 48, LW - 60, 1);
+
+// ---------- shift display ----------
+col(0.085, 0.09, 0.095);
+rct(30, 62, 370, 96);
+in_rect(30, 62, 370, 96) || g_tg == 1 ? acc() : col(0.22, 0.23, 0.25);
+gfx_rect(PX(30), PY(62), 370 * sc, 96 * sc, 0);
+// bipolar bar
+col(0.20, 0.205, 0.22);
+rct(40, 70, 350, 4);
+col(0.40, 0.41, 0.43);
+rct(214, 67, 2, 10);
+g_n = f_norm();
+acc();
+g_n >= 0 ? rct(215, 70, 175 * g_n, 4) : rct(215 + 175 * g_n, 70, -175 * g_n, 4);
+
+gfx_setfont(3);
+g_ed ? (
+  acc();
+  strcpy(#lb, #ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#lb, "_");
+  text_c(215, 116, #lb);
+) : (
+  abs(slider1) >= 1000 ? (
+    slider1 > 0 ? ( sprintf(#lb, "+%.2f kHz", slider1 / 1000); ) : ( sprintf(#lb, "%.2f kHz", slider1 / 1000); );
+  ) : (
+    g_dv = abs(slider1) < 0.005 ? 0 : slider1;
+    slider1 > 0.004 ? ( sprintf(#lb, "+%.2f Hz", g_dv); ) : ( sprintf(#lb, "%.2f Hz", g_dv); );
+  );
+  acc();
+  text_c(215, 116, #lb);
+);
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_c(215, 148, "SHIFT");
+
+// mix
+sprintf(#va, "%d %%", slider2);
+draw_knob(458, 110, 24, slider2 / 100, "MIX", #va);
+
+// ---------- bottom bar : help + SIZE ----------
+col(0.045, 0.045, 0.05);
+rct(6, 178, LW - 12, 28);
+gfx_setfont(4);
+col(0.45, 0.46, 0.48);
+text_l(16, 192, "Drag: shift   Ctrl-click: 0 Hz   Dbl-click: type");
+col(0.55, 0.56, 0.58);
+text_r(318, 192, "SIZE");
+gi = 0;
+loop(5,
+  gx = 326 + gi * 38;
+  gi == sz ? ( acc(); rct(gx, 181, 34, 22); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, 181, 34, 22); col(0.70, 0.71, 0.73); );
+  gi == 0 ? strcpy(#lb, "75");
+  gi == 1 ? strcpy(#lb, "100");
+  gi == 2 ? strcpy(#lb, "125");
+  gi == 3 ? strcpy(#lb, "150");
+  gi == 4 ? strcpy(#lb, "200");
+  text_c(gx + 17, 192, #lb);
+  gi += 1;
+);
+
+// ---------- keyboard entry ----------
+g_ed ? (
+  g_c = gfx_getchar();
+  while (g_c > 0) (
+    g_c == 13 ? ( parse_entry(); g_ed = 0; ) :
+    g_c == 27 ? ( g_ed = 0; ) :
+    g_c == 8 ? ( strlen(#ed) > 0 ? str_delsub(#ed, strlen(#ed) - 1, 1); ) :
+    ((g_c >= '0' && g_c <= '9') || g_c == '.' || g_c == ',' || g_c == '-' || g_c == 'k' || g_c == 'K') ? (
+      strlen(#ed) < 10 ? ( sprintf(#ch, "%c", g_c); strcat(#ed, #ch); );
+    );
+    g_c = g_ed ? gfx_getchar() : 0;
+  );
+);
+
+// ---------- mouse ----------
+m_l = mouse_cap & 1;
+m_pl = g_lcap & 1;
+
+m_l && !m_pl ? (
+  g_tg = 0;
+  // click outside the display ends typing
+  g_ed && !in_rect(30, 62, 370, 96) ? ( parse_entry(); g_ed = 0; );
+  // size buttons
+  my >= 181 && my < 203 ? (
+    gi = 0;
+    loop(5,
+      in_rect(326 + gi * 38, 181, 34, 22) ? ( slider3 = gi; sliderchange(slider3); );
+      gi += 1;
+    );
+  );
+  // title double-click : theme
+  in_rect(th_x0, 18, th_x1 - th_x0, 28) ? (
+    time_precise() - th_t < 0.35 ? (
+      slider4 = slider4 >= 0.5 ? 0 : 1; sliderchange(slider4); th_t = 0;
+    ) : th_t = time_precise();
+  );
+  // shift display
+  in_rect(30, 62, 370, 96) ? (
+    (mouse_cap & 4) ? (
+      slider1 = 0; sliderchange(slider1); g_ed = 0;
+    ) : time_precise() - g_dt < 0.35 ? (
+      g_ed = 1; strcpy(#ed, ""); g_dt = 0;
+    ) : (
+      g_ed = 0;
+      g_tg = 1; g_kn = f_norm(); g_lx = mouse_x; g_ly = mouse_y; g_dt = time_precise();
+    );
+  );
+  // mix knob
+  sqr(mx - 458) + sqr(my - 110) <= sqr(30) ? (
+    (mouse_cap & 4) || time_precise() - g_mt < 0.3 ? (
+      slider2 = 100; sliderchange(slider2); g_mt = 0;
+    ) : (
+      g_tg = 2; g_kn = slider2 / 100; g_ly = mouse_y; g_mt = time_precise();
+    );
+  );
+);
+
+m_l && m_pl ? (
+  g_tg == 1 ? (
+    (mouse_x != g_lx || mouse_y != g_ly) ? (
+      g_kn += ((mouse_x - g_lx) - (mouse_y - g_ly)) / (350 * sc) * ((mouse_cap & 8) ? 0.1 : 1);
+      g_kn = min(1, max(-1, g_kn));
+      f_set(g_kn);
+      g_lx = mouse_x; g_ly = mouse_y;
+    );
+  );
+  g_tg == 2 ? (
+    mouse_y != g_ly ? (
+      g_kn -= (mouse_y - g_ly) / (200 * sc) * ((mouse_cap & 8) ? 0.1 : 1);
+      g_kn = min(1, max(0, g_kn));
+      slider2 = floor(g_kn * 1000 + 0.5) / 10; sliderchange(slider2);
+      g_ly = mouse_y;
+    );
+  );
+);
+!m_l ? g_tg = 0;
+
+mouse_wheel != 0 ? (
+  g_w = mouse_wheel / 120;
+  in_rect(30, 62, 370, 96) ? (
+    f_set(f_norm() + g_w * ((mouse_cap & 8) ? 0.002 : 0.02));
+  ) : sqr(mx - 458) + sqr(my - 110) <= sqr(30) ? (
+    slider2 = min(100, max(0, slider2 + g_w * ((mouse_cap & 8) ? 0.5 : 5))); sliderchange(slider2);
+  );
+  mouse_wheel = 0;
+);
+
+g_lcap = mouse_cap;

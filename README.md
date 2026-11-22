@@ -52,6 +52,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
 | **RM1982maximizer** | Sonic maximizer façon BBE : LOW CONTOUR + PROCESS (aigu dynamique piloté par CV), d'après Sonic Enhancer (GPL) |
 | **RM1982Inflat** | Inflator (comportement du Sonnox Oxford Inflator, Band Split compris), d'après RCInflator 2 de lewloiwc / RCJacH |
+| **RMfreqshifter** | Décaleur de fréquence sans latence (inspiré du Kilohearts Frequency Shifter) : ±5 kHz, réglage fin autour de 0 Hz, saisie au clavier, mix |
 
 ## Réverbération et multi-effet
 
