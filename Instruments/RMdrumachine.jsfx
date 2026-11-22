@@ -1,8 +1,8 @@
 desc:RMdrumachine - ReNo Mellow Drum Machine (16-pad sample player + step sequencer)
-//tags: drum machine sampler sequencer step 808 909 linn mpc trigger midi
+//tags: drum machine sampler sequencer step 808 909 linn mpc trigger midi instrument
 //@author ReNo Mellow
-//@version 1.9
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.10
+//@changelog Classé dans la catégorie Instruments de REAPER (tag « instrument »)
 //@about Boîte à rythmes / lecteur d'échantillons 16 pads (esprit 808, 909, Linn, Akai) : 4 kits fournis (Doves, IWDwS, Vogue, Monday), Load/Save kit, glisser-déposer de WAV/OGG, notes MIDI réglables, déclenchement MIDI, CV (entrées audio 1-6) et step séquenceur 16 pas par pad avec 8 motifs (A-H, notes 101-108), accent, ghost, découpe des pas, swing, play style push/laid back, half/double time ; choke des hi-hats, anti machine gun, couches, 8 sorties, sortie MIDI.
 //
 // ---------------------------------------------------------------------------
