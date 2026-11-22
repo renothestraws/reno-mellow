@@ -1,8 +1,8 @@
 desc:RMeqp1A - ReNo Mellow EQP-1A (Passive Tube Program Equalizer)
 //tags: equalizer EQ passive tube program pultec-style
 //@author ReNo Mellow
-//@version 1.8
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.9
+//@changelog Classic factory presets: kick low end trick, bass, snare, toms, overheads, vocals, guitars, master, Scheps Master (presets do not change Size or color)
 //@about Égaliseur passif à lampes inspiré du Pultec EQP-1A : courbes calculées par analyse nodale, boost et cut simultanés (truc Pultec), étage à lampes bypassable, HPF/LPF, vumètres LED.
 //
 // ---------------------------------------------------------------------------

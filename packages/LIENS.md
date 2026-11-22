@@ -31,7 +31,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | EQ | RMcleanEQ | 1.4 | [RMcleanEQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMcleanEQ.ReaperPkg) |
 | EQ | RMdevilQ | 1.6 | [RMdevilQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdevilQ.ReaperPkg) |
 | EQ | RMeq4 | 1.7 | [RMeq4.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMeq4.ReaperPkg) |
-| EQ | RMeqp1A | 1.8 | [RMeqp1A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMeqp1A.ReaperPkg) |
+| EQ | RMeqp1A | 1.9 | [RMeqp1A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMeqp1A.ReaperPkg) |
 | EQ | RMtownQ | 1.4 | [RMtownQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMtownQ.ReaperPkg) |
 | EQ | RMvioletQ | 1.3 | [RMvioletQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMvioletQ.ReaperPkg) |
 | Color | RM1982Bass | 1.5 | [RM1982Bass.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Bass.ReaperPkg) |
