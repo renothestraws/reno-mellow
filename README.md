@@ -23,6 +23,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982debleed** | Débleeder : gate/expandeur au-dessus d'un crossover |
 | **RM1982De-ess** | De-esser (inspiré du FabFilter Pro-DS) |
 | **RM1982Transient** | Transient designer |
+| **RMtrancegate** | Gate programmable synchronisée au tempo (inspirée du Kilohearts Trance Gate) : 8 patterns de 1 à 32 pas avec liaisons, ADSR, résolution 1/2 à 1/64, mix, changement de pattern par MIDI |
 
 ## Égaliseurs
 

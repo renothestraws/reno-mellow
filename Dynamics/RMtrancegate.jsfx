@@ -1,0 +1,674 @@
+desc:RMtrancegate - ReNo Mellow programmable trance gate
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release: 8 patterns of 1-32 steps (on / off / tie), ADSR, resolution, mix, host sync, MIDI pattern change (notes 101-108)
+//@about
+//  # RMtrancegate
+//  Programmable audio gate synced to the project tempo (inspired by the Kilohearts Trance Gate).
+//  - 8 pattern slots, 1 to 32 steps each, drawn on a circular step editor.
+//  - Click a step to switch it on / off, click and drag to tie steps together (one long gate).
+//  - Right-click the editor for tools: clear, fill, invert, shift, reverse, random, copy / paste, factory pattern.
+//  - ADSR envelope applied to every gate, step resolution from 1/2 to 1/64 (with triplets), dry / wet mix.
+//  - MIDI notes 101 to 108 select patterns 1 to 8 (all MIDI is passed through).
+//  - Zero latency. Double-click the plug-in name to switch the colour (green / orange).
+
+slider1:0<0,7,1>-Pattern
+slider2:4<0,7,1{1/2,1/4,1/8,1/8T,1/16,1/16T,1/32,1/64}>-Resolution
+slider3:1<0,200,0.1>-Attack (ms)
+slider4:120<1,1000,1>-Decay (ms)
+slider5:75<0,100,0.1>-Sustain (%)
+slider6:15<1,500,1>-Release (ms)
+slider7:100<0,100,0.1>-Mix (%)
+slider8:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider9:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+ext_noinit = 1;
+pdc_delay = 0;
+
+// memory map
+pm = 0;      // 8 patterns x 32 steps : 0 = off, 1 = on, 2 = tie
+pl = 256;    // 8 lengths
+bk = 300;    // backup during a drag edit
+clp = 340;   // clipboard (32 steps + length at clp[32])
+tmp = 400;   // scratch
+
+function setpat(p, str) local(n, i, c, v)
+(
+  n = min(32, strlen(str));
+  i = 0;
+  loop(32, pm[p*32 + i] = 0; i += 1;);
+  i = 0;
+  loop(n,
+    c = str_getchar(str, i);
+    v = 0;
+    c == 'x' ? v = 1;
+    c == '-' ? v = 2;
+    pm[p*32 + i] = v;
+    i += 1;
+  );
+  pl[p] = n;
+);
+
+function factory(p)
+(
+  p == 0 ? setpat(0, "x-.x.x-.x-.x.x-.");
+  p == 1 ? setpat(1, "xxxxxxxxxxxxxxxx");
+  p == 2 ? setpat(2, "..x-..x-..x-..x-");
+  p == 3 ? setpat(3, "x-.x-.x-.x-.x-x.");
+  p == 4 ? setpat(4, "x.x.x.x-x.x.x---");
+  p == 5 ? setpat(5, "x---.x-.x---x.x.");
+  p == 6 ? setpat(6, "x.xx.xx.xx.x");
+  p == 7 ? setpat(7, "x---x---x-x-x-x-xxxxxxxxxxxxxxxx");
+);
+
+pat_ok != 1 ? (
+  fi = 0;
+  loop(8, factory(fi); fi += 1;);
+  clp[32] = 0;
+  pat_ok = 1;
+);
+
+d_lasts = -1000000;
+d_pos = 0;
+d_env = 0;
+d_g = 0;
+d_stage = 0;
+
+@serialize
+s_mk = 1;
+file_var(0, s_mk);
+si = 0;
+loop(256, file_var(0, pm[si]); si += 1;);
+si = 0;
+loop(8, file_var(0, pl[si]); si += 1;);
+si = 0;
+loop(8, pl[si] = max(1, min(32, floor(pl[si] + 0.5))); si += 1;);
+pat_ok = 1;
+
+@block
+// MIDI : notes 101-108 select patterns 1-8, everything passes through
+while (midirecv(mi_ofs, mi_1, mi_2, mi_3)) (
+  ((mi_1 & 240) == 144 && mi_3 > 0 && mi_2 >= 101 && mi_2 <= 108) ? (
+    slider1 = mi_2 - 101;
+    sliderchange(slider1);
+  );
+  midisend(mi_ofs, mi_1, mi_2, mi_3);
+);
+
+b_r = floor(slider2 + 0.5);
+d_stepb = 0.25;
+b_r == 0 ? d_stepb = 2;
+b_r == 1 ? d_stepb = 1;
+b_r == 2 ? d_stepb = 0.5;
+b_r == 3 ? d_stepb = 1/3;
+b_r == 4 ? d_stepb = 0.25;
+b_r == 5 ? d_stepb = 1/6;
+b_r == 6 ? d_stepb = 0.125;
+b_r == 7 ? d_stepb = 0.0625;
+
+d_inc = tempo / 60 / srate;
+(play_state & 1) ? d_pos = beat_position;
+
+d_ainc = 1 / max(0.0005 * srate, slider3 * 0.001 * srate);
+d_dc = exp(-4.6 / max(1, slider4 * 0.001 * srate));
+d_sus = min(1, max(0, slider5 * 0.01));
+d_rc = exp(-4.6 / max(0.002 * srate, slider6 * 0.001 * srate));
+d_sm = 1 - exp(-1 / (0.0002 * srate));
+d_mix = min(1, max(0, slider7 * 0.01));
+d_p = max(0, min(7, floor(slider1 + 0.5)));
+
+@sample
+d_sabs = floor(d_pos / d_stepb);
+d_sabs != d_lasts ? (
+  d_lasts = d_sabs;
+  d_len = max(1, min(32, pl[d_p]));
+  d_k = d_sabs - floor(d_sabs / d_len) * d_len;
+  d_step = d_k;
+  d_cnt += 1;
+  d_v = pm[d_p*32 + d_k];
+  d_v == 1 ? (
+    d_stage = 1;
+  ) : d_v == 2 ? (
+    d_stage == 0 ? d_stage = 1;
+  ) : (
+    d_stage = 0;
+  );
+);
+
+d_stage == 1 ? (
+  d_env += d_ainc;
+  d_env >= 1 ? ( d_env = 1; d_stage = 2; );
+) : d_stage == 2 ? (
+  d_env = d_sus + (d_env - d_sus) * d_dc;
+) : (
+  d_env *= d_rc;
+);
+d_g += (d_env - d_g) * d_sm;
+d_gain = 1 - d_mix + d_mix * d_g;
+spl0 *= d_gain;
+spl1 *= d_gain;
+d_pos += d_inc;
+
+@gfx 360 630
+// ---------- layout constants (logical units) ----------
+LW = 360;
+LH = 630;           // incl. 34 for the SIZE strip
+CX = 180; CY = 250; RO = 128; RI = 86;
+KY = 438; KR = 20;
+
+function PX(x) ( ox + x * sc; );
+function PY(y) ( oy + y * sc; );
+function col(r, g, b) ( gfx_set(r, g, b, 1); );
+function acc() ( gfx_set(acR, acG, acB, 1); );
+function acc_l() ( gfx_set(alR, alG, alB, 1); );
+function acc_d() ( gfx_set(adR, adG, adB, 1); );
+function rct(x, y, ww, hh) ( gfx_rect(PX(x), PY(y), ww * sc, hh * sc); );
+function text_c(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw / 2; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_l(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x); gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function text_r(x, y, str) local(tw, th)
+(
+  gfx_measurestr(str, tw, th);
+  gfx_x = PX(x) - tw; gfx_y = PY(y) - th / 2;
+  gfx_drawstr(str);
+);
+function in_rect(x, y, ww, hh) ( mx >= x && mx < x + ww && my >= y && my < y + hh; );
+
+function theme_set()
+(
+  slider9 >= 0.5 ? (
+    acR = 0.424; acG = 0.851; acB = 0.780;
+    alR = 0.70;  alG = 0.95;  alB = 0.90;
+    adR = 0.03;  adG = 0.10;  adB = 0.09;
+  ) : (
+    acR = 1.00; acG = 0.58; acB = 0.12;
+    alR = 1.00; alG = 0.70; alB = 0.35;
+    adR = 0.10; adG = 0.06; adB = 0.02;
+  );
+);
+
+// ring sector from angle a0 to a1 (0 = top, clockwise), radii r0..r1
+function sector(a0, a1, r0, r1) local(n, i, sa, sb, x0, y0, x1, y1, x2, y2, x3, y3, cxp, cyp)
+(
+  cxp = PX(CX); cyp = PY(CY);
+  n = max(1, ceil((a1 - a0) / 0.04));
+  i = 0;
+  loop(n,
+    sa = a0 + (a1 - a0) * i / n;
+    sb = a0 + (a1 - a0) * (i + 1) / n;
+    x0 = cxp + sin(sa) * r0 * sc; y0 = cyp - cos(sa) * r0 * sc;
+    x1 = cxp + sin(sa) * r1 * sc; y1 = cyp - cos(sa) * r1 * sc;
+    x2 = cxp + sin(sb) * r1 * sc; y2 = cyp - cos(sb) * r1 * sc;
+    x3 = cxp + sin(sb) * r0 * sc; y3 = cyp - cos(sb) * r0 * sc;
+    gfx_triangle(x0, y0, x1, y1, x2, y2, x3, y3);
+    i += 1;
+  );
+);
+
+function draw_knob(x, y, n, lab, val) local(i, a0, a1, qx, qy)
+(
+  a0 = -2.36; a1 = a0 + 4.72 * min(1, max(0, n));
+  qx = PX(x); qy = PY(y);
+  col(0.22, 0.23, 0.25);
+  i = 0;
+  loop(ceil(4 * sc), gfx_arc(qx, qy, KR * sc - i * 0.9, -2.36, 2.36, 1); i += 1;);
+  acc();
+  n > 0.001 ? (
+    i = 0;
+    loop(ceil(4 * sc), gfx_arc(qx, qy, KR * sc - i * 0.9, a0, a1, 1); i += 1;);
+  );
+  col(0.16, 0.165, 0.18);
+  gfx_circle(qx, qy, (KR - 6) * sc, 1, 1);
+  col(0.26, 0.27, 0.29);
+  gfx_circle(qx, qy, (KR - 6) * sc, 0, 1);
+  col(0.92, 0.92, 0.92);
+  gfx_line(qx + sin(a1) * (KR - 14) * sc, qy - cos(a1) * (KR - 14) * sc,
+           qx + sin(a1) * (KR - 7) * sc,  qy - cos(a1) * (KR - 7) * sc, 1);
+  gfx_setfont(4);
+  col(0.62, 0.63, 0.66);
+  text_c(x, y - KR - 12, lab);
+  col(0.85, 0.85, 0.86);
+  text_c(x, y + KR + 11, val);
+);
+
+// knob <-> parameter
+function k_norm(i)
+(
+  i == 1 ? sqrt(max(0, slider3) / 200) :
+  i == 2 ? log(max(1, slider4)) / log(1000) :
+  i == 3 ? slider5 / 100 :
+  i == 4 ? log(max(1, slider6)) / log(500) :
+  slider7 / 100;
+);
+function k_set(i, n)
+(
+  n = min(1, max(0, n));
+  i == 1 ? ( slider3 = floor(200 * n * n * 10 + 0.5) / 10; sliderchange(slider3); );
+  i == 2 ? ( slider4 = floor(exp(log(1000) * n) + 0.5); sliderchange(slider4); );
+  i == 3 ? ( slider5 = floor(1000 * n + 0.5) / 10; sliderchange(slider5); );
+  i == 4 ? ( slider6 = floor(exp(log(500) * n) + 0.5); sliderchange(slider6); );
+  i == 5 ? ( slider7 = floor(1000 * n + 0.5) / 10; sliderchange(slider7); );
+);
+function k_default(i)
+(
+  i == 1 ? ( slider3 = 1;   sliderchange(slider3); );
+  i == 2 ? ( slider4 = 120; sliderchange(slider4); );
+  i == 3 ? ( slider5 = 75;  sliderchange(slider5); );
+  i == 4 ? ( slider6 = 15;  sliderchange(slider6); );
+  i == 5 ? ( slider7 = 100; sliderchange(slider7); );
+);
+function k_x(i) ( i == 5 ? 300 : 60 + (i - 1) * 80; );
+function k_y(i) ( i == 5 ? 534 : KY; );
+
+function res_name(i)
+(
+  strcpy(#rn, "1/16");
+  i == 0 ? strcpy(#rn, "1/2");
+  i == 1 ? strcpy(#rn, "1/4");
+  i == 2 ? strcpy(#rn, "1/8");
+  i == 3 ? strcpy(#rn, "1/8 T");
+  i == 5 ? strcpy(#rn, "1/16 T");
+  i == 6 ? strcpy(#rn, "1/32");
+  i == 7 ? strcpy(#rn, "1/64");
+);
+
+// pattern helpers (gp = current pattern, gl = its length)
+function cur_pat() ( gp = max(0, min(7, floor(slider1 + 0.5))); gl = max(1, min(32, pl[gp])); );
+function st(k) ( pm[gp*32 + ((k % gl) + gl) % gl]; );
+function st_set(k, v) ( pm[gp*32 + ((k % gl) + gl) % gl] = v; );
+function edited() ( sliderchange(-1); );
+
+// turn a step off, together with the steps tied to it
+function step_off(k) local(j)
+(
+  st_set(k, 0);
+  j = 1;
+  while (j < gl && st(k + j) == 2) ( st_set(k + j, 0); j += 1; );
+);
+
+function pat_reverse() local(k, e, j)
+(
+  k = 0; loop(32, tmp[k] = 0; k += 1;);
+  k = 0;
+  while (k < gl) (
+    (pm[gp*32 + k] == 1 || pm[gp*32 + k] == 2) ? (
+      e = k;
+      while (e + 1 < gl && pm[gp*32 + e + 1] == 2) ( e += 1; );
+      tmp[gl - 1 - e] = 1;
+      j = gl - e; while (j <= gl - 1 - k) ( tmp[j] = 2; j += 1; );
+      k = e + 1;
+    ) : (
+      k += 1;
+    );
+  );
+  k = 0; loop(gl, pm[gp*32 + k] = tmp[k]; k += 1;);
+);
+
+function tools_menu() local(r, k, v, prev)
+(
+  cur_pat();
+  strcpy(#mn, "Clear|Fill all steps|Invert||Shift left|Shift right|Reverse||Random||Copy pattern|");
+  clp[32] > 0 ? ( strcat(#mn, "Paste pattern|"); ) : ( strcat(#mn, "#Paste pattern|"); );
+  strcat(#mn, "|Reset to factory pattern");
+  gfx_x = mouse_x; gfx_y = mouse_y;
+  r = gfx_showmenu(#mn);
+  r == 1 ? ( k = 0; loop(gl, st_set(k, 0); k += 1;); edited(); );
+  r == 2 ? ( k = 0; loop(gl, st_set(k, 1); k += 1;); edited(); );
+  r == 3 ? ( k = 0; loop(gl, st_set(k, st(k) == 0 ? 1 : 0); k += 1;); edited(); );
+  r == 4 ? (
+    v = st(0); k = 0; loop(gl - 1, st_set(k, st(k + 1)); k += 1;); st_set(gl - 1, v); edited();
+  );
+  r == 5 ? (
+    v = st(gl - 1); k = gl - 1; loop(gl - 1, st_set(k, st(k - 1)); k -= 1;); st_set(0, v); edited();
+  );
+  r == 6 ? ( pat_reverse(); edited(); );
+  r == 7 ? (
+    prev = 0; k = 0;
+    loop(gl,
+      v = rand(1) < 0.62 ? 1 : 0;
+      (v == 1 && prev != 0 && rand(1) < 0.3) ? v = 2;
+      st_set(k, v); prev = v; k += 1;
+    );
+    st(0) == 2 ? st_set(0, 1);
+    edited();
+  );
+  r == 8 ? ( k = 0; loop(32, clp[k] = pm[gp*32 + k]; k += 1;); clp[32] = gl; );
+  r == 9 ? (
+    clp[32] > 0 ? ( k = 0; loop(32, pm[gp*32 + k] = clp[k]; k += 1;); pl[gp] = clp[32]; edited(); );
+  );
+  r == 10 ? ( factory(gp); edited(); );
+);
+
+function res_menu() local(r, i)
+(
+  strcpy(#mn, "");
+  i = 0;
+  loop(8,
+    res_name(i);
+    i == floor(slider2 + 0.5) ? strcat(#mn, "!");
+    strcat(#mn, #rn);
+    i < 7 ? strcat(#mn, "|");
+    i += 1;
+  );
+  gfx_x = PX(24); gfx_y = PY(542);
+  r = gfx_showmenu(#mn);
+  r > 0 ? ( slider2 = r - 1; sliderchange(slider2); );
+);
+
+function set_len(n) ( cur_pat(); pl[gp] = max(1, min(32, n)); edited(); );
+
+// angle -> step under the mouse
+function hit_step() local(a)
+(
+  a = atan2(mx - CX, -(my - CY));
+  a < 0 ? a += 2 * $pi;
+  min(gl - 1, floor(a / (2 * $pi / gl)));
+);
+
+// ---------- frame setup ----------
+theme_set();
+sz = floor(slider8 + 0.5);
+sc = sz >= 4 ? 2 : 0.75 + 0.25 * sz;
+sc != last_sc ? (
+  gfx_setfont(1, "Arial", 13 * sc);
+  gfx_setfont(2, "Arial", 24 * sc, 'b');
+  gfx_setfont(3, "Arial", 44 * sc);
+  gfx_setfont(4, "Arial", 11 * sc);
+  gfx_setfont(5, "Arial", 12 * sc, 'b');
+  last_sc = sc;
+);
+ox = max(0, floor((gfx_w - LW * sc) / 2));
+oy = max(0, floor((gfx_h - LH * sc) / 2)) + 34 * sc;
+mx = (mouse_x - ox) / sc;
+my = (mouse_y - oy) / sc;
+cur_pat();
+
+// ---------- background ----------
+col(0.07, 0.07, 0.075);
+gfx_rect(0, 0, gfx_w, gfx_h);
+
+// SIZE strip (top)
+col(0.045, 0.045, 0.05);
+rct(6, -28, LW - 12, 28);
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_l(14, -14, "SIZE");
+gi = 0;
+loop(5,
+  gx = 52 + gi * 60;
+  gi == sz ? ( acc(); rct(gx, -25, 56, 22); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, -25, 56, 22); col(0.70, 0.71, 0.73); );
+  gi == 0 ? strcpy(#lb, "75%");
+  gi == 1 ? strcpy(#lb, "100%");
+  gi == 2 ? strcpy(#lb, "125%");
+  gi == 3 ? strcpy(#lb, "150%");
+  gi == 4 ? strcpy(#lb, "200%");
+  text_c(gx + 28, -14, #lb);
+  gi += 1;
+);
+
+// panel
+col(0.115, 0.12, 0.13);
+rct(6, 4, LW - 12, 586);
+col(0.105, 0.11, 0.12);
+gi = 8;
+while (gi < 588) ( rct(6, gi, LW - 12, 1); gi += 4; );
+col(0.20, 0.205, 0.22);
+gfx_circle(PX(16), PY(14), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(14), 3.5 * sc, 1, 1);
+gfx_circle(PX(16), PY(580), 3.5 * sc, 1, 1);
+gfx_circle(PX(LW - 16), PY(580), 3.5 * sc, 1, 1);
+
+// title
+gfx_setfont(2);
+acc();
+text_l(26, 30, "RMtrancegate");
+gfx_measurestr("RMtrancegate", t_w, t_h);
+th_x0 = 26; th_x1 = 26 + t_w / sc;
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_r(LW - 26, 30, "ReNo Mellow");
+acc();
+rct(26, 46, LW - 52, 1);
+col(0.55, 0.56, 0.58);
+text_l(26, 58, "P R O G R A M M A B L E    G A T E");
+
+// pattern buttons
+gfx_setfont(5);
+gi = 0;
+loop(8,
+  gx = 22 + gi * 40;
+  gi == gp ? ( acc(); rct(gx, 72, 36, 26); acc_d(); ) : ( col(0.16, 0.165, 0.18); rct(gx, 72, 36, 26); col(0.80, 0.81, 0.83); );
+  sprintf(#lb, "%d", gi + 1);
+  text_c(gx + 18, 85, #lb);
+  gi += 1;
+);
+
+// ---------- circular step editor ----------
+col(0.085, 0.09, 0.095);
+gfx_circle(PX(CX), PY(CY), (RO + 8) * sc, 1, 1);
+col(0.16, 0.165, 0.18);
+gfx_circle(PX(CX), PY(CY), (RO + 8) * sc, 0, 1);
+
+g_seg = 2 * $pi / gl;
+g_gap = 1.6 / RO;
+gk = 0;
+loop(gl,
+  g_v = st(gk);
+  g_pv = st(gk - 1);
+  g_nv = st(gk + 1);
+  g_a0 = gk * g_seg;
+  g_a1 = (gk + 1) * g_seg;
+  !(g_v == 2 && g_pv != 0) ? g_a0 += g_gap;
+  !(g_nv == 2 && g_v != 0) ? g_a1 -= g_gap;
+  g_v == 0 ? col(0.30, 0.31, 0.33) : acc();
+  gl == 1 ? ( g_a0 = 0; g_a1 = 2 * $pi; );
+  sector(g_a0, g_a1, RI, RO);
+  gk += 1;
+);
+
+// playhead + gate light
+d_cnt != g_lastcnt ? ( g_lastcnt = d_cnt; g_seen = time_precise(); );
+time_precise() - g_seen < 0.4 ? (
+  g_k = d_step % gl;
+  acc_l();
+  sector(g_k * g_seg + g_gap, (g_k + 1) * g_seg - g_gap, RO + 3, RO + 7);
+);
+col(0.15, 0.155, 0.17);
+gfx_circle(PX(CX), PY(CY), (RI - 4) * sc, 1, 1);
+gfx_set(acR, acG, acB, 0.12 + 0.88 * min(1, max(0, d_g)));
+sector(0, 2 * $pi, RI - 10, RI - 6);
+
+// length display
+gfx_setfont(3);
+col(0.80, 0.81, 0.83);
+sprintf(#lb, "%d", gl);
+text_c(CX - 8, CY - 4, #lb);
+in_rect(CX + 26, CY - 28, 20, 20) ? acc() : col(0.62, 0.63, 0.66);
+gfx_triangle(PX(CX + 36), PY(CY - 24), PX(CX + 29), PY(CY - 12), PX(CX + 43), PY(CY - 12));
+in_rect(CX + 26, CY - 4, 20, 20) ? acc() : col(0.62, 0.63, 0.66);
+gfx_triangle(PX(CX + 29), PY(CY + 2), PX(CX + 43), PY(CY + 2), PX(CX + 36), PY(CY + 14));
+gfx_setfont(4);
+col(0.55, 0.56, 0.58);
+text_c(CX, CY + 34, "STEPS");
+sprintf(#lb, "PATTERN %d", gp + 1);
+text_c(CX, CY - 44, #lb);
+
+// ---------- knobs ----------
+slider3 < 10 ? ( sprintf(#va, "%.1f ms", slider3); ) : ( sprintf(#va, "%d ms", slider3); );
+draw_knob(k_x(1), KY, k_norm(1), "ATTACK", #va);
+sprintf(#va, "%d ms", slider4);
+draw_knob(k_x(2), KY, k_norm(2), "DECAY", #va);
+sprintf(#va, "%d %%", slider5);
+draw_knob(k_x(3), KY, k_norm(3), "SUSTAIN", #va);
+sprintf(#va, "%d ms", slider6);
+draw_knob(k_x(4), KY, k_norm(4), "RELEASE", #va);
+
+col(0.20, 0.205, 0.22);
+rct(26, 486, LW - 52, 1);
+
+// resolution
+gfx_setfont(4);
+col(0.62, 0.63, 0.66);
+text_l(26, 504, "RESOLUTION");
+col(0.085, 0.09, 0.095);
+rct(24, 516, 180, 28);
+in_rect(24, 516, 180, 28) ? acc() : col(0.22, 0.23, 0.25);
+gfx_rect(PX(24), PY(516), 180 * sc, 28 * sc, 0);
+gfx_setfont(1);
+col(0.88, 0.88, 0.89);
+res_name(floor(slider2 + 0.5));
+text_l(36, 530, #rn);
+col(0.62, 0.63, 0.66);
+gfx_triangle(PX(184), PY(526), PX(196), PY(526), PX(190), PY(534));
+
+sprintf(#va, "%d %%", slider7);
+draw_knob(k_x(5), k_y(5), k_norm(5), "MIX", #va);
+
+gfx_setfont(4);
+col(0.45, 0.46, 0.48);
+text_l(26, 574, "Click: on/off   Drag: tie   Right-click: tools");
+
+// ---------- mouse ----------
+m_l = mouse_cap & 1;
+m_r = mouse_cap & 2;
+m_pl = g_lcap & 1;
+m_pr = g_lcap & 2;
+
+m_l && !m_pl ? (
+  g_tg = 0;
+  // size buttons
+  my >= -25 && my < -3 ? (
+    gi = 0;
+    loop(5,
+      in_rect(52 + gi * 60, -25, 56, 22) ? ( slider8 = gi; sliderchange(slider8); );
+      gi += 1;
+    );
+  );
+  // title double-click : theme
+  in_rect(th_x0, 16, th_x1 - th_x0, 28) ? (
+    time_precise() - th_t < 0.35 ? (
+      slider9 = slider9 >= 0.5 ? 0 : 1; sliderchange(slider9); th_t = 0;
+    ) : th_t = time_precise();
+  );
+  // pattern buttons
+  my >= 72 && my < 98 ? (
+    gi = 0;
+    loop(8,
+      in_rect(22 + gi * 40, 72, 36, 26) ? ( slider1 = gi; sliderchange(slider1); );
+      gi += 1;
+    );
+  );
+  g_dr = sqrt(sqr(mx - CX) + sqr(my - CY));
+  in_rect(CX + 26, CY - 28, 20, 20) ? set_len(gl + 1) :
+  in_rect(CX + 26, CY - 4, 20, 20) ? set_len(gl - 1) :
+  g_dr < RI - 12 ? ( g_tg = 20; g_y0 = mouse_y; g_v0 = gl; ) :
+  g_dr <= RO + 10 && my < 400 ? (
+    g_tg = 30;
+    g_s0 = hit_step();
+    g_mv = 0;
+    gk = 0; loop(32, bk[gk] = pm[gp*32 + gk]; gk += 1;);
+  );
+  // knobs
+  gi = 1;
+  loop(5,
+    sqr(mx - k_x(gi)) + sqr(my - k_y(gi)) <= sqr(KR + 6) ? (
+      (mouse_cap & 4) || time_precise() - g_kt < 0.3 && g_kl == gi ? (
+        k_default(gi); g_kt = 0;
+      ) : (
+        g_tg = gi; g_kn = k_norm(gi); g_ly = mouse_y; g_kt = time_precise(); g_kl = gi;
+      );
+    );
+    gi += 1;
+  );
+  in_rect(24, 516, 180, 28) ? res_menu();
+);
+
+// dragging
+m_l && m_pl ? (
+  g_tg >= 1 && g_tg <= 5 ? (
+    mouse_y != g_ly ? (
+      g_kn -= (mouse_y - g_ly) / (200 * sc) * ((mouse_cap & 8) ? 0.1 : 1);
+      g_kn = min(1, max(0, g_kn));
+      k_set(g_tg, g_kn);
+      g_ly = mouse_y;
+    );
+  );
+  g_tg == 20 ? (
+    g_nl = max(1, min(32, g_v0 + floor(-(mouse_y - g_y0) / (8 * sc))));
+    g_nl != gl ? ( pl[gp] = g_nl; );
+  );
+  g_tg == 30 ? (
+    g_t = hit_step();
+    g_d = g_t - g_s0;
+    g_d > gl / 2 ? g_d -= gl;
+    g_d < -gl / 2 ? g_d += gl;
+    g_d != 0 ? g_mv = 1;
+    g_mv ? (
+      gk = 0; loop(32, pm[gp*32 + gk] = bk[gk]; gk += 1;);
+      g_d > 0 ? (
+        st(g_s0) == 0 ? st_set(g_s0, 1);
+        gk = 1; loop(g_d, st_set(g_s0 + gk, 2); gk += 1;);
+      );
+      g_d < 0 ? (
+        st(g_s0 + g_d) == 0 ? st_set(g_s0 + g_d, 1);
+        gk = g_d + 1; loop(-g_d, st_set(g_s0 + gk, 2); gk += 1;);
+      );
+    );
+  );
+);
+
+// release
+!m_l && m_pl ? (
+  g_tg == 30 ? (
+    !g_mv ? (
+      g_v = st(g_s0);
+      g_v == 0 ? st_set(g_s0, 1) :
+      g_v == 2 ? st_set(g_s0, 1) :
+      step_off(g_s0);
+    );
+    edited();
+  );
+  g_tg == 20 ? edited();
+  g_tg = 0;
+);
+
+// right-click tools on the editor
+m_r && !m_pr ? (
+  sqrt(sqr(mx - CX) + sqr(my - CY)) <= RO + 10 ? tools_menu();
+);
+
+// mouse wheel
+mouse_wheel != 0 ? (
+  g_w = mouse_wheel / 120;
+  sqrt(sqr(mx - CX) + sqr(my - CY)) < RI - 12 ? (
+    set_len(gl + (g_w > 0 ? 1 : -1));
+  ) : my >= 72 && my < 98 ? (
+    slider1 = max(0, min(7, gp + (g_w > 0 ? 1 : -1))); sliderchange(slider1);
+  ) : (
+    gi = 1;
+    loop(5,
+      sqr(mx - k_x(gi)) + sqr(my - k_y(gi)) <= sqr(KR + 6) ? (
+        k_set(gi, k_norm(gi) + g_w * ((mouse_cap & 8) ? 0.005 : 0.03));
+      );
+      gi += 1;
+    );
+  );
+  mouse_wheel = 0;
+);
+
+g_lcap = mouse_cap;

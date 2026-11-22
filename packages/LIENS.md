@@ -21,6 +21,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Dynamics | RMEL8 | 1.2 | [RMEL8.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMEL8.ReaperPkg) |
 | Dynamics | RMGbuss | 1.3 | [RMGbuss.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMGbuss.ReaperPkg) |
 | Dynamics | RMMultidyn | 1.3 | [RMMultidyn.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMMultidyn.ReaperPkg) |
+| Dynamics | RMtrancegate | 1.0 | [RMtrancegate.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMtrancegate.ReaperPkg) |
 | EQ | RM1373 | 1.7 | [RM1373.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1373.ReaperPkg) |
 | EQ | RM1982Fletcher | 1.5 | [RM1982Fletcher.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Fletcher.ReaperPkg) |
 | EQ | RM360 | 1.5 | [RM360.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM360.ReaperPkg) |
