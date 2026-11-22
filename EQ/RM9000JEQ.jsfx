@@ -1,8 +1,8 @@
 desc:RM9000JEQ - ReNo Mellow 9000J EQ (Channel EQ + Filters)
 //tags: equalizer EQ parametric filters console ssl-style 9000j
 //@author ReNo Mellow
-//@version 1.7
-//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
+//@version 1.8
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Section EQ et filtres d'une tranche inspirée de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vumètres LED.
 //
 // ---------------------------------------------------------------------------
@@ -541,6 +541,149 @@ sz = floor(slider23 + 0.5);
 draw_btn(282, 883, 42, 22, slider24 >= 0.5, "HQ");
 
 // ---- Souris ----------------------------------------------------------------------------------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( set_sl(idx, v); );
+function kbx_ic(cx, cy, r) ( sqr(mx - cx) + sqr(my - cy) <= r * r; );
+function kbx_ir(x, y, w, h) ( mx >= x && mx < x + w && my >= y && my < y + h; );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  kbx_ic(HPX, HPY, 30) ? 1 :
+  kbx_ic(LPX, LPY, 30) ? 2 :
+  kbx_ic(HFGX, HFGY, 30) ? 3 :
+  kbx_ic(HFFX, HFFY, 30) ? 4 :
+  kbx_ic(HMGX, HMGY, 30) ? 5 :
+  kbx_ic(HMFX, HMFY, 30) ? 6 :
+  kbx_ic(HMQX, HMQY, 24) ? 7 :
+  kbx_ic(LMGX, LMGY, 30) ? 8 :
+  kbx_ic(LMFX, LMFY, 30) ? 9 :
+  kbx_ic(LMQX, LMQY, 24) ? 10 :
+  kbx_ic(LFGX, LFGY, 30) ? 11 :
+  kbx_ic(LFFX, LFFY, 30) ? 12 :
+  kbx_ic(70, 894, 13) ? 13 :
+  kbx_ic(218, 894, 13) ? 14 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? HPX :
+  i == 2 ? LPX :
+  i == 3 ? HFGX :
+  i == 4 ? HFFX :
+  i == 5 ? HMGX :
+  i == 6 ? HMFX :
+  i == 7 ? HMQX :
+  i == 8 ? LMGX :
+  i == 9 ? LMFX :
+  i == 10 ? LMQX :
+  i == 11 ? LFGX :
+  i == 12 ? LFFX :
+  i == 13 ? 70 :
+  i == 14 ? 218 :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? HPY :
+  i == 2 ? LPY :
+  i == 3 ? HFGY :
+  i == 4 ? HFFY :
+  i == 5 ? HMGY :
+  i == 6 ? HMFY :
+  i == 7 ? HMQY :
+  i == 8 ? LMGY :
+  i == 9 ? LMFY :
+  i == 10 ? LMQY :
+  i == 11 ? LFGY :
+  i == 12 ? LFFY :
+  i == 13 ? 894 :
+  i == 14 ? 894 :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 ? ( kbx_off ? kbx_put(1, 0, 0, 600, 1) : kbx_ok ? kbx_put(1, v * 1, 0, 600, 1); );
+  i == 2 ? ( kbx_off ? kbx_put(3, 30000, 3000, 30000, 1) : kbx_ok ? kbx_put(3, v * ((kbx_kil || abs(v) < 31) ? 1000 : 1), 3000, 30000, 1); );
+  i == 3 && kbx_ok ? kbx_put(5, v * 1, -15, 15, 0.1);
+  i == 4 && kbx_ok ? kbx_put(6, v * ((kbx_kil || abs(v) < 30) ? 1000 : 1), 1500, 22000, 1);
+  i == 5 && kbx_ok ? kbx_put(8, v * 1, -20, 20, 0.1);
+  i == 6 && kbx_ok ? kbx_put(9, v * ((kbx_kil || abs(v) < 10) ? 1000 : 1), 600, 7000, 1);
+  i == 7 && kbx_ok ? kbx_put(10, v * 1, 0.7, 2.5, 0.01);
+  i == 8 && kbx_ok ? kbx_put(12, v * 1, -20, 20, 0.1);
+  i == 9 && kbx_ok ? kbx_put(13, v * ((kbx_kil || abs(v) < 3) ? 1000 : 1), 200, 2500, 1);
+  i == 10 && kbx_ok ? kbx_put(14, v * 1, 0.7, 2.5, 0.01);
+  i == 11 && kbx_ok ? kbx_put(16, v * 1, -15, 15, 0.1);
+  i == 12 && kbx_ok ? kbx_put(17, v * 1, 40, 600, 1);
+  i == 13 && kbx_ok ? kbx_put(21, v * 1, -12, 12, 0.1);
+  i == 14 && kbx_ok ? kbx_put(22, v * 1, -12, 12, 0.1);
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 mb1 = mouse_cap & 1;
 (mb1 && !last_mb) ? (
   drag = 0;
@@ -606,3 +749,18 @@ th_mb = mouse_cap & 1;
   );
 );
 th_lmb = th_mb;
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);

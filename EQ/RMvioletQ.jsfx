@@ -1,8 +1,8 @@
 desc:RMvioletQ - ReNo Mellow violet Q (Passive Stereo Mastering EQ)
 //tags: equalizer EQ passive tube mastering stereo manley-style
 //@author ReNo Mellow
-//@version 1.2
-//@changelog Couleur verte par défaut (double-clic sur le nom = orange) ; nouvelle taille 200 %
+//@version 1.3
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Égaliseur passif stéréo à lampes inspiré du Manley Massive Passive (version Mastering) : 2 x 4 bandes à crans, BANDWIDTH qui sculpte les shelfs (courbes Pultec), combinaison parallèle, LP/HP, Link.
 //
 // ---------------------------------------------------------------------------
@@ -741,6 +741,547 @@ draw_btn(1360, 496, 90, 24, slider53 >= 0.5, "COLOR");
 draw_btn(1456, 496, 64, 24, slider54 >= 0.5, "HQ");
 
 // ---- Souris ----------------------------------------------------------------------------------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( set_sl(idx, v); );
+function kbx_ic(cx, cy, r) ( sqr(mx - cx) + sqr(my - cy) <= r * r; );
+function kbx_ir(x, y, w, h) ( mx >= x && mx < x + w && my >= y && my < y + h; );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  kbx_ic(150, 194, 34) ? 1 :
+  kbx_ic(150, 294, 30) ? 2 :
+  kbx_ic(150, 398, 32) ? 3 :
+  kbx_ic(296, 194, 34) ? 4 :
+  kbx_ic(296, 294, 30) ? 5 :
+  kbx_ic(296, 398, 32) ? 6 :
+  kbx_ic(442, 194, 34) ? 7 :
+  kbx_ic(442, 294, 30) ? 8 :
+  kbx_ic(442, 398, 32) ? 9 :
+  kbx_ic(588, 194, 34) ? 10 :
+  kbx_ic(588, 294, 30) ? 11 :
+  kbx_ic(588, 398, 32) ? 12 :
+  kbx_ic(720, 226, 24) ? 13 :
+  kbx_ic(720, 326, 24) ? 14 :
+  kbx_ic(720, 434, 24) ? 15 :
+  kbx_ic(972, 194, 34) ? 16 :
+  kbx_ic(972, 294, 30) ? 17 :
+  kbx_ic(972, 398, 32) ? 18 :
+  kbx_ic(1118, 194, 34) ? 19 :
+  kbx_ic(1118, 294, 30) ? 20 :
+  kbx_ic(1118, 398, 32) ? 21 :
+  kbx_ic(1264, 194, 34) ? 22 :
+  kbx_ic(1264, 294, 30) ? 23 :
+  kbx_ic(1264, 398, 32) ? 24 :
+  kbx_ic(1410, 194, 34) ? 25 :
+  kbx_ic(1410, 294, 30) ? 26 :
+  kbx_ic(1410, 398, 32) ? 27 :
+  kbx_ic(840, 226, 24) ? 28 :
+  kbx_ic(840, 326, 24) ? 29 :
+  kbx_ic(840, 434, 24) ? 30 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? 150 :
+  i == 2 ? 150 :
+  i == 3 ? 150 :
+  i == 4 ? 296 :
+  i == 5 ? 296 :
+  i == 6 ? 296 :
+  i == 7 ? 442 :
+  i == 8 ? 442 :
+  i == 9 ? 442 :
+  i == 10 ? 588 :
+  i == 11 ? 588 :
+  i == 12 ? 588 :
+  i == 13 ? 720 :
+  i == 14 ? 720 :
+  i == 15 ? 720 :
+  i == 16 ? 972 :
+  i == 17 ? 972 :
+  i == 18 ? 972 :
+  i == 19 ? 1118 :
+  i == 20 ? 1118 :
+  i == 21 ? 1118 :
+  i == 22 ? 1264 :
+  i == 23 ? 1264 :
+  i == 24 ? 1264 :
+  i == 25 ? 1410 :
+  i == 26 ? 1410 :
+  i == 27 ? 1410 :
+  i == 28 ? 840 :
+  i == 29 ? 840 :
+  i == 30 ? 840 :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? 194 :
+  i == 2 ? 294 :
+  i == 3 ? 398 :
+  i == 4 ? 194 :
+  i == 5 ? 294 :
+  i == 6 ? 398 :
+  i == 7 ? 194 :
+  i == 8 ? 294 :
+  i == 9 ? 398 :
+  i == 10 ? 194 :
+  i == 11 ? 294 :
+  i == 12 ? 398 :
+  i == 13 ? 226 :
+  i == 14 ? 326 :
+  i == 15 ? 434 :
+  i == 16 ? 194 :
+  i == 17 ? 294 :
+  i == 18 ? 398 :
+  i == 19 ? 194 :
+  i == 20 ? 294 :
+  i == 21 ? 398 :
+  i == 22 ? 194 :
+  i == 23 ? 294 :
+  i == 24 ? 398 :
+  i == 25 ? 194 :
+  i == 26 ? 294 :
+  i == 27 ? 398 :
+  i == 28 ? 226 :
+  i == 29 ? 326 :
+  i == 30 ? 434 :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 && kbx_ok ? kbx_put(3, v * 1, 0, 11, 0.5);
+  i == 2 && kbx_ok ? kbx_put(4, v * 1, 0, 10, 1);
+  i == 3 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "22") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "33") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "47") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "68") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "100") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "150") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "220") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "330") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "470") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "680") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "1k") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (22)), abs(v * 1000 - (22))) < kbx_bd ? ( kbx_bd = min(abs(v - (22)), abs(v * 1000 - (22))); kbx_b = 0; );
+      min(abs(v - (33)), abs(v * 1000 - (33))) < kbx_bd ? ( kbx_bd = min(abs(v - (33)), abs(v * 1000 - (33))); kbx_b = 1; );
+      min(abs(v - (47)), abs(v * 1000 - (47))) < kbx_bd ? ( kbx_bd = min(abs(v - (47)), abs(v * 1000 - (47))); kbx_b = 2; );
+      min(abs(v - (68)), abs(v * 1000 - (68))) < kbx_bd ? ( kbx_bd = min(abs(v - (68)), abs(v * 1000 - (68))); kbx_b = 3; );
+      min(abs(v - (100)), abs(v * 1000 - (100))) < kbx_bd ? ( kbx_bd = min(abs(v - (100)), abs(v * 1000 - (100))); kbx_b = 4; );
+      min(abs(v - (150)), abs(v * 1000 - (150))) < kbx_bd ? ( kbx_bd = min(abs(v - (150)), abs(v * 1000 - (150))); kbx_b = 5; );
+      min(abs(v - (220)), abs(v * 1000 - (220))) < kbx_bd ? ( kbx_bd = min(abs(v - (220)), abs(v * 1000 - (220))); kbx_b = 6; );
+      min(abs(v - (330)), abs(v * 1000 - (330))) < kbx_bd ? ( kbx_bd = min(abs(v - (330)), abs(v * 1000 - (330))); kbx_b = 7; );
+      min(abs(v - (470)), abs(v * 1000 - (470))) < kbx_bd ? ( kbx_bd = min(abs(v - (470)), abs(v * 1000 - (470))); kbx_b = 8; );
+      min(abs(v - (680)), abs(v * 1000 - (680))) < kbx_bd ? ( kbx_bd = min(abs(v - (680)), abs(v * 1000 - (680))); kbx_b = 9; );
+      min(abs(v - (1000)), abs(v * 1000 - (1000))) < kbx_bd ? ( kbx_bd = min(abs(v - (1000)), abs(v * 1000 - (1000))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(5, kbx_b);
+  );
+  i == 4 && kbx_ok ? kbx_put(8, v * 1, 0, 11, 0.5);
+  i == 5 && kbx_ok ? kbx_put(9, v * 1, 0, 10, 1);
+  i == 6 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "82") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "120") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "180") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "270") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "390") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "560") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "820") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "1k2") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "1k8") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "2k7") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "3k9") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (82)), abs(v * 1000 - (82))) < kbx_bd ? ( kbx_bd = min(abs(v - (82)), abs(v * 1000 - (82))); kbx_b = 0; );
+      min(abs(v - (120)), abs(v * 1000 - (120))) < kbx_bd ? ( kbx_bd = min(abs(v - (120)), abs(v * 1000 - (120))); kbx_b = 1; );
+      min(abs(v - (180)), abs(v * 1000 - (180))) < kbx_bd ? ( kbx_bd = min(abs(v - (180)), abs(v * 1000 - (180))); kbx_b = 2; );
+      min(abs(v - (270)), abs(v * 1000 - (270))) < kbx_bd ? ( kbx_bd = min(abs(v - (270)), abs(v * 1000 - (270))); kbx_b = 3; );
+      min(abs(v - (390)), abs(v * 1000 - (390))) < kbx_bd ? ( kbx_bd = min(abs(v - (390)), abs(v * 1000 - (390))); kbx_b = 4; );
+      min(abs(v - (560)), abs(v * 1000 - (560))) < kbx_bd ? ( kbx_bd = min(abs(v - (560)), abs(v * 1000 - (560))); kbx_b = 5; );
+      min(abs(v - (820)), abs(v * 1000 - (820))) < kbx_bd ? ( kbx_bd = min(abs(v - (820)), abs(v * 1000 - (820))); kbx_b = 6; );
+      min(abs(v - (1200)), abs(v * 1000 - (1200))) < kbx_bd ? ( kbx_bd = min(abs(v - (1200)), abs(v * 1000 - (1200))); kbx_b = 7; );
+      min(abs(v - (1800)), abs(v * 1000 - (1800))) < kbx_bd ? ( kbx_bd = min(abs(v - (1800)), abs(v * 1000 - (1800))); kbx_b = 8; );
+      min(abs(v - (2700)), abs(v * 1000 - (2700))) < kbx_bd ? ( kbx_bd = min(abs(v - (2700)), abs(v * 1000 - (2700))); kbx_b = 9; );
+      min(abs(v - (3900)), abs(v * 1000 - (3900))) < kbx_bd ? ( kbx_bd = min(abs(v - (3900)), abs(v * 1000 - (3900))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(10, kbx_b);
+  );
+  i == 7 && kbx_ok ? kbx_put(13, v * 1, 0, 11, 0.5);
+  i == 8 && kbx_ok ? kbx_put(14, v * 1, 0, 10, 1);
+  i == 9 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "220") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "330") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "470") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "680") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "1k") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "1k5") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "2k2") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "3k3") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "4k7") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "6k8") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "10k") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (220)), abs(v * 1000 - (220))) < kbx_bd ? ( kbx_bd = min(abs(v - (220)), abs(v * 1000 - (220))); kbx_b = 0; );
+      min(abs(v - (330)), abs(v * 1000 - (330))) < kbx_bd ? ( kbx_bd = min(abs(v - (330)), abs(v * 1000 - (330))); kbx_b = 1; );
+      min(abs(v - (470)), abs(v * 1000 - (470))) < kbx_bd ? ( kbx_bd = min(abs(v - (470)), abs(v * 1000 - (470))); kbx_b = 2; );
+      min(abs(v - (680)), abs(v * 1000 - (680))) < kbx_bd ? ( kbx_bd = min(abs(v - (680)), abs(v * 1000 - (680))); kbx_b = 3; );
+      min(abs(v - (1000)), abs(v * 1000 - (1000))) < kbx_bd ? ( kbx_bd = min(abs(v - (1000)), abs(v * 1000 - (1000))); kbx_b = 4; );
+      min(abs(v - (1500)), abs(v * 1000 - (1500))) < kbx_bd ? ( kbx_bd = min(abs(v - (1500)), abs(v * 1000 - (1500))); kbx_b = 5; );
+      min(abs(v - (2200)), abs(v * 1000 - (2200))) < kbx_bd ? ( kbx_bd = min(abs(v - (2200)), abs(v * 1000 - (2200))); kbx_b = 6; );
+      min(abs(v - (3300)), abs(v * 1000 - (3300))) < kbx_bd ? ( kbx_bd = min(abs(v - (3300)), abs(v * 1000 - (3300))); kbx_b = 7; );
+      min(abs(v - (4700)), abs(v * 1000 - (4700))) < kbx_bd ? ( kbx_bd = min(abs(v - (4700)), abs(v * 1000 - (4700))); kbx_b = 8; );
+      min(abs(v - (6800)), abs(v * 1000 - (6800))) < kbx_bd ? ( kbx_bd = min(abs(v - (6800)), abs(v * 1000 - (6800))); kbx_b = 9; );
+      min(abs(v - (10000)), abs(v * 1000 - (10000))) < kbx_bd ? ( kbx_bd = min(abs(v - (10000)), abs(v * 1000 - (10000))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(15, kbx_b);
+  );
+  i == 10 && kbx_ok ? kbx_put(18, v * 1, 0, 11, 0.5);
+  i == 11 && kbx_ok ? kbx_put(19, v * 1, 0, 10, 1);
+  i == 12 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "560") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "820") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "1k2") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "1k8") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "2k7") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "3k9") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "5k6") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "8k2") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "12k") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "16k") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "27k") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (560)), abs(v * 1000 - (560))) < kbx_bd ? ( kbx_bd = min(abs(v - (560)), abs(v * 1000 - (560))); kbx_b = 0; );
+      min(abs(v - (820)), abs(v * 1000 - (820))) < kbx_bd ? ( kbx_bd = min(abs(v - (820)), abs(v * 1000 - (820))); kbx_b = 1; );
+      min(abs(v - (1200)), abs(v * 1000 - (1200))) < kbx_bd ? ( kbx_bd = min(abs(v - (1200)), abs(v * 1000 - (1200))); kbx_b = 2; );
+      min(abs(v - (1800)), abs(v * 1000 - (1800))) < kbx_bd ? ( kbx_bd = min(abs(v - (1800)), abs(v * 1000 - (1800))); kbx_b = 3; );
+      min(abs(v - (2700)), abs(v * 1000 - (2700))) < kbx_bd ? ( kbx_bd = min(abs(v - (2700)), abs(v * 1000 - (2700))); kbx_b = 4; );
+      min(abs(v - (3900)), abs(v * 1000 - (3900))) < kbx_bd ? ( kbx_bd = min(abs(v - (3900)), abs(v * 1000 - (3900))); kbx_b = 5; );
+      min(abs(v - (5600)), abs(v * 1000 - (5600))) < kbx_bd ? ( kbx_bd = min(abs(v - (5600)), abs(v * 1000 - (5600))); kbx_b = 6; );
+      min(abs(v - (8200)), abs(v * 1000 - (8200))) < kbx_bd ? ( kbx_bd = min(abs(v - (8200)), abs(v * 1000 - (8200))); kbx_b = 7; );
+      min(abs(v - (12000)), abs(v * 1000 - (12000))) < kbx_bd ? ( kbx_bd = min(abs(v - (12000)), abs(v * 1000 - (12000))); kbx_b = 8; );
+      min(abs(v - (16000)), abs(v * 1000 - (16000))) < kbx_bd ? ( kbx_bd = min(abs(v - (16000)), abs(v * 1000 - (16000))); kbx_b = 9; );
+      min(abs(v - (27000)), abs(v * 1000 - (27000))) < kbx_bd ? ( kbx_bd = min(abs(v - (27000)), abs(v * 1000 - (27000))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(20, kbx_b);
+  );
+  i == 13 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "-2.5") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "-2") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "-1.5") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "-1") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "-0.5") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "0") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "+0.5") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "+1") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "+1.5") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "+2") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "+2.5") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (-2.5)), abs(v * 1000 - (-2.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (-2.5)), abs(v * 1000 - (-2.5))); kbx_b = 0; );
+      min(abs(v - (-2)), abs(v * 1000 - (-2))) < kbx_bd ? ( kbx_bd = min(abs(v - (-2)), abs(v * 1000 - (-2))); kbx_b = 1; );
+      min(abs(v - (-1.5)), abs(v * 1000 - (-1.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (-1.5)), abs(v * 1000 - (-1.5))); kbx_b = 2; );
+      min(abs(v - (-1)), abs(v * 1000 - (-1))) < kbx_bd ? ( kbx_bd = min(abs(v - (-1)), abs(v * 1000 - (-1))); kbx_b = 3; );
+      min(abs(v - (-0.5)), abs(v * 1000 - (-0.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (-0.5)), abs(v * 1000 - (-0.5))); kbx_b = 4; );
+      min(abs(v - (0)), abs(v * 1000 - (0))) < kbx_bd ? ( kbx_bd = min(abs(v - (0)), abs(v * 1000 - (0))); kbx_b = 5; );
+      min(abs(v - (0.5)), abs(v * 1000 - (0.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (0.5)), abs(v * 1000 - (0.5))); kbx_b = 6; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 7; );
+      min(abs(v - (1.5)), abs(v * 1000 - (1.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (1.5)), abs(v * 1000 - (1.5))); kbx_b = 8; );
+      min(abs(v - (2)), abs(v * 1000 - (2))) < kbx_bd ? ( kbx_bd = min(abs(v - (2)), abs(v * 1000 - (2))); kbx_b = 9; );
+      min(abs(v - (2.5)), abs(v * 1000 - (2.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (2.5)), abs(v * 1000 - (2.5))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(22, kbx_b);
+  );
+  i == 14 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "off") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "52k") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "40k") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "27k") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "20k") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "15k") == 0 ? kbx_b = 5;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (52000)), abs(v * 1000 - (52000))) < kbx_bd ? ( kbx_bd = min(abs(v - (52000)), abs(v * 1000 - (52000))); kbx_b = 1; );
+      min(abs(v - (40000)), abs(v * 1000 - (40000))) < kbx_bd ? ( kbx_bd = min(abs(v - (40000)), abs(v * 1000 - (40000))); kbx_b = 2; );
+      min(abs(v - (27000)), abs(v * 1000 - (27000))) < kbx_bd ? ( kbx_bd = min(abs(v - (27000)), abs(v * 1000 - (27000))); kbx_b = 3; );
+      min(abs(v - (20000)), abs(v * 1000 - (20000))) < kbx_bd ? ( kbx_bd = min(abs(v - (20000)), abs(v * 1000 - (20000))); kbx_b = 4; );
+      min(abs(v - (15000)), abs(v * 1000 - (15000))) < kbx_bd ? ( kbx_bd = min(abs(v - (15000)), abs(v * 1000 - (15000))); kbx_b = 5; );
+    );
+    kbx_b >= 0 ? kbx_setsl(23, kbx_b);
+  );
+  i == 15 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "off") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "12") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "16") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "23") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "30") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "39") == 0 ? kbx_b = 5;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (12)), abs(v * 1000 - (12))) < kbx_bd ? ( kbx_bd = min(abs(v - (12)), abs(v * 1000 - (12))); kbx_b = 1; );
+      min(abs(v - (16)), abs(v * 1000 - (16))) < kbx_bd ? ( kbx_bd = min(abs(v - (16)), abs(v * 1000 - (16))); kbx_b = 2; );
+      min(abs(v - (23)), abs(v * 1000 - (23))) < kbx_bd ? ( kbx_bd = min(abs(v - (23)), abs(v * 1000 - (23))); kbx_b = 3; );
+      min(abs(v - (30)), abs(v * 1000 - (30))) < kbx_bd ? ( kbx_bd = min(abs(v - (30)), abs(v * 1000 - (30))); kbx_b = 4; );
+      min(abs(v - (39)), abs(v * 1000 - (39))) < kbx_bd ? ( kbx_bd = min(abs(v - (39)), abs(v * 1000 - (39))); kbx_b = 5; );
+    );
+    kbx_b >= 0 ? kbx_setsl(24, kbx_b);
+  );
+  i == 16 && kbx_ok ? kbx_put(27, v * 1, 0, 11, 0.5);
+  i == 17 && kbx_ok ? kbx_put(28, v * 1, 0, 10, 1);
+  i == 18 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "22") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "33") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "47") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "68") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "100") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "150") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "220") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "330") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "470") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "680") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "1k") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (22)), abs(v * 1000 - (22))) < kbx_bd ? ( kbx_bd = min(abs(v - (22)), abs(v * 1000 - (22))); kbx_b = 0; );
+      min(abs(v - (33)), abs(v * 1000 - (33))) < kbx_bd ? ( kbx_bd = min(abs(v - (33)), abs(v * 1000 - (33))); kbx_b = 1; );
+      min(abs(v - (47)), abs(v * 1000 - (47))) < kbx_bd ? ( kbx_bd = min(abs(v - (47)), abs(v * 1000 - (47))); kbx_b = 2; );
+      min(abs(v - (68)), abs(v * 1000 - (68))) < kbx_bd ? ( kbx_bd = min(abs(v - (68)), abs(v * 1000 - (68))); kbx_b = 3; );
+      min(abs(v - (100)), abs(v * 1000 - (100))) < kbx_bd ? ( kbx_bd = min(abs(v - (100)), abs(v * 1000 - (100))); kbx_b = 4; );
+      min(abs(v - (150)), abs(v * 1000 - (150))) < kbx_bd ? ( kbx_bd = min(abs(v - (150)), abs(v * 1000 - (150))); kbx_b = 5; );
+      min(abs(v - (220)), abs(v * 1000 - (220))) < kbx_bd ? ( kbx_bd = min(abs(v - (220)), abs(v * 1000 - (220))); kbx_b = 6; );
+      min(abs(v - (330)), abs(v * 1000 - (330))) < kbx_bd ? ( kbx_bd = min(abs(v - (330)), abs(v * 1000 - (330))); kbx_b = 7; );
+      min(abs(v - (470)), abs(v * 1000 - (470))) < kbx_bd ? ( kbx_bd = min(abs(v - (470)), abs(v * 1000 - (470))); kbx_b = 8; );
+      min(abs(v - (680)), abs(v * 1000 - (680))) < kbx_bd ? ( kbx_bd = min(abs(v - (680)), abs(v * 1000 - (680))); kbx_b = 9; );
+      min(abs(v - (1000)), abs(v * 1000 - (1000))) < kbx_bd ? ( kbx_bd = min(abs(v - (1000)), abs(v * 1000 - (1000))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(29, kbx_b);
+  );
+  i == 19 && kbx_ok ? kbx_put(32, v * 1, 0, 11, 0.5);
+  i == 20 && kbx_ok ? kbx_put(33, v * 1, 0, 10, 1);
+  i == 21 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "82") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "120") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "180") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "270") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "390") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "560") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "820") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "1k2") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "1k8") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "2k7") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "3k9") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (82)), abs(v * 1000 - (82))) < kbx_bd ? ( kbx_bd = min(abs(v - (82)), abs(v * 1000 - (82))); kbx_b = 0; );
+      min(abs(v - (120)), abs(v * 1000 - (120))) < kbx_bd ? ( kbx_bd = min(abs(v - (120)), abs(v * 1000 - (120))); kbx_b = 1; );
+      min(abs(v - (180)), abs(v * 1000 - (180))) < kbx_bd ? ( kbx_bd = min(abs(v - (180)), abs(v * 1000 - (180))); kbx_b = 2; );
+      min(abs(v - (270)), abs(v * 1000 - (270))) < kbx_bd ? ( kbx_bd = min(abs(v - (270)), abs(v * 1000 - (270))); kbx_b = 3; );
+      min(abs(v - (390)), abs(v * 1000 - (390))) < kbx_bd ? ( kbx_bd = min(abs(v - (390)), abs(v * 1000 - (390))); kbx_b = 4; );
+      min(abs(v - (560)), abs(v * 1000 - (560))) < kbx_bd ? ( kbx_bd = min(abs(v - (560)), abs(v * 1000 - (560))); kbx_b = 5; );
+      min(abs(v - (820)), abs(v * 1000 - (820))) < kbx_bd ? ( kbx_bd = min(abs(v - (820)), abs(v * 1000 - (820))); kbx_b = 6; );
+      min(abs(v - (1200)), abs(v * 1000 - (1200))) < kbx_bd ? ( kbx_bd = min(abs(v - (1200)), abs(v * 1000 - (1200))); kbx_b = 7; );
+      min(abs(v - (1800)), abs(v * 1000 - (1800))) < kbx_bd ? ( kbx_bd = min(abs(v - (1800)), abs(v * 1000 - (1800))); kbx_b = 8; );
+      min(abs(v - (2700)), abs(v * 1000 - (2700))) < kbx_bd ? ( kbx_bd = min(abs(v - (2700)), abs(v * 1000 - (2700))); kbx_b = 9; );
+      min(abs(v - (3900)), abs(v * 1000 - (3900))) < kbx_bd ? ( kbx_bd = min(abs(v - (3900)), abs(v * 1000 - (3900))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(34, kbx_b);
+  );
+  i == 22 && kbx_ok ? kbx_put(37, v * 1, 0, 11, 0.5);
+  i == 23 && kbx_ok ? kbx_put(38, v * 1, 0, 10, 1);
+  i == 24 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "220") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "330") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "470") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "680") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "1k") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "1k5") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "2k2") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "3k3") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "4k7") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "6k8") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "10k") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (220)), abs(v * 1000 - (220))) < kbx_bd ? ( kbx_bd = min(abs(v - (220)), abs(v * 1000 - (220))); kbx_b = 0; );
+      min(abs(v - (330)), abs(v * 1000 - (330))) < kbx_bd ? ( kbx_bd = min(abs(v - (330)), abs(v * 1000 - (330))); kbx_b = 1; );
+      min(abs(v - (470)), abs(v * 1000 - (470))) < kbx_bd ? ( kbx_bd = min(abs(v - (470)), abs(v * 1000 - (470))); kbx_b = 2; );
+      min(abs(v - (680)), abs(v * 1000 - (680))) < kbx_bd ? ( kbx_bd = min(abs(v - (680)), abs(v * 1000 - (680))); kbx_b = 3; );
+      min(abs(v - (1000)), abs(v * 1000 - (1000))) < kbx_bd ? ( kbx_bd = min(abs(v - (1000)), abs(v * 1000 - (1000))); kbx_b = 4; );
+      min(abs(v - (1500)), abs(v * 1000 - (1500))) < kbx_bd ? ( kbx_bd = min(abs(v - (1500)), abs(v * 1000 - (1500))); kbx_b = 5; );
+      min(abs(v - (2200)), abs(v * 1000 - (2200))) < kbx_bd ? ( kbx_bd = min(abs(v - (2200)), abs(v * 1000 - (2200))); kbx_b = 6; );
+      min(abs(v - (3300)), abs(v * 1000 - (3300))) < kbx_bd ? ( kbx_bd = min(abs(v - (3300)), abs(v * 1000 - (3300))); kbx_b = 7; );
+      min(abs(v - (4700)), abs(v * 1000 - (4700))) < kbx_bd ? ( kbx_bd = min(abs(v - (4700)), abs(v * 1000 - (4700))); kbx_b = 8; );
+      min(abs(v - (6800)), abs(v * 1000 - (6800))) < kbx_bd ? ( kbx_bd = min(abs(v - (6800)), abs(v * 1000 - (6800))); kbx_b = 9; );
+      min(abs(v - (10000)), abs(v * 1000 - (10000))) < kbx_bd ? ( kbx_bd = min(abs(v - (10000)), abs(v * 1000 - (10000))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(39, kbx_b);
+  );
+  i == 25 && kbx_ok ? kbx_put(42, v * 1, 0, 11, 0.5);
+  i == 26 && kbx_ok ? kbx_put(43, v * 1, 0, 10, 1);
+  i == 27 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "560") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "820") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "1k2") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "1k8") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "2k7") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "3k9") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "5k6") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "8k2") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "12k") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "16k") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "27k") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (560)), abs(v * 1000 - (560))) < kbx_bd ? ( kbx_bd = min(abs(v - (560)), abs(v * 1000 - (560))); kbx_b = 0; );
+      min(abs(v - (820)), abs(v * 1000 - (820))) < kbx_bd ? ( kbx_bd = min(abs(v - (820)), abs(v * 1000 - (820))); kbx_b = 1; );
+      min(abs(v - (1200)), abs(v * 1000 - (1200))) < kbx_bd ? ( kbx_bd = min(abs(v - (1200)), abs(v * 1000 - (1200))); kbx_b = 2; );
+      min(abs(v - (1800)), abs(v * 1000 - (1800))) < kbx_bd ? ( kbx_bd = min(abs(v - (1800)), abs(v * 1000 - (1800))); kbx_b = 3; );
+      min(abs(v - (2700)), abs(v * 1000 - (2700))) < kbx_bd ? ( kbx_bd = min(abs(v - (2700)), abs(v * 1000 - (2700))); kbx_b = 4; );
+      min(abs(v - (3900)), abs(v * 1000 - (3900))) < kbx_bd ? ( kbx_bd = min(abs(v - (3900)), abs(v * 1000 - (3900))); kbx_b = 5; );
+      min(abs(v - (5600)), abs(v * 1000 - (5600))) < kbx_bd ? ( kbx_bd = min(abs(v - (5600)), abs(v * 1000 - (5600))); kbx_b = 6; );
+      min(abs(v - (8200)), abs(v * 1000 - (8200))) < kbx_bd ? ( kbx_bd = min(abs(v - (8200)), abs(v * 1000 - (8200))); kbx_b = 7; );
+      min(abs(v - (12000)), abs(v * 1000 - (12000))) < kbx_bd ? ( kbx_bd = min(abs(v - (12000)), abs(v * 1000 - (12000))); kbx_b = 8; );
+      min(abs(v - (16000)), abs(v * 1000 - (16000))) < kbx_bd ? ( kbx_bd = min(abs(v - (16000)), abs(v * 1000 - (16000))); kbx_b = 9; );
+      min(abs(v - (27000)), abs(v * 1000 - (27000))) < kbx_bd ? ( kbx_bd = min(abs(v - (27000)), abs(v * 1000 - (27000))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(44, kbx_b);
+  );
+  i == 28 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "-2.5") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "-2") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "-1.5") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "-1") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "-0.5") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "0") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "+0.5") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "+1") == 0 ? kbx_b = 7;
+    stricmp(#kbx_n, "+1.5") == 0 ? kbx_b = 8;
+    stricmp(#kbx_n, "+2") == 0 ? kbx_b = 9;
+    stricmp(#kbx_n, "+2.5") == 0 ? kbx_b = 10;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (-2.5)), abs(v * 1000 - (-2.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (-2.5)), abs(v * 1000 - (-2.5))); kbx_b = 0; );
+      min(abs(v - (-2)), abs(v * 1000 - (-2))) < kbx_bd ? ( kbx_bd = min(abs(v - (-2)), abs(v * 1000 - (-2))); kbx_b = 1; );
+      min(abs(v - (-1.5)), abs(v * 1000 - (-1.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (-1.5)), abs(v * 1000 - (-1.5))); kbx_b = 2; );
+      min(abs(v - (-1)), abs(v * 1000 - (-1))) < kbx_bd ? ( kbx_bd = min(abs(v - (-1)), abs(v * 1000 - (-1))); kbx_b = 3; );
+      min(abs(v - (-0.5)), abs(v * 1000 - (-0.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (-0.5)), abs(v * 1000 - (-0.5))); kbx_b = 4; );
+      min(abs(v - (0)), abs(v * 1000 - (0))) < kbx_bd ? ( kbx_bd = min(abs(v - (0)), abs(v * 1000 - (0))); kbx_b = 5; );
+      min(abs(v - (0.5)), abs(v * 1000 - (0.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (0.5)), abs(v * 1000 - (0.5))); kbx_b = 6; );
+      min(abs(v - (1)), abs(v * 1000 - (1))) < kbx_bd ? ( kbx_bd = min(abs(v - (1)), abs(v * 1000 - (1))); kbx_b = 7; );
+      min(abs(v - (1.5)), abs(v * 1000 - (1.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (1.5)), abs(v * 1000 - (1.5))); kbx_b = 8; );
+      min(abs(v - (2)), abs(v * 1000 - (2))) < kbx_bd ? ( kbx_bd = min(abs(v - (2)), abs(v * 1000 - (2))); kbx_b = 9; );
+      min(abs(v - (2.5)), abs(v * 1000 - (2.5))) < kbx_bd ? ( kbx_bd = min(abs(v - (2.5)), abs(v * 1000 - (2.5))); kbx_b = 10; );
+    );
+    kbx_b >= 0 ? kbx_setsl(46, kbx_b);
+  );
+  i == 29 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "off") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "52k") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "40k") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "27k") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "20k") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "15k") == 0 ? kbx_b = 5;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (52000)), abs(v * 1000 - (52000))) < kbx_bd ? ( kbx_bd = min(abs(v - (52000)), abs(v * 1000 - (52000))); kbx_b = 1; );
+      min(abs(v - (40000)), abs(v * 1000 - (40000))) < kbx_bd ? ( kbx_bd = min(abs(v - (40000)), abs(v * 1000 - (40000))); kbx_b = 2; );
+      min(abs(v - (27000)), abs(v * 1000 - (27000))) < kbx_bd ? ( kbx_bd = min(abs(v - (27000)), abs(v * 1000 - (27000))); kbx_b = 3; );
+      min(abs(v - (20000)), abs(v * 1000 - (20000))) < kbx_bd ? ( kbx_bd = min(abs(v - (20000)), abs(v * 1000 - (20000))); kbx_b = 4; );
+      min(abs(v - (15000)), abs(v * 1000 - (15000))) < kbx_bd ? ( kbx_bd = min(abs(v - (15000)), abs(v * 1000 - (15000))); kbx_b = 5; );
+    );
+    kbx_b >= 0 ? kbx_setsl(47, kbx_b);
+  );
+  i == 30 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "off") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "12") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "16") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "23") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "30") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "39") == 0 ? kbx_b = 5;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (12)), abs(v * 1000 - (12))) < kbx_bd ? ( kbx_bd = min(abs(v - (12)), abs(v * 1000 - (12))); kbx_b = 1; );
+      min(abs(v - (16)), abs(v * 1000 - (16))) < kbx_bd ? ( kbx_bd = min(abs(v - (16)), abs(v * 1000 - (16))); kbx_b = 2; );
+      min(abs(v - (23)), abs(v * 1000 - (23))) < kbx_bd ? ( kbx_bd = min(abs(v - (23)), abs(v * 1000 - (23))); kbx_b = 3; );
+      min(abs(v - (30)), abs(v * 1000 - (30))) < kbx_bd ? ( kbx_bd = min(abs(v - (30)), abs(v * 1000 - (30))); kbx_b = 4; );
+      min(abs(v - (39)), abs(v * 1000 - (39))) < kbx_bd ? ( kbx_bd = min(abs(v - (39)), abs(v * 1000 - (39))); kbx_b = 5; );
+    );
+    kbx_b >= 0 ? kbx_setsl(48, kbx_b);
+  );
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 mb1 = mouse_cap & 1;
 (mb1 && !last_mb) ? (
   drag = 0; acc = 0;
@@ -807,3 +1348,18 @@ mb1 = mouse_cap & 1;
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
 link_sync(1);
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);

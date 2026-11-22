@@ -1,8 +1,8 @@
 desc:RMdevilQ - ReNo Mellow devil Q (Colored British 4-Band EQ)
 //tags: equalizer EQ inductor saturation colored 500-series british chandler-style
 //@author ReNo Mellow
-//@version 1.5
-//@changelog Boutons SIZE déplacés en haut de l'interface (toujours accessibles, même fenêtre réduite)
+//@version 1.6
+//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
 //@about Égaliseur 4 bandes à l'anglaise inspiré du Chandler Little Devil : shelfs à condensateur, médiums à inductance avec Q hi/lo, low cut, et une couleur riche et épaisse réglable (HEAT).
 //
 // ---------------------------------------------------------------------------
@@ -522,6 +522,169 @@ sz = floor(slider14 + 0.5);
 draw_btn(56, 993, 234, 22, slider16 >= 0.5, "HQ");
 
 // ---- Souris ----------------------------------------------------------------------------------
+
+// ---------- keyboard value entry (ReNo Mellow standard) : double-click a knob or its value, type, Enter ----------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kil = 0; kbx_off = 0; kbx_inf = 0; kbx_sec = 0; kbx_pc = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == 'i' ? kbx_inf = 1;
+    (c == 's' && kbx_pc != 'm') ? kbx_sec = 1;
+    kbx_pc = c;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kil = 1;
+    c == 'o' ? kbx_off = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0') / dv; ) : ( v = v * 10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_neg ? -v : v;
+);
+function kbx_setsl(idx, v) ( set_sl(idx, v); );
+function kbx_ic(cx, cy, r) ( sqr(mx - cx) + sqr(my - cy) <= r * r; );
+function kbx_ir(x, y, w, h) ( mx >= x && mx < x + w && my >= y && my < y + h; );
+function kbx_put(idx, v, lo, hi, st)
+(
+  v = min(hi, max(lo, v));
+  st > 0 ? v = lo + floor((v - lo) / st + 0.5) * st;
+  kbx_setsl(idx, min(hi, max(lo, v)));
+);
+function kbx_norm() local(i, n, c)
+(
+  strcpy(#kbx_n, "");
+  n = strlen(#kbx_ed); i = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c != ' ' ? ( sprintf(#kbx_c1, "%c", c); strcat(#kbx_n, #kbx_c1); );
+    i += 1;
+  );
+);
+function kbx_hit()
+(
+  kbx_ic(92, 138, 34) ? 1 :
+  kbx_ic(222, 268, 34) ? 2 :
+  kbx_ic(92, 384, 34) ? 3 :
+  kbx_ic(222, 512, 34) ? 4 :
+  kbx_ic(92, 628, 34) ? 5 :
+  kbx_ic(212, 752, 34) ? 6 :
+  kbx_ic(64, 966, 13) ? 7 :
+  kbx_ic(166, 966, 13) ? 8 :
+  kbx_ic(262, 966, 14) ? 9 :
+  0;
+);
+function kbx_x(i)
+(
+  i == 1 ? 92 :
+  i == 2 ? 222 :
+  i == 3 ? 92 :
+  i == 4 ? 222 :
+  i == 5 ? 92 :
+  i == 6 ? 212 :
+  i == 7 ? 64 :
+  i == 8 ? 166 :
+  i == 9 ? 262 :
+  0;
+);
+function kbx_y(i)
+(
+  i == 1 ? 138 :
+  i == 2 ? 268 :
+  i == 3 ? 384 :
+  i == 4 ? 512 :
+  i == 5 ? 628 :
+  i == 6 ? 752 :
+  i == 7 ? 966 :
+  i == 8 ? 966 :
+  i == 9 ? 966 :
+  0;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  i == 1 && kbx_ok ? kbx_put(1, v * 1, -6, 6, 0.5);
+  i == 2 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "out") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "1k2") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "2k7") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "3k3") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "4k7") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "5k6") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "6k8") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "8k2") == 0 ? kbx_b = 7;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (1200)), abs(v * 1000 - (1200))) < kbx_bd ? ( kbx_bd = min(abs(v - (1200)), abs(v * 1000 - (1200))); kbx_b = 1; );
+      min(abs(v - (2700)), abs(v * 1000 - (2700))) < kbx_bd ? ( kbx_bd = min(abs(v - (2700)), abs(v * 1000 - (2700))); kbx_b = 2; );
+      min(abs(v - (3300)), abs(v * 1000 - (3300))) < kbx_bd ? ( kbx_bd = min(abs(v - (3300)), abs(v * 1000 - (3300))); kbx_b = 3; );
+      min(abs(v - (4700)), abs(v * 1000 - (4700))) < kbx_bd ? ( kbx_bd = min(abs(v - (4700)), abs(v * 1000 - (4700))); kbx_b = 4; );
+      min(abs(v - (5600)), abs(v * 1000 - (5600))) < kbx_bd ? ( kbx_bd = min(abs(v - (5600)), abs(v * 1000 - (5600))); kbx_b = 5; );
+      min(abs(v - (6800)), abs(v * 1000 - (6800))) < kbx_bd ? ( kbx_bd = min(abs(v - (6800)), abs(v * 1000 - (6800))); kbx_b = 6; );
+      min(abs(v - (8200)), abs(v * 1000 - (8200))) < kbx_bd ? ( kbx_bd = min(abs(v - (8200)), abs(v * 1000 - (8200))); kbx_b = 7; );
+    );
+    kbx_b >= 0 ? kbx_setsl(3, kbx_b);
+  );
+  i == 3 && kbx_ok ? kbx_put(2, v * 1, -6, 6, 0.5);
+  i == 4 ? (
+    kbx_norm(); kbx_b = -1; kbx_bd = 1000000000;
+    stricmp(#kbx_n, "out") == 0 ? kbx_b = 0;
+    stricmp(#kbx_n, "220") == 0 ? kbx_b = 1;
+    stricmp(#kbx_n, "270") == 0 ? kbx_b = 2;
+    stricmp(#kbx_n, "330") == 0 ? kbx_b = 3;
+    stricmp(#kbx_n, "390") == 0 ? kbx_b = 4;
+    stricmp(#kbx_n, "470") == 0 ? kbx_b = 5;
+    stricmp(#kbx_n, "560") == 0 ? kbx_b = 6;
+    stricmp(#kbx_n, "820") == 0 ? kbx_b = 7;
+    kbx_b < 0 && kbx_ok ? (
+      min(abs(v - (220)), abs(v * 1000 - (220))) < kbx_bd ? ( kbx_bd = min(abs(v - (220)), abs(v * 1000 - (220))); kbx_b = 1; );
+      min(abs(v - (270)), abs(v * 1000 - (270))) < kbx_bd ? ( kbx_bd = min(abs(v - (270)), abs(v * 1000 - (270))); kbx_b = 2; );
+      min(abs(v - (330)), abs(v * 1000 - (330))) < kbx_bd ? ( kbx_bd = min(abs(v - (330)), abs(v * 1000 - (330))); kbx_b = 3; );
+      min(abs(v - (390)), abs(v * 1000 - (390))) < kbx_bd ? ( kbx_bd = min(abs(v - (390)), abs(v * 1000 - (390))); kbx_b = 4; );
+      min(abs(v - (470)), abs(v * 1000 - (470))) < kbx_bd ? ( kbx_bd = min(abs(v - (470)), abs(v * 1000 - (470))); kbx_b = 5; );
+      min(abs(v - (560)), abs(v * 1000 - (560))) < kbx_bd ? ( kbx_bd = min(abs(v - (560)), abs(v * 1000 - (560))); kbx_b = 6; );
+      min(abs(v - (820)), abs(v * 1000 - (820))) < kbx_bd ? ( kbx_bd = min(abs(v - (820)), abs(v * 1000 - (820))); kbx_b = 7; );
+    );
+    kbx_b >= 0 ? kbx_setsl(6, kbx_b);
+  );
+  i == 5 && kbx_ok ? kbx_put(5, v * 1, -6, 6, 0.5);
+  i == 6 && kbx_ok ? kbx_put(8, v * 1, -6, 6, 0.5);
+  i == 7 && kbx_ok ? kbx_put(12, v * 1, -12, 12, 0.1);
+  i == 8 && kbx_ok ? kbx_put(13, v * 1, -12, 12, 0.1);
+  i == 9 && kbx_ok ? kbx_put(15, v * 1, 0, 10, 0.1);
+);
+
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+(kbx_mb && !kbx_lmb) ? (
+  kbx_h = kbx_hit();
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
 mb1 = mouse_cap & 1;
 (mb1 && !last_mb) ? (
   drag = 0; acc = 0;
@@ -563,3 +726,18 @@ mb1 = mouse_cap & 1;
 !mb1 ? (drag = 0);
 last_mb = mb1;
 last_my = (mouse_y - oy)/S;
+
+// ---------- keyboard value entry : edit box ----------
+kbx_ed > 0 ? (
+  kbx_cx = kbx_x(kbx_ed); kbx_cy = kbx_y(kbx_ed);
+  gfx_setfont(15, "Arial", 15 * kbx_sc, 'b');
+  gfx_set(0.06, 0.065, 0.07, 0.96);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc);
+  gfx_set(0.92, 0.92, 0.92, 1);
+  gfx_rect(PX(kbx_cx - 42), PY(kbx_cy - 13), 84 * kbx_sc, 26 * kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise() * 2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw / 2; gfx_y = PY(kbx_cy) - kbx_th / 2;
+  gfx_drawstr(#kbx_sh);
+);
