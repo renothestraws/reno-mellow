@@ -1,8 +1,8 @@
 desc:RM9000JEQ - ReNo Mellow 9000J EQ (Channel EQ + Filters)
 //tags: equalizer EQ parametric filters console ssl-style 9000j
 //@author ReNo Mellow
-//@version 1.8
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.9
+//@changelog Factory presets for live mixing: Male Vocal, Female Vocal, Speech, Acoustic Guitar, Electric Guitar, Piano, Keys Pad, Bass, Kick, Snare, Toms, Overheads (presets do not change Size or color)
 //@about Section EQ et filtres d'une tranche inspirée de la SSL 9000J : 4 bandes (shelf/cloche), HPF 18 dB/oct, LPF 12 dB/oct, mode Vintage, vumètres LED.
 //
 // ---------------------------------------------------------------------------

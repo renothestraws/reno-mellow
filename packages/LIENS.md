@@ -23,11 +23,11 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Dynamics | RMMultidyn | 1.4 | [RMMultidyn.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMMultidyn.ReaperPkg) |
 | Dynamics | RMsidekicker | 1.2 | [RMsidekicker.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMsidekicker.ReaperPkg) |
 | Dynamics | RMtrancegate | 1.1 | [RMtrancegate.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMtrancegate.ReaperPkg) |
-| EQ | RM1373 | 1.8 | [RM1373.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1373.ReaperPkg) |
+| EQ | RM1373 | 1.9 | [RM1373.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1373.ReaperPkg) |
 | EQ | RM1982Fletcher | 1.6 | [RM1982Fletcher.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Fletcher.ReaperPkg) |
 | EQ | RM360 | 1.6 | [RM360.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM360.ReaperPkg) |
-| EQ | RM550b | 1.4 | [RM550b.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM550b.ReaperPkg) |
-| EQ | RM9000JEQ | 1.8 | [RM9000JEQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM9000JEQ.ReaperPkg) |
+| EQ | RM550b | 1.5 | [RM550b.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM550b.ReaperPkg) |
+| EQ | RM9000JEQ | 1.9 | [RM9000JEQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM9000JEQ.ReaperPkg) |
 | EQ | RMcleanEQ | 1.4 | [RMcleanEQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMcleanEQ.ReaperPkg) |
 | EQ | RMdevilQ | 1.6 | [RMdevilQ.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMdevilQ.ReaperPkg) |
 | EQ | RMeq4 | 1.7 | [RMeq4.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMeq4.ReaperPkg) |
