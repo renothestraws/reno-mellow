@@ -4,7 +4,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 
 | Catégorie | Plugin | Version | Lien |
 |---|---|---|---|
-| Dynamics | RM1176 | 1.3 | [RM1176.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1176.ReaperPkg) |
+| Dynamics | RM1176 | 1.4 | [RM1176.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1176.ReaperPkg) |
 | Dynamics | RM160A | 1.3 | [RM160A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM160A.ReaperPkg) |
 | Dynamics | RM1982De-ess | 1.5 | [RM1982De-ess.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982De-ess.ReaperPkg) |
 | Dynamics | RM1982Gate | 1.7 | [RM1982Gate.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM1982Gate.ReaperPkg) |
@@ -16,7 +16,7 @@ Glisser le fichier dans la fenêtre de REAPER pour l'installer.
 | Dynamics | RM2A | 1.3 | [RM2A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM2A.ReaperPkg) |
 | Dynamics | RM33609 | 1.3 | [RM33609.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM33609.ReaperPkg) |
 | Dynamics | RM3A | 1.3 | [RM3A.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM3A.ReaperPkg) |
-| Dynamics | RM670 | 1.3 | [RM670.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM670.ReaperPkg) |
+| Dynamics | RM670 | 1.4 | [RM670.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM670.ReaperPkg) |
 | Dynamics | RM9000JDYN | 1.4 | [RM9000JDYN.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RM9000JDYN.ReaperPkg) |
 | Dynamics | RMEL8 | 1.3 | [RMEL8.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMEL8.ReaperPkg) |
 | Dynamics | RMGbuss | 1.4 | [RMGbuss.ReaperPkg](https://github.com/renothestraws/reno-mellow/raw/main/packages/RMGbuss.ReaperPkg) |

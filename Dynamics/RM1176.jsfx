@@ -1,8 +1,8 @@
 desc:RM1176 - ReNo Mellow 1176 (FET Limiting Amplifier)
 //tags: dynamics compressor limiter FET 1176
 //@author ReNo Mellow
-//@version 1.3
-//@changelog Keyboard value entry: double-click a knob or its value, type, Enter (Esc = cancel)
+//@version 1.4
+//@changelog Factory presets: Dr Pepper, CLA Vox, Samara Vox, Bones Howe, All Buttons In, Snare Punch, Kick Tight (presets do not change Size or color)
 //@about Compresseur/limiteur FET inspiré du 1176 : ratios 4/8/12/20 et all-buttons, attaque et release ultra-rapides, Punch, Analog, Calib.
 //
 // ---------------------------------------------------------------------------
