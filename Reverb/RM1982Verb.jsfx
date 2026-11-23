@@ -1,8 +1,8 @@
 desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attack, predelay, decay, mod, width, output EQ)
 //tags: reverb convolution impulse response ir zero latency predelay decay width eq
 //@author ReNo Mellow
-//@version 1.1
-//@changelog PAN knob (wet only, equal-power stereo pan) ; wet level raised to about -3 dB below the input ; 4 factory IRs replaced
+//@version 1.2
+//@changelog IR Buddy 1.1: real-time capture for plug-ins running on external DSP (UAD...), which return silence offline
 //@about
 //  # RM1982Verb
 //  Convolution reverb in the 1982 series. Load your own impulse responses (WAV, mono or stereo, up to 10 s).
