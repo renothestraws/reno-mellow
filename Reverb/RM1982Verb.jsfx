@@ -1,8 +1,8 @@
 desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attack, predelay, decay, mod, width, output EQ)
 //tags: reverb convolution impulse response ir zero latency predelay decay width eq
 //@author ReNo Mellow
-//@version 1.0
-//@changelog First release
+//@version 1.1
+//@changelog PAN knob (wet only, equal-power stereo pan) ; wet level raised to about -3 dB below the input ; 4 factory IRs replaced
 //@about
 //  # RM1982Verb
 //  Convolution reverb in the 1982 series. Load your own impulse responses (WAV, mono or stereo, up to 10 s).
@@ -13,7 +13,8 @@ desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attac
 //    or drop any .wav file on the plug-in window. Automatic high-quality resampling (windowed sinc) when the IR
 //    sample rate differs from the project. The IR is normalized (constant energy) and its silent tail is trimmed.
 //  - SPACE: ATTACK (fades in the start of the IR, 0..500 ms), PREDELAY (0..250 ms), DECAY (shortens the tail, 10..100 %),
-//    MOD (light chorus on the tail), WIDTH (0 = mono, 100 = as recorded, 200 = extra wide).
+//    MOD (light chorus on the tail), WIDTH (0 = mono, 100 = as recorded, 200 = extra wide),
+//    PAN (wet only: moves the reverb to the left or right, equal power).
 //  - DUCKER: the dry signal compresses the wet (sidechain): the knob is the threshold (0 dB = off), ratio 3:1, soft knee,
 //    attack 1 ms, automatic release (fast after short hits, slower when the ducking lasts). The reverb blooms between the notes.
 //  - OUTPUT EQ (wet only): HPF (off..1 kHz), LOW shelf 250 Hz, MID bell 1.2 kHz, HIGH shelf 6 kHz (+/-12 dB), LPF (1 kHz..off).
@@ -52,6 +53,7 @@ slider15:/RM IR:none:IR file (REAPER/Data/RM IR)
 slider16:0<-60,0,0.1>-Ducker threshold (dB, 0 = off)
 slider17:/RMIRIndex:index.txt:-IR Buddy index (REAPER/Data/RMIRIndex)
 slider18:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+slider19:0<-100,100,1>-Pan (wet only)
 
 options:maxmem=33554432
 
@@ -386,7 +388,7 @@ function load_step() local(n, k, k1, t, acc, u, ui, c, nn, bud, y, e, pk, i, j, 
       i -= 1;
     );
     Lir = max(64, last + 1);
-    gnorm = pk > 0 ? 0.5/sqrt(max(e/nchir, EPS)) : 0;
+    gnorm = pk > 0 ? 0.70795/sqrt(max(e/nchir, EPS)) : 0;   // wet ~ -3 dB sous l entrée (bruit large bande)
     j = 0;
     loop(NPK,
       i = floor(j*Lir/NPK); n = max(1, floor((j + 1)*Lir/NPK) - i); v = 0;
@@ -454,6 +456,9 @@ function update_params()
   ch_base = 0.007*srate; ch_dep = 0.0015*srate*mod_m;
   ch_inc0 = 0.40/srate; ch_inc1 = 0.47/srate;
   wid = slider5/100;
+  // PAN (traité seulement) : le côté opposé est replié à puissance constante
+  pan_p = min(max(slider19/100, -1), 1);
+  pan_c = cos(abs(pan_p)*$pi/2); pan_s = sin(abs(pan_p)*$pi/2);
   hp_on = slider6 > 20.5; hp_on ? rbj_set(C_HP, 1, slider6, 0.7071, 0);
   ls_on = abs(slider7) > 0.05; ls_on ? rbj_set(C_LS, 3, 250, 0.7071, slider7);
   pk_on = abs(slider8) > 0.05; pk_on ? rbj_set(C_PK, 2, 1200, 0.8, slider8);
@@ -630,6 +635,8 @@ mod_m > 0 ? (
 
 // WIDTH
 wid != 1 ? ( wm_ = 0.5*(w0 + w1); ws_ = 0.5*(w0 - w1)*wid; w0 = wm_ + ws_; w1 = wm_ - ws_; );
+// PAN
+pan_p > 0 ? ( w1 += w0*pan_s; w0 *= pan_c; ) : pan_p < 0 ? ( w0 += w1*pan_s; w1 *= pan_c; );
 
 // EQ de sortie (traité seulement)
 hp_on ? ( w0 = bq1(w0, C_HP, EQS);      w1 = bq1(w1, C_HP, EQS + 2); );
@@ -726,18 +733,18 @@ function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
 function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
 
 // ---- Table des potards : 1 ATTACK, 2 PREDELAY, 3 DECAY, 4 MOD, 5 WIDTH, 6 HPF, 7 LOW, 8 MID, 9 HIGH, 10 LPF, 11 VOLUME, 12 MIX
-function k_sl(i) ( i == 13 ? 16 : i; );
-function k_lo(i) ( i == 13 ? -60 : i == 3 ? 10 : i == 6 ? 20 : (i >= 7 && i <= 9) ? -12 : i == 10 ? 1000 : i == 11 ? -24 : 0; );
-function k_hi(i) ( i == 13 ? 0 : i == 1 ? 500 : i == 2 ? 250 : (i == 3 || i == 4 || i == 12) ? 100 : i == 5 ? 200 : i == 6 ? 1000 : (i >= 7 && i <= 9) ? 12 : i == 10 ? 20000 : 12; );
+function k_sl(i) ( i == 14 ? 19 : i == 13 ? 16 : i; );
+function k_lo(i) ( i == 14 ? -100 : i == 13 ? -60 : i == 3 ? 10 : i == 6 ? 20 : (i >= 7 && i <= 9) ? -12 : i == 10 ? 1000 : i == 11 ? -24 : 0; );
+function k_hi(i) ( i == 14 ? 100 : i == 13 ? 0 : i == 1 ? 500 : i == 2 ? 250 : (i == 3 || i == 4 || i == 12) ? 100 : i == 5 ? 200 : i == 6 ? 1000 : (i >= 7 && i <= 9) ? 12 : i == 10 ? 20000 : 12; );
 function k_df(i) ( i == 3 ? 100 : i == 5 ? 100 : i == 6 ? 20 : i == 10 ? 20000 : i == 12 ? 30 : 0; );
 function k_st(i) ( ((i >= 7 && i <= 9) || i == 11 || i == 13) ? 0.1 : i == 10 ? 10 : 1; );
 function k_lg(i) ( i == 6 || i == 10; );
 function k_sq(i) ( i == 1 || i == 2; );
-function k_cx(i) ( i == 13 ? 598 : i <= 5 ? 78 + (i - 1)*104 : i <= 10 ? 676 + (i - 6)*80 : i == 11 ? 700 : 800; );
-function k_cy(i) ( (i <= 5 || i == 13) ? 336 : i <= 10 ? 150 : 368; );
-function k_r(i) ( (i <= 5 || i == 13) ? 28 : i <= 10 ? 22 : 26; );
-function k_vy(i) ( (i <= 5 || i == 13) ? 392 : i <= 10 ? 194 : 411; );
-function k_vw(i) ( (i <= 5 || i == 13) ? 86 : i <= 10 ? 74 : 86; );
+function k_cx(i) ( i == 13 ? 602 : i == 14 ? 514 : i <= 5 ? 74 + (i - 1)*88 : i <= 10 ? 676 + (i - 6)*80 : i == 11 ? 700 : 800; );
+function k_cy(i) ( (i <= 5 || i >= 13) ? 336 : i <= 10 ? 150 : 368; );
+function k_r(i) ( (i <= 5 || i >= 13) ? 28 : i <= 10 ? 22 : 26; );
+function k_vy(i) ( (i <= 5 || i >= 13) ? 392 : i <= 10 ? 194 : 411; );
+function k_vw(i) ( (i <= 5 || i >= 13) ? 80 : i <= 10 ? 74 : 86; );
 function k_frac(i) local(v, lo, hi)
 (
   v = slider(k_sl(i)); lo = k_lo(i); hi = k_hi(i);
@@ -758,13 +765,13 @@ function k_set_frac(i, f) local(lo, hi)
 function k_hit() local(i, r)
 (
   r = 0; i = 1;
-  loop(13, (r == 0 && in_circ(k_cx(i), k_cy(i), k_r(i) + 8)) ? r = i; i += 1;);
+  loop(14, (r == 0 && in_circ(k_cx(i), k_cy(i), k_r(i) + 8)) ? r = i; i += 1;);
   r;
 );
 function v_hit() local(i, r)
 (
   r = 0; i = 1;
-  loop(13, (r == 0 && in_rect(k_cx(i) - k_vw(i)/2, k_vy(i) - 10, k_vw(i), 20)) ? r = i; i += 1;);
+  loop(14, (r == 0 && in_rect(k_cx(i) - k_vw(i)/2, k_vy(i) - 10, k_vw(i), 20)) ? r = i; i += 1;);
   r;
 );
 function k_str(i) local(v)
@@ -779,6 +786,7 @@ function k_str(i) local(v)
   i == 10 ? ( v >= 19990 ? strcpy(#ks, "OFF") : sprintf(#ks, "%.1f kHz", v/1000); ) :
   i == 11 ? sprintf(#ks, "%+.1f dB", v) :
   i == 13 ? ( v > -0.05 ? strcpy(#ks, "OFF") : sprintf(#ks, "%.1f dB", v); ) :
+  i == 14 ? ( abs(v) < 0.5 ? strcpy(#ks, "C") : v < 0 ? sprintf(#ks, "L%d", -v) : sprintf(#ks, "R%d", v); ) :
   sprintf(#ks, "%d %%", v);
 );
 function pk_y(d, y, h) ( y + h*(1 - (min(max(d, -60), 3) + 60)/63); );
@@ -819,7 +827,7 @@ function g_env(i) local(v, gna, gdk, gle, gnf)
 function kbx_pnum() local(i, n, c, v, frac, dv)
 (
   n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
-  kbx_ok = 0; kbx_neg = 0; kbx_kilo = 0; kbx_off = 0; kbx_sec = 0; kbx_mil = 0;
+  kbx_ok = 0; kbx_neg = 0; kbx_kilo = 0; kbx_off = 0; kbx_sec = 0; kbx_mil = 0; kbx_lft = 0; kbx_ctr = 0;
   loop(n,
     c = str_getchar(#kbx_ed, i);
     (c >= 'A' && c <= 'Z') ? c += 32;
@@ -828,6 +836,8 @@ function kbx_pnum() local(i, n, c, v, frac, dv)
     c == 'o' ? kbx_off = 1;
     c == 's' ? kbx_sec = 1;
     c == 'm' ? kbx_mil = 1;
+    c == 'l' ? kbx_lft = 1;
+    c == 'c' ? kbx_ctr = 1;
     (c == '.' || c == ',') ? frac = 1;
     (c >= '0' && c <= '9') ? (
       kbx_ok = 1;
@@ -846,6 +856,8 @@ function kbx_apply(i) local(v)
   (kbx_off && !kbx_ok && i == 6) ? k_put(6, 20);
   (kbx_off && !kbx_ok && i == 10) ? k_put(10, 20000);
   (kbx_off && !kbx_ok && i == 13) ? k_put(13, 0);
+  (i == 14 && kbx_lft) ? v = -abs(v);
+  (i == 14 && kbx_ctr && !kbx_ok) ? k_put(14, 0);
   (i == 13 && kbx_ok && !kbx_neg) ? v = -v;
   kbx_ok ? k_put(i, v);
 );
@@ -963,7 +975,7 @@ col(0.45,0.46,0.50); text_r(620, 246, "ENVELOPE : ATTACK / DECAY");
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(34, 272, "SPACE");
 col(0.25,0.26,0.29); rct(80, 272, 540, 1, 1);
 gfx_setfont(4); col(0.92,0.93,0.95);
-text_c(78, 290, "ATTACK"); text_c(182, 290, "PREDELAY"); text_c(286, 290, "DECAY"); text_c(390, 290, "MOD"); text_c(494, 290, "WIDTH"); text_c(598, 290, "DUCKER");
+text_c(74, 290, "ATTACK"); text_c(162, 290, "PREDELAY"); text_c(250, 290, "DECAY"); text_c(338, 290, "MOD"); text_c(426, 290, "WIDTH"); text_c(514, 290, "PAN"); text_c(602, 290, "DUCKER");
 
 // ---- EQ de sortie ---------------------------------------------------------------------
 gfx_setfont(3); col(0.62,0.63,0.66); text_l(650, 74, "OUTPUT EQ  (wet only)");
@@ -997,8 +1009,8 @@ gfx_setfont(6); col(0.55,0.56,0.60); slider13 >= 0.5 ? strcpy(#s, "no latency, m
 
 // ---- Potards (dessin + valeurs) ------------------------------------------------------------
 ki = 1;
-loop(13,
-  fz = (ki >= 7 && ki <= 9) ? 0.5 : ki == 5 ? 0.5 : ki == 10 ? 1 : ki == 11 ? 24/36 : ki == 13 ? 1 : 0;
+loop(14,
+  fz = (ki >= 7 && ki <= 9) ? 0.5 : ki == 5 ? 0.5 : ki == 10 ? 1 : ki == 11 ? 24/36 : ki == 13 ? 1 : ki == 14 ? 0.5 : 0;
   draw_knob(k_cx(ki), k_cy(ki), k_r(ki), k_frac(ki), fz);
   (ki <= 5 || ki >= 11) ? gfx_setfont(1) : gfx_setfont(6);
   col(thc1r,thc1g,thc1b);
@@ -1011,7 +1023,7 @@ loop(13,
 g_dk = max(dk_grm, g_dk*0.85); dk_grm = 0;
 slider16 < -0.05 ? (
   gfx_setfont(6); g_dk > 0.05 ? col(thc1r,thc1g,thc1b) : col(0.45,0.46,0.50);
-  sprintf(#s, "GR -%.1f dB", g_dk); text_c(598, 406, #s);
+  sprintf(#s, "GR -%.1f dB", g_dk); text_c(602, 406, #s);
 );
 
 // ---- Crête-mètres IN / OUT -------------------------------------------------------------------
