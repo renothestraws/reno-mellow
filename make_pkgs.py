@@ -26,6 +26,15 @@ for cat in CATS:
             desc, ver, tag(s, "about"), tag(s, "changelog"), repo, cat, name, user, repo)
         doc = "Docs/ReNo Mellow/%s.txt" % name
         meta = 'NAME "%s - ReNo Mellow"\nAUTHOR "ReNo Mellow"\nVERSION "%s"\nURL "https://github.com/%s/%s"\nINFO "%s"\n' % (name, ver, user, repo, doc)
+        rdir = os.path.join(cat, name + ".res")
+        if os.path.isdir(rdir):   # ressources : chemins relatifs à la racine REAPER
+            if os.path.isfile(os.path.join(rdir, "Data", "RMIRIndex", "index.txt")):
+                meta += "NO_OVERWRITE Data/RMIRIndex/index.txt\n"
+            for root_, _, files_ in os.walk(rdir):
+                for fn_ in files_:
+                    rp = os.path.relpath(os.path.join(root_, fn_), rdir).replace(os.sep, "/")
+                    if rp.startswith("Scripts/") and (rp.endswith("_index.lua") or rp.endswith("_lib.lua")):
+                        meta += "SCRIPT_NO_REG %s\n" % rp
         out = "packages/%s.ReaperPkg" % name
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr("reaper-package-info.txt", meta)
@@ -39,6 +48,11 @@ for cat in CATS:
                     for fn in sorted(files):
                         p = os.path.join(root, fn)
                         z.write(p, "Data/%s/%s" % (name, os.path.relpath(p, ddir).replace(os.sep, "/")))
+            if os.path.isdir(rdir):
+                for root_, _, files_ in os.walk(rdir):
+                    for fn_ in sorted(files_):
+                        p = os.path.join(root_, fn_)
+                        z.write(p, os.path.relpath(p, rdir).replace(os.sep, "/"))
         rows.append((cat, name, ver, out))
 url = "https://github.com/%s/%s/raw/%s/" % (user, repo, branch)
 with open("packages/LIENS.md", "w", encoding="utf-8") as fo:

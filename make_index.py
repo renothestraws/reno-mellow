@@ -97,6 +97,22 @@ def main():
                         continue
                     dn = os.path.relpath(dp, ddir).replace(os.sep, "/")
                     x.append('        <source type="data" file=%s>%s</source>' % (quoteattr(fn[:-5] + "/" + dn), escape(raw + cat + "/" + fn[:-5] + "/" + dn)))
+            # ressources installées ailleurs (dossier <nom>.res/ = racine des ressources REAPER) :
+            #   Data/...    -> fichiers de données (REAPER/Data/...) ; Data/RMIRIndex/ exclu (index local, paquet .ReaperPkg seulement)
+            #   Scripts/... -> scripts Lua (actions [main], sauf les bibliothèques *_index.lua / *_lib.lua)
+            rdir = os.path.join(root, cat, fn[:-5] + ".res")
+            if os.path.isdir(rdir):
+                for dp in sorted(glob.glob(os.path.join(rdir, "**", "*"), recursive=True)):
+                    if not os.path.isfile(dp):
+                        continue
+                    rel = os.path.relpath(dp, rdir).replace(os.sep, "/")
+                    url = escape(raw + cat + "/" + fn[:-5] + ".res/" + rel).replace(" ", "%20")
+                    if rel.startswith("Data/") and not rel.startswith("Data/RMIRIndex/"):
+                        x.append('        <source type="data" file=%s>%s</source>' % (quoteattr(rel[5:]), url))
+                    elif rel.startswith("Scripts/") and rel.endswith(".lua"):
+                        sub = "/".join(rel.split("/")[-2:])
+                        lib = rel.endswith("_index.lua") or rel.endswith("_lib.lua")
+                        x.append('        <source type="script" file=%s%s>%s</source>' % (quoteattr(sub), "" if lib else ' main="main"', url))
             x.append('      </version>')
             x.append('    </reapack>')
             n += 1

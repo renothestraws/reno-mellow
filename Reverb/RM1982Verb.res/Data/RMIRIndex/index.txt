@@ -1,0 +1,109 @@
+RMIRINDEX 1
+D	Ambience
+D	Chamber
+D	Hall
+D	Microphone
+D	NonLin
+D	Plate
+D	Room
+D	Spaces
+F	0	Classic - Strong Ambience	Ambience/Classic - Strong Ambience.wav	RM IR/Ambience/Classic - Strong Ambience.wav
+F	0	Eighties - Amb 0.4s	Ambience/Eighties - Amb 0.4s.wav	RM IR/Ambience/Eighties - Amb 0.4s.wav
+F	0	Eighties - Ambience	Ambience/Eighties - Ambience.wav	RM IR/Ambience/Eighties - Ambience.wav
+F	0	Modern - Bass XXL	Ambience/Modern - Bass XXL.wav	RM IR/Ambience/Modern - Bass XXL.wav
+F	0	Modern - Long Ambience	Ambience/Modern - Long Ambience.wav	RM IR/Ambience/Modern - Long Ambience.wav
+F	0	Modern - Medium Ambience	Ambience/Modern - Medium Ambience.wav	RM IR/Ambience/Modern - Medium Ambience.wav
+F	0	Modern - Percussion Air	Ambience/Modern - Percussion Air.wav	RM IR/Ambience/Modern - Percussion Air.wav
+F	0	Modern - Small Ambience	Ambience/Modern - Small Ambience.wav	RM IR/Ambience/Modern - Small Ambience.wav
+F	0	Sim - Wardrobe	Ambience/Sim - Wardrobe.wav	RM IR/Ambience/Sim - Wardrobe.wav
+F	1	Classic - Large Chamber	Chamber/Classic - Large Chamber.wav	RM IR/Chamber/Classic - Large Chamber.wav
+F	1	Digital - Rich Chamber	Chamber/Digital - Rich Chamber.wav	RM IR/Chamber/Digital - Rich Chamber.wav
+F	1	Modern - Echo Chamber	Chamber/Modern - Echo Chamber.wav	RM IR/Chamber/Modern - Echo Chamber.wav
+F	1	Modern - Kick Chamber	Chamber/Modern - Kick Chamber.wav	RM IR/Chamber/Modern - Kick Chamber.wav
+F	1	Modern - Snare Chamber	Chamber/Modern - Snare Chamber.wav	RM IR/Chamber/Modern - Snare Chamber.wav
+F	1	Modern - Sunset Chamber	Chamber/Modern - Sunset Chamber.wav	RM IR/Chamber/Modern - Sunset Chamber.wav
+F	1	Modern - Vocal Chamber	Chamber/Modern - Vocal Chamber.wav	RM IR/Chamber/Modern - Vocal Chamber.wav
+F	1	Sim - Music Studio	Chamber/Sim - Music Studio.wav	RM IR/Chamber/Sim - Music Studio.wav
+F	1	Vintage - Acoustic Chamber	Chamber/Vintage - Acoustic Chamber.wav	RM IR/Chamber/Vintage - Acoustic Chamber.wav
+F	1	Vintage - Rich Chamber B	Chamber/Vintage - Rich Chamber B.wav	RM IR/Chamber/Vintage - Rich Chamber B.wav
+F	2	Classic - Jazz Hall	Hall/Classic - Jazz Hall.wav	RM IR/Hall/Classic - Jazz Hall.wav
+F	2	Digital - Long Hall	Hall/Digital - Long Hall.wav	RM IR/Hall/Digital - Long Hall.wav
+F	2	Eighties - Hall B	Hall/Eighties - Hall B.wav	RM IR/Hall/Eighties - Hall B.wav
+F	2	Eighties - Hall C	Hall/Eighties - Hall C.wav	RM IR/Hall/Eighties - Hall C.wav
+F	2	Modern - Amsterdam Hall	Hall/Modern - Amsterdam Hall.wav	RM IR/Hall/Modern - Amsterdam Hall.wav
+F	2	Modern - Large Hall	Hall/Modern - Large Hall.wav	RM IR/Hall/Modern - Large Hall.wav
+F	2	Modern - Medium Hall	Hall/Modern - Medium Hall.wav	RM IR/Hall/Modern - Medium Hall.wav
+F	2	Modern - Sandors Hall	Hall/Modern - Sandors Hall.wav	RM IR/Hall/Modern - Sandors Hall.wav
+F	2	Modern - Small Hall	Hall/Modern - Small Hall.wav	RM IR/Hall/Modern - Small Hall.wav
+F	2	Modern - The ArchDuke	Hall/Modern - The ArchDuke.wav	RM IR/Hall/Modern - The ArchDuke.wav
+F	2	Modern - Vienna Hall	Hall/Modern - Vienna Hall.wav	RM IR/Hall/Modern - Vienna Hall.wav
+F	2	Sim - Church	Hall/Sim - Church.wav	RM IR/Hall/Sim - Church.wav
+F	2	Sim - Empty Hall	Hall/Sim - Empty Hall.wav	RM IR/Hall/Sim - Empty Hall.wav
+F	2	Sim - Full Hall	Hall/Sim - Full Hall.wav	RM IR/Hall/Sim - Full Hall.wav
+F	2	Sim - Oil Tank	Hall/Sim - Oil Tank.wav	RM IR/Hall/Sim - Oil Tank.wav
+F	2	Vintage - Small Concert Hall B	Hall/Vintage - Small Concert Hall B.wav	RM IR/Hall/Vintage - Small Concert Hall B.wav
+F	2	Vintage - Small Concert Hall	Hall/Vintage - Small Concert Hall.wav	RM IR/Hall/Vintage - Small Concert Hall.wav
+F	3	Dynamic - Broadcast Deep	Microphone/Dynamic - Broadcast Deep.wav	RM IR/Microphone/Dynamic - Broadcast Deep.wav
+F	3	Dynamic - Broadcast Vocal	Microphone/Dynamic - Broadcast Vocal.wav	RM IR/Microphone/Dynamic - Broadcast Vocal.wav
+F	3	Dynamic - Flat Side	Microphone/Dynamic - Flat Side.wav	RM IR/Microphone/Dynamic - Flat Side.wav
+F	3	Dynamic - Kick Vintage	Microphone/Dynamic - Kick Vintage.wav	RM IR/Microphone/Dynamic - Kick Vintage.wav
+F	3	Dynamic - Snare Classic	Microphone/Dynamic - Snare Classic.wav	RM IR/Microphone/Dynamic - Snare Classic.wav
+F	3	Dynamic - Tom Classic	Microphone/Dynamic - Tom Classic.wav	RM IR/Microphone/Dynamic - Tom Classic.wav
+F	3	LDC - Modern Bright	Microphone/LDC - Modern Bright.wav	RM IR/Microphone/LDC - Modern Bright.wav
+F	3	LDC - Multi Pattern Bright	Microphone/LDC - Multi Pattern Bright.wav	RM IR/Microphone/LDC - Multi Pattern Bright.wav
+F	3	LDC - Multi Pattern	Microphone/LDC - Multi Pattern.wav	RM IR/Microphone/LDC - Multi Pattern.wav
+F	3	LDC - Studio Classic	Microphone/LDC - Studio Classic.wav	RM IR/Microphone/LDC - Studio Classic.wav
+F	3	LDC - Studio Vintage	Microphone/LDC - Studio Vintage.wav	RM IR/Microphone/LDC - Studio Vintage.wav
+F	3	Ribbon - Dark Classic	Microphone/Ribbon - Dark Classic.wav	RM IR/Microphone/Ribbon - Dark Classic.wav
+F	3	Ribbon - Hypercardioid	Microphone/Ribbon - Hypercardioid.wav	RM IR/Microphone/Ribbon - Hypercardioid.wav
+F	3	Ribbon - Modern	Microphone/Ribbon - Modern.wav	RM IR/Microphone/Ribbon - Modern.wav
+F	3	SDC - Vintage	Microphone/SDC - Vintage.wav	RM IR/Microphone/SDC - Vintage.wav
+F	3	Tube LDC - Bright	Microphone/Tube LDC - Bright.wav	RM IR/Microphone/Tube LDC - Bright.wav
+F	3	Tube LDC - Modern Vocal	Microphone/Tube LDC - Modern Vocal.wav	RM IR/Microphone/Tube LDC - Modern Vocal.wav
+F	3	Tube LDC - Round	Microphone/Tube LDC - Round.wav	RM IR/Microphone/Tube LDC - Round.wav
+F	3	Tube LDC - Silk	Microphone/Tube LDC - Silk.wav	RM IR/Microphone/Tube LDC - Silk.wav
+F	3	Tube LDC - Warm	Microphone/Tube LDC - Warm.wav	RM IR/Microphone/Tube LDC - Warm.wav
+F	3	Tube Omni - Orchestral	Microphone/Tube Omni - Orchestral.wav	RM IR/Microphone/Tube Omni - Orchestral.wav
+F	4	Eighties - NonLin 1	NonLin/Eighties - NonLin 1.wav	RM IR/NonLin/Eighties - NonLin 1.wav
+F	4	Eighties - NonLin 2	NonLin/Eighties - NonLin 2.wav	RM IR/NonLin/Eighties - NonLin 2.wav
+F	4	Modern - NonLin A	NonLin/Modern - NonLin A.wav	RM IR/NonLin/Modern - NonLin A.wav
+F	4	Modern - NonLin B	NonLin/Modern - NonLin B.wav	RM IR/NonLin/Modern - NonLin B.wav
+F	4	Modern - NonLin C	NonLin/Modern - NonLin C.wav	RM IR/NonLin/Modern - NonLin C.wav
+F	4	Modern - NonLin D	NonLin/Modern - NonLin D.wav	RM IR/NonLin/Modern - NonLin D.wav
+F	4	Soft - NonLin	NonLin/Soft - NonLin.wav	RM IR/NonLin/Soft - NonLin.wav
+F	5	Classic - Punch Plate	Plate/Classic - Punch Plate.wav	RM IR/Plate/Classic - Punch Plate.wav
+F	5	Digital - Rich Plate	Plate/Digital - Rich Plate.wav	RM IR/Plate/Digital - Rich Plate.wav
+F	5	Eighties - Plate	Plate/Eighties - Plate.wav	RM IR/Plate/Eighties - Plate.wav
+F	5	Modern - Dark Plate	Plate/Modern - Dark Plate.wav	RM IR/Plate/Modern - Dark Plate.wav
+F	5	Modern - London Plate	Plate/Modern - London Plate.wav	RM IR/Plate/Modern - London Plate.wav
+F	5	Modern - Silver Plate	Plate/Modern - Silver Plate.wav	RM IR/Plate/Modern - Silver Plate.wav
+F	5	Modern - Snare Plate A	Plate/Modern - Snare Plate A.wav	RM IR/Plate/Modern - Snare Plate A.wav
+F	5	Modern - Snare Plate B	Plate/Modern - Snare Plate B.wav	RM IR/Plate/Modern - Snare Plate B.wav
+F	5	Modern - Sun Plate	Plate/Modern - Sun Plate.wav	RM IR/Plate/Modern - Sun Plate.wav
+F	5	Modern - Vocal Plate	Plate/Modern - Vocal Plate.wav	RM IR/Plate/Modern - Vocal Plate.wav
+F	5	Steel - Lush Plate	Plate/Steel - Lush Plate.wav	RM IR/Plate/Steel - Lush Plate.wav
+F	5	Steel - Warm Plate	Plate/Steel - Warm Plate.wav	RM IR/Plate/Steel - Warm Plate.wav
+F	5	Vintage - Vocal Plate	Plate/Vintage - Vocal Plate.wav	RM IR/Plate/Vintage - Vocal Plate.wav
+F	6	Classic - Music Club	Room/Classic - Music Club.wav	RM IR/Room/Classic - Music Club.wav
+F	6	Classic - Punch Room	Room/Classic - Punch Room.wav	RM IR/Room/Classic - Punch Room.wav
+F	6	Digital - Tiled Room	Room/Digital - Tiled Room.wav	RM IR/Room/Digital - Tiled Room.wav
+F	6	Eighties - Room 1.7s	Room/Eighties - Room 1.7s.wav	RM IR/Room/Eighties - Room 1.7s.wav
+F	6	Eighties - Room	Room/Eighties - Room.wav	RM IR/Room/Eighties - Room.wav
+F	6	Modern - Large Wood Room	Room/Modern - Large Wood Room.wav	RM IR/Room/Modern - Large Wood Room.wav
+F	6	Modern - Long Wood Room	Room/Modern - Long Wood Room.wav	RM IR/Room/Modern - Long Wood Room.wav
+F	6	Modern - Oakland Room	Room/Modern - Oakland Room.wav	RM IR/Room/Modern - Oakland Room.wav
+F	6	Modern - Studio B Close	Room/Modern - Studio B Close.wav	RM IR/Room/Modern - Studio B Close.wav
+F	6	Modern - Studio B Far	Room/Modern - Studio B Far.wav	RM IR/Room/Modern - Studio B Far.wav
+F	6	Sim - Furnished Room	Room/Sim - Furnished Room.wav	RM IR/Room/Sim - Furnished Room.wav
+F	6	Sim - Unfurnished Room	Room/Sim - Unfurnished Room.wav	RM IR/Room/Sim - Unfurnished Room.wav
+F	6	Vintage - Room A	Room/Vintage - Room A.wav	RM IR/Room/Vintage - Room A.wav
+F	7	Modern - Arena	Spaces/Modern - Arena.wav	RM IR/Spaces/Modern - Arena.wav
+F	7	Modern - Car Park	Spaces/Modern - Car Park.wav	RM IR/Spaces/Modern - Car Park.wav
+F	7	Modern - Cavern	Spaces/Modern - Cavern.wav	RM IR/Spaces/Modern - Cavern.wav
+F	7	Modern - Cinema Room	Spaces/Modern - Cinema Room.wav	RM IR/Spaces/Modern - Cinema Room.wav
+F	7	Modern - Grand Church	Spaces/Modern - Grand Church.wav	RM IR/Spaces/Modern - Grand Church.wav
+F	7	Modern - Scoring Stage	Spaces/Modern - Scoring Stage.wav	RM IR/Spaces/Modern - Scoring Stage.wav
+F	7	Modern - South Church	Spaces/Modern - South Church.wav	RM IR/Spaces/Modern - South Church.wav
+F	7	Modern - Vox Ambience	Spaces/Modern - Vox Ambience.wav	RM IR/Spaces/Modern - Vox Ambience.wav
+F	7	Sim - Saint Peters	Spaces/Sim - Saint Peters.wav	RM IR/Spaces/Sim - Saint Peters.wav
+F	7	Sim - Taj Mahal	Spaces/Sim - Taj Mahal.wav	RM IR/Spaces/Sim - Taj Mahal.wav

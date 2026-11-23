@@ -1,0 +1,1227 @@
+desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attack, predelay, decay, mod, width, output EQ)
+//tags: reverb convolution impulse response ir zero latency predelay decay width eq
+//@author ReNo Mellow
+//@version 1.0
+//@changelog First release
+//@about
+//  # RM1982Verb
+//  Convolution reverb in the 1982 series. Load your own impulse responses (WAV, mono or stereo, up to 10 s).
+//  - IR loader: put your .wav files in REAPER/Data/RM IR (sub-folders allowed) and pick them in the IR file list above the panel,
+//    or click the IR name to open the IR BROWSER (folders + files, < > = previous / next IR of the folder; index written by the
+//    free IR Buddy script, action "Rescan RM IR"),
+//    or link your own IR folder with the folder button (action "ReNo Mellow - IR Buddy - Add IR folder"),
+//    or drop any .wav file on the plug-in window. Automatic high-quality resampling (windowed sinc) when the IR
+//    sample rate differs from the project. The IR is normalized (constant energy) and its silent tail is trimmed.
+//  - SPACE: ATTACK (fades in the start of the IR, 0..500 ms), PREDELAY (0..250 ms), DECAY (shortens the tail, 10..100 %),
+//    MOD (light chorus on the tail), WIDTH (0 = mono, 100 = as recorded, 200 = extra wide).
+//  - DUCKER: the dry signal compresses the wet (sidechain): the knob is the threshold (0 dB = off), ratio 3:1, soft knee,
+//    attack 1 ms, automatic release (fast after short hits, slower when the ducking lasts). The reverb blooms between the notes.
+//  - OUTPUT EQ (wet only): HPF (off..1 kHz), LOW shelf 250 Hz, MID bell 1.2 kHz, HIGH shelf 6 kHz (+/-12 dB), LPF (1 kHz..off).
+//  - VOLUME (wet + dry output level) and MIX (dry / wet; 100 % on a send).
+//  - LATENCY: ECO (1024 samples, lower CPU, compensated by REAPER) or ZERO (no latency at all, more CPU).
+//    Engine: non-uniform partitioned FFT convolution (64 / 512 / 4096 / 16384), direct FIR for the first 64 samples in ZERO.
+//  - Includes 100 factory IRs (Ambience, Chamber, Hall, Microphone, NonLin, Plate, Room, Spaces) and the IR Buddy script:
+//    actions "ReNo Mellow - IR Buddy" (capture the IR of the reverb plug-ins of the selected track), "Add IR folder",
+//    "Rescan RM IR" (update the browser index) and "Open RM IR folder". Manual: github.com/renothestraws/reno-mellow-manuals
+//  - Click a value (or double-click a knob) to type it: 25, 1.2s, 4.5k, off. Enter = OK, Esc = cancel.
+//  - Double-click the plug-in name: orange / green.
+//
+// ---------------------------------------------------------------------------
+// RM1982Verb - réverbération à convolution, série 1982.
+// Moteur : convolution partitionnée non uniforme (overlap-save + ligne à retard fréquentielle par niveau).
+//   ZERO : FIR direct [0,64) + niveaux 64 (p0=1, calcul en rafale à la frontière), 512 / 4096 / 16384 (p0=2, calcul
+//          réparti sur les échantillons du bloc précédent). ECO : seulement 512 / 4096 / 16384, IR décalée de 1024
+//          échantillons (pdc_delay = 1024, sec retardé d'autant).
+// Chaîne : entrée -> PREDELAY -> convolution -> MOD (chorus) -> WIDTH (M/S) -> EQ -> DUCKER (sidechain = sec) -> mix -> VOLUME.
+
+slider1:0<0,500,1>-Attack (ms)
+slider2:0<0,250,1>-Predelay (ms)
+slider3:100<10,100,1>-Decay (%)
+slider4:0<0,100,1>-Mod (%)
+slider5:100<0,200,1>-Width (%)
+slider6:20<20,1000,1>-HPF (Hz)
+slider7:0<-12,12,0.1>-Low 250 Hz (dB)
+slider8:0<-12,12,0.1>-Mid 1.2 kHz (dB)
+slider9:0<-12,12,0.1>-High 6 kHz (dB)
+slider10:20000<1000,20000,10>-LPF (Hz)
+slider11:0<-24,12,0.1>-Volume (dB)
+slider12:30<0,100,1>-Mix (%)
+slider13:0<0,1,1{Eco,Zero}>-Latency
+slider14:1<0,4,1{75%,100%,125%,150%,200%}>-Size
+slider15:/RM IR:none:IR file (REAPER/Data/RM IR)
+slider16:0<-60,0,0.1>-Ducker threshold (dB, 0 = off)
+slider17:/RMIRIndex:index.txt:-IR Buddy index (REAPER/Data/RMIRIndex)
+slider18:1<0,1,1{Orange,Green}>-Theme (double-click the plug-in name)
+
+options:maxmem=33554432
+
+in_pin:Left In
+in_pin:Right In
+out_pin:Left Out
+out_pin:Right Out
+
+@init
+ext_noinit = 1;
+EPS = 0.000000000001;
+function db2lin(d) ( exp(d*0.11512925464970228); );
+function lin2db(x) ( 8.685889638065035*log(max(x, EPS)); );
+
+// ---- mémoire ---------------------------------------------------------------------------
+RAW = 0; RAWN = 4194304;
+IRB0 = 4194304; IRB1 = 5242880;
+LMAXS = min(floor(10*srate), 960000);
+SNC = 6291456; SN_OS = 512; SN_Z = 16;
+PDB0 = 6356992; PDB1 = 6422528;
+CHB0 = 6488064; CHB1 = 6492160;
+FHB0 = 6496256; FHB1 = 6496384; FIRC0 = 6496512; FIRC1 = 6496576;
+DDB0 = 6496640; DDB1 = 6498688;
+PKA = 6500736; NPK = 580;
+C_HP = 6501400; C_LS = 6501410; C_PK = 6501420; C_HS = 6501430; C_LP = 6501440;
+EQS = 6501500;
+LVT = 6553600; LVBASE = 6619136;
+// index du navigateur (écrit par IR Buddy) : 1 Mo en haut de la mémoire
+IXB = 32505856; MEMTOP = IXB;
+IX_FI = IXB; IX_NO = IXB + 8000; IX_NL = IXB + 16000; IX_RO = IXB + 24000; IX_RL = IXB + 32000;
+IX_PO = IXB + 40000; IX_PL = IXB + 48000; IX_DO = IXB + 56000; IX_DL = IXB + 57000; IX_DF = IXB + 58000; IX_DN = IXB + 59000;
+IX_POOL = IXB + 60000; IX_PEND = 33554432; IX_MAXF = 8000; IX_MAXD = 1000;
+ECO_D = 1024;
+
+// ---- table du sinus cardinal fenêtré (Blackman, 16 passages par zéro) -------------------
+function sinc_table() local(j, u, w)
+(
+  j = 0;
+  loop(SN_Z*SN_OS + 2,
+    u = j/SN_OS;
+    w = u < SN_Z ? 0.42 + 0.5*cos($pi*u/SN_Z) + 0.08*cos(2*$pi*u/SN_Z) : 0;
+    SNC[j] = (u == 0 ? 1 : sin($pi*u)/($pi*u))*w;
+    j += 1;
+  );
+);
+sinc_table();
+
+// ---- auto-test FFT : format de la paire 0 (DC/Nyquist) et échelle de ifft_real(fft_real) ----
+// h = Dirac au rang 3 -> la convolution circulaire attendue est x décalé de 3.
+function fft_cal(n) local(i, ar, ai, br, bi, sxy0, syy0, sxx, sxy1, syy1, c, y0, y1)
+(
+  i = 0; loop(n, 65536[i] = sin(i*i*0.7 + i*1.3) + 0.3*cos(i*0.11); i += 1;);
+  memset(0, 0, n); 0[3] = 1; fft_real(0, n);
+  memcpy(32768, 65536, n); fft_real(32768, n);
+  i = 0;
+  loop(n/2,
+    ar = 32768[2*i]; ai = 32768[2*i + 1]; br = 0[2*i]; bi = 0[2*i + 1];
+    98304[2*i] = ar*br - ai*bi; 98304[2*i + 1] = ar*bi + ai*br;
+    i == 0 ? ( 131072[0] = ar*br; 131072[1] = ai*bi; ) : ( 131072[2*i] = ar*br - ai*bi; 131072[2*i + 1] = ar*bi + ai*br; );
+    i += 1;
+  );
+  ifft_real(98304, n); ifft_real(131072, n);
+  sxy0 = syy0 = sxy1 = syy1 = sxx = 0; i = 0;
+  loop(n,
+    c = 65536[(i - 3 + n) % n]; y0 = 98304[i]; y1 = 131072[i];
+    sxy0 += c*y0; syy0 += y0*y0; sxy1 += c*y1; syy1 += y1*y1; sxx += c*c;
+    i += 1;
+  );
+  cal_k0 = sxy0/max(syy0, EPS); cal_k1 = sxy1/max(syy1, EPS);
+  cal_e0 = max(sxx - sxy0*cal_k0, 0)/max(sxx, EPS);
+  cal_e1 = max(sxx - sxy1*cal_k1, 0)/max(sxx, EPS);
+);
+fft_cal(64);
+dcmode = cal_e1 < cal_e0;
+fft_ok = min(cal_e0, cal_e1) < 0.000001;
+function ksc_of(n) ( fft_cal(n); dcmode ? cal_k1 : cal_k0; );
+
+// ---- niveaux : 0 B, 1 p0, 2 début, 3 fin, 4 P, 5 Pa, 6 R, 7 H0, 8 H1, 9 F0, 10 F1, 11 A0, 12 A1,
+//      13 IN0, 14 IN1, 15 OC0, 16 OC1, 17 ON0, 18 ON1, 19 pos, 20 ri, 21 wq, 22 wc, 23 wi, 24 wst,
+//      25 cps, 26 actif, 27 Pa à appliquer, 29 Pa visé par la construction, 30 échelle ifft
+function lev_def(l, bs, p0, st, en) local(lv)
+(
+  lv = LVT + l*64;
+  memset(lv, 0, 64);
+  lv[0] = bs; lv[1] = p0; lv[2] = st; lv[3] = en; lv[24] = 3;
+  lv[30] = ksc_of(2*bs);
+);
+lev_def(0, 64, 1, 64, 1024);
+lev_def(1, 512, 2, 1024, 8192);
+lev_def(2, 4096, 2, 8192, 32768);
+lev_def(3, 16384, 2, 32768, 100000000);
+
+// calcul : n paires complexes au plus ; fin = 1 -> tout terminer (y compris les deux ifft)
+function lev_work(lv, n, fin) local(bs, rr, q, c, i, m, dc, xp, hp, ap, op, xr, xi, hr, hm)
+(
+  bs = lv[0]; rr = lv[6];
+  while (n > 0 && lv[24] < 3) (
+    lv[24] < 1 ? (
+      lv[5] < 1 ? ( lv[24] = 1; ) : (
+        q = lv[21]; c = lv[22]; i = lv[23];
+        m = min(n, bs - i);
+        dc = dcmode && i == 0;
+        xp = (c ? lv[10] : lv[9]) + ((lv[20] - q + rr) % rr)*2*bs + 2*i;
+        hp = (c ? lv[8] : lv[7]) + q*2*bs + 2*i;
+        ap = (c ? lv[12] : lv[11]) + 2*i;
+        n -= m; i += m;
+        dc ? ( ap[0] += xp[0]*hp[0]; ap[1] += xp[1]*hp[1]; xp += 2; hp += 2; ap += 2; m -= 1; );
+        loop(m,
+          xr = xp[0]; xi = xp[1]; hr = hp[0]; hm = hp[1];
+          ap[0] += xr*hr - xi*hm; ap[1] += xr*hm + xi*hr;
+          xp += 2; hp += 2; ap += 2;
+        );
+        i >= bs ? ( i = 0; c += 1; c > 1 ? ( c = 0; q += 1; q >= lv[5] ? lv[24] = 1; ); );
+        lv[21] = q; lv[22] = c; lv[23] = i;
+      );
+    ) : (
+      c = lv[24] - 1;
+      ap = c ? lv[12] : lv[11]; op = c ? lv[18] : lv[17];
+      ifft_real(ap, 2*bs);
+      i = 0; m = lv[30]; loop(bs, op[i] = ap[bs + i]*m; i += 1;);
+      lv[24] += 1;
+      !fin ? n = 0;
+    );
+  );
+);
+function lev_swap(lv) local(t)
+(
+  t = lv[15]; lv[15] = lv[17]; lv[17] = t;
+  t = lv[16]; lv[16] = lv[18]; lv[18] = t;
+);
+function lev_bound(lv) local(bs, sz, ri, sl)
+(
+  bs = lv[0]; sz = 2*bs;
+  lv[1] > 1 ? ( lev_work(lv, 1000000000, 1); lev_swap(lv); );
+  ri = (lv[20] + 1) % lv[6]; lv[20] = ri;
+  sl = lv[9] + ri*sz; memcpy(sl, lv[13], sz); fft_real(sl, sz); memcpy(lv[13], lv[13] + bs, bs);
+  sl = lv[10] + ri*sz; memcpy(sl, lv[14], sz); fft_real(sl, sz); memcpy(lv[14], lv[14] + bs, bs);
+  lv[5] = lv[27];
+  lv[21] = 0; lv[22] = 0; lv[23] = 0;
+  lv[5] > 0 ? (
+    memset(lv[11], 0, sz); memset(lv[12], 0, sz); lv[24] = 0;
+    lv[25] = ceil(lv[5]*sz/(bs - 4)) + 1;
+    lv[1] < 2 ? lev_work(lv, 1000000000, 1);
+  ) : (
+    memset(lv[17], 0, bs); memset(lv[18], 0, bs); lv[24] = 3;
+  );
+  lv[1] < 2 ? lev_swap(lv);
+);
+function lev_sample(lv, a, b) local(bs, pos, p)
+(
+  bs = lv[0]; pos = lv[19];
+  p = lv[13]; p[bs + pos] = a;
+  p = lv[14]; p[bs + pos] = b;
+  p = lv[15]; w0 += p[pos];
+  p = lv[16]; w1 += p[pos];
+  lv[24] < 3 ? lev_work(lv, lv[25], 0);
+  pos += 1;
+  pos >= bs ? ( lev_bound(lv); pos = 0; );
+  lv[19] = pos;
+);
+
+// ---- disposition mémoire des niveaux selon le mode et la longueur de l'IR -------------------
+function layout() local(l, lv, bs, P, ptr, sz, tl)
+(
+  tl = Lir + shift;
+  ptr = LVBASE; lay_ok = 1;
+  l = 3;
+  while (l >= 0) (
+    lv = LVT + l*64;
+    bs = lv[0];
+    P = (l == 0 && !zmode) ? 0 : max(0, ceil((min(lv[3], tl) - lv[2])/bs));
+    lv[4] = P; lv[26] = P > 0; lv[6] = max(P, 1);
+    lv[5] = 0; lv[27] = 0; lv[29] = 0; lv[19] = 0; lv[20] = 0; lv[21] = 0; lv[22] = 0; lv[23] = 0; lv[24] = 3; lv[25] = 0;
+    P > 0 ? (
+      sz = 2*bs;
+      ptr = ceil(ptr/sz)*sz;
+      lv[7] = ptr; ptr += sz*P;
+      nchir > 1 ? ( lv[8] = ptr; ptr += sz*P; ) : ( lv[8] = lv[7]; );
+      lv[9] = ptr; ptr += sz*P; lv[10] = ptr; ptr += sz*P;
+      lv[11] = ptr; ptr += sz; lv[12] = ptr; ptr += sz;
+      lv[13] = ptr; ptr += sz; lv[14] = ptr; ptr += sz;
+      lv[15] = ptr; ptr += bs; lv[16] = ptr; ptr += bs; lv[17] = ptr; ptr += bs; lv[18] = ptr; ptr += bs;
+    );
+    l -= 1;
+  );
+  ptr > MEMTOP ? ( lay_ok = 0; l = 0; loop(4, lv = LVT + l*64; lv[4] = 0; lv[26] = 0; l += 1;); ) : memset(LVBASE, 0, ptr - LVBASE);
+  memset(FHB0, 0, 384);
+  lay_on = lay_ok;
+);
+
+// ---- forme de l'IR : attaque, décroissance, fondu final, normalisation ----------------------
+function env_at(i) local(v)
+(
+  v = 1;
+  i < na ? v = 0.5 - 0.5*cos($pi*i/na);
+  dk > 0 ? v *= exp(-dk*i);
+  i > Le - nf ? v *= 0.5 + 0.5*cos($pi*min(i - (Le - nf), nf)/nf);
+  i >= Le ? v = 0;
+  v;
+);
+function shp(c, t) local(i, p)
+(
+  i = t - shift;
+  (i < 0 || i >= Le) ? 0 : ( p = c ? IRB1 : IRB0; p[i]*gnorm*env_at(i); );
+);
+function shape_params()
+(
+  na = floor(slider1*0.001*srate);
+  dk = slider3 < 99.9 ? 6.907755*(100/max(slider3, 10) - 1)/max(Lir, 1) : 0;
+  Le = slider3 < 99.9 ? min(Lir, ceil(Lir*slider3/100*1.4)) : Lir;
+  nf = max(1, min(2048, floor(Le/4)));
+  sh_a = slider1; sh_d = slider3;
+);
+function build_start() local(l, lv, tl)
+(
+  shape_params();
+  tl = Le + shift;
+  l = 0;
+  loop(4,
+    lv = LVT + l*64;
+    lv[29] = lv[4] > 0 ? min(lv[4], max(0, ceil((min(lv[3], tl) - lv[2])/lv[0]))) : 0;
+    l += 1;
+  );
+  bd_l = 3; bd_c = 0; bd_q = 0; building = 1;
+);
+function build_step(budget) local(lv, bs, sl, t0, i, j)
+(
+  while (building && budget > 0) (
+    bd_l >= 0 ? (
+      lv = LVT + bd_l*64;
+      bd_q >= lv[29] ? ( bd_l -= 1; bd_q = 0; bd_c = 0; ) : (
+        bs = lv[0];
+        sl = (bd_c ? lv[8] : lv[7]) + bd_q*2*bs;
+        t0 = lv[2] + bd_q*bs;
+        i = 0; loop(bs, sl[i] = shp(bd_c, t0 + i); i += 1;);
+        memset(sl + bs, 0, bs);
+        fft_real(sl, 2*bs);
+        budget -= bs;
+        bd_c += 1; bd_c >= nchir ? ( bd_c = 0; bd_q += 1; );
+      );
+    ) : (
+      j = 0;
+      loop(64,
+        FIRC0[j] = zmode ? shp(0, 63 - j) : 0;
+        FIRC1[j] = zmode ? shp(nchir > 1 ? 1 : 0, 63 - j) : 0;
+        j += 1;
+      );
+      j = 0; loop(4, lv = LVT + j*64; lv[27] = lv[29]; j += 1;);
+      building = 0; ready = 1;
+    );
+  );
+);
+
+// ---- chargement de l'IR (machine à états, répartie sur plusieurs @block) ---------------------
+function basename() local(i, n, c, p)
+(
+  n = strlen(#irpath); p = 0; i = 0;
+  loop(n, c = str_getchar(#irpath, i); (c == '/' || c == '\\') ? p = i + 1; i += 1;);
+  strcpy_substr(#irname, #irpath, p);
+);
+function load_step() local(n, k, k1, t, acc, u, ui, c, nn, bud, y, e, pk, i, j, a, b, last, v)
+(
+  ld_st == 1 ? (
+    ld_err = 0; capped = 0;
+    ir_src == 1 ? ( fh = file_open(#irpath); basename(); ) : ( fh = file_open(slider15); strcpy_fromslider(#irname, slider15);
+      (!strncmp(#irname, "RM IR/", 6) || !strncmp(#irname, "RM IR\\", 6)) ? str_delsub(#irname, 0, 6); );
+    fh < 0 ? (
+      ld_err = 1; ld_st = 0;
+    ) : (
+      f_nch = 0; f_sr = 0;
+      file_riff(fh, f_nch, f_sr);
+      (f_nch < 1 || f_sr < 1) ? ( file_close(fh); ld_err = 2; ld_st = 0; ) : (
+        f_nfr = floor(file_avail(fh)/f_nch);
+        n = min(floor(RAWN/f_nch), ceil(10*f_sr));
+        capped = f_nfr > n; f_nfr = min(f_nfr, n);
+        f_nfr < 1 ? ( file_close(fh); ld_err = 3; ld_st = 0; ) : (
+          rd_n = 0; rd_tot = f_nfr*f_nch; ld_st = 2;
+        );
+      );
+    );
+  ) :
+  ld_st == 2 ? (
+    n = min(262144, rd_tot - rd_n);
+    k = file_mem(fh, RAW + rd_n, n);
+    rd_n += n;
+    (k < n || rd_n >= rd_tot) ? (
+      k < n ? ( f_nfr = floor((rd_n - n + k)/f_nch); );
+      file_close(fh);
+      nchir = min(f_nch, 2);
+      rs_r = f_sr/srate; rs_fc = min(1, srate/f_sr); rs_hw = SN_Z/rs_fc;
+      rs_same = abs(f_sr - srate) < 0.5;
+      rs_len = min(floor(f_nfr/rs_r), LMAXS);
+      rs_n = 0; rs_c = 0; ld_st = 3;
+    );
+  ) :
+  ld_st == 3 ? (
+    bud = 65536;
+    while (bud > 0 && ld_st == 3) (
+      c = rs_c; y = c ? IRB1 : IRB0;
+      rs_same ? (
+        nn = min(rs_len - rs_n, 16384);
+        i = 0; loop(nn, y[rs_n + i] = RAW[(rs_n + i)*f_nch + c]; i += 1;);
+        rs_n += nn; bud -= nn;
+      ) : (
+        t = rs_n*rs_r;
+        k = max(ceil(t - rs_hw), 0); k1 = min(floor(t + rs_hw), f_nfr - 1);
+        acc = 0;
+        loop(k1 - k + 1,
+          u = abs(t - k)*rs_fc*SN_OS; ui = floor(u);
+          acc += RAW[k*f_nch + c]*(SNC[ui] + (SNC[ui + 1] - SNC[ui])*(u - ui));
+          k += 1;
+        );
+        y[rs_n] = acc*rs_fc;
+        rs_n += 1; bud -= 2*rs_hw + 4;
+      );
+      rs_n >= rs_len ? ( rs_n = 0; rs_c += 1; rs_c >= nchir ? ld_st = 4; );
+    );
+    ld_pct = (rs_c + rs_n/max(rs_len, 1))/nchir;
+  ) :
+  ld_st == 4 ? (
+    // énergie, crête, coupe du silence final (-80 dB sous la crête)
+    e = 0; pk = 0; i = 0;
+    loop(rs_len,
+      a = IRB0[i]; b = nchir > 1 ? IRB1[i] : 0;
+      e += a*a + b*b; pk = max(pk, max(abs(a), abs(b)));
+      i += 1;
+    );
+    last = 0; i = rs_len - 1;
+    while (i > 0 && last == 0) (
+      v = max(abs(IRB0[i]), nchir > 1 ? abs(IRB1[i]) : 0);
+      v > pk*0.0001 ? last = i;
+      i -= 1;
+    );
+    Lir = max(64, last + 1);
+    gnorm = pk > 0 ? 0.5/sqrt(max(e/nchir, EPS)) : 0;
+    j = 0;
+    loop(NPK,
+      i = floor(j*Lir/NPK); n = max(1, floor((j + 1)*Lir/NPK) - i); v = 0;
+      loop(n, v = max(v, max(abs(IRB0[i]), nchir > 1 ? abs(IRB1[i]) : 0)); i += 1;);
+      PKA[j] = v; j += 1;
+    );
+    pk_max = max(pk, EPS);
+    ir_dur = Lir/srate; ir_fsr = f_sr; ir_nch = f_nch;
+    loaded = 1; ld_st = 0; ld_gen += 1;
+    zmode = slider13 >= 0.5; shift = zmode ? 0 : ECO_D;
+    layout(); build_start();
+  );
+);
+
+// ---- filtres ------------------------------------------------------------------------
+function setc(c, b0, b1, b2, a0, a1, a2) ( c[0] = b0/a0; c[1] = b1/a0; c[2] = b2/a0; c[3] = a1/a0; c[4] = a2/a0; );
+function rbj(ty, f, q, db) local(A, w, cs, sn, al, sq)
+(
+  f = min(max(f, 5), 0.45*srate);
+  A = pow(10, db/40); w = 2*$pi*f/srate; cs = cos(w); sn = sin(w);
+  al = sn/(2*q); sq = 2*sqrt(A)*al;
+  ty == 0 ? (
+    qb0 = (1 - cs)/2; qb1 = 1 - cs; qb2 = (1 - cs)/2; qa0 = 1 + al; qa1 = -2*cs; qa2 = 1 - al;
+  ) : ty == 1 ? (
+    qb0 = (1 + cs)/2; qb1 = -(1 + cs); qb2 = (1 + cs)/2; qa0 = 1 + al; qa1 = -2*cs; qa2 = 1 - al;
+  ) : ty == 2 ? (
+    qb0 = 1 + al*A; qb1 = -2*cs; qb2 = 1 - al*A; qa0 = 1 + al/A; qa1 = -2*cs; qa2 = 1 - al/A;
+  ) : ty == 3 ? (
+    qb0 = A*((A + 1) - (A - 1)*cs + sq); qb1 = 2*A*((A - 1) - (A + 1)*cs); qb2 = A*((A + 1) - (A - 1)*cs - sq);
+    qa0 = (A + 1) + (A - 1)*cs + sq; qa1 = -2*((A - 1) + (A + 1)*cs); qa2 = (A + 1) + (A - 1)*cs - sq;
+  ) : (
+    qb0 = A*((A + 1) + (A - 1)*cs + sq); qb1 = -2*A*((A - 1) + (A + 1)*cs); qb2 = A*((A + 1) + (A - 1)*cs - sq);
+    qa0 = (A + 1) - (A - 1)*cs + sq; qa1 = 2*((A - 1) - (A + 1)*cs); qa2 = (A + 1) - (A - 1)*cs - sq;
+  );
+);
+function rbj_set(c, ty, f, q, db) ( rbj(ty, f, q, db); setc(c, qb0, qb1, qb2, qa0, qa1, qa2); );
+function bq_mag(c, f) local(w, c1, s1, c2, s2, nr, ni, dr, di)
+(
+  w = 2*$pi*f/srate;
+  c1 = cos(w); s1 = sin(w); c2 = cos(2*w); s2 = sin(2*w);
+  nr = c[0] + c[1]*c1 + c[2]*c2; ni = -(c[1]*s1 + c[2]*s2);
+  dr = 1 + c[3]*c1 + c[4]*c2;    di = -(c[3]*s1 + c[4]*s2);
+  sqrt((nr*nr + ni*ni)/max(dr*dr + di*di, EPS));
+);
+function bq1(x, c, st) local(y)
+(
+  y = c[0]*x + st[0];
+  st[0] = c[1]*x - c[3]*y + st[1];
+  st[1] = c[2]*x - c[4]*y;
+  y;
+);
+// lecture interpolée (Hermite) dans une ligne de 4096
+function hread(buf, wp, d) local(rp, i, f, xm, xa, xb, xc, c1, c2, c3)
+(
+  rp = wp - d; i = floor(rp); f = rp - i;
+  xm = buf[(i - 1) & 4095]; xa = buf[i & 4095]; xb = buf[(i + 1) & 4095]; xc = buf[(i + 2) & 4095];
+  c1 = 0.5*(xb - xm); c2 = xm - 2.5*xa + 2*xb - 0.5*xc; c3 = 0.5*(xc - xm) + 1.5*(xa - xb);
+  ((c3*f + c2)*f + c1)*f + xa;
+);
+
+function update_params()
+(
+  pdn = min(floor(slider2*0.001*srate + 0.5), 65000);
+  mod_m = slider4/100;
+  ch_base = 0.007*srate; ch_dep = 0.0015*srate*mod_m;
+  ch_inc0 = 0.40/srate; ch_inc1 = 0.47/srate;
+  wid = slider5/100;
+  hp_on = slider6 > 20.5; hp_on ? rbj_set(C_HP, 1, slider6, 0.7071, 0);
+  ls_on = abs(slider7) > 0.05; ls_on ? rbj_set(C_LS, 3, 250, 0.7071, slider7);
+  pk_on = abs(slider8) > 0.05; pk_on ? rbj_set(C_PK, 2, 1200, 0.8, slider8);
+  hs_on = abs(slider9) > 0.05; hs_on ? rbj_set(C_HS, 4, 6000, 0.7071, slider9);
+  lp_on = slider10 < 19990; lp_on ? rbj_set(C_LP, 0, slider10, 0.7071, 0);
+  mix_w = slider12/100; mix_d = 1 - mix_w;
+  vol = db2lin(slider11);
+  dk_on = slider16 < -0.05; dk_thr = slider16;
+);
+
+pk_dec = exp(-(20/1.7)/srate*0.11512925464970228);
+// DUCKER : attaque 1 ms ; release automatique = suiveur rapide (80 ms) + suiveur lent (charge 400 ms, release 1.2 s)
+dk_att = 1 - exp(-1/(0.001*srate));
+dk_rf = 1 - exp(-1/(0.080*srate));
+dk_sa = 1 - exp(-1/(0.400*srate));
+dk_sr = 1 - exp(-1/(1.200*srate));
+DK_R = 3; DK_W = 10;
+dk_f = 0; dk_s = 0; dk_gr = 0;
+need_load = 1; ld_st = 0; loaded = 0; ready = 0; building = 0; lay_on = 0; sl15_seen = 0;
+zmode = slider13 >= 0.5; shift = zmode ? 0 : ECO_D;
+memset(PDB0, 0, 65536*2 + 4096*2);
+memset(FHB0, 0, 384); memset(DDB0, 0, 4096); memset(EQS, 0, 64);
+pdw = 0; chw = 0; fwp = 0; ddw = 0; ch_p0 = 0; ch_p1 = 0.25;
+update_params();
+
+// ---- index des IR (REAPER/Data/RMIRIndex/index.txt, écrit par IR Buddy) -------------------
+// ligne D<tab>dossier ; ligne F<tab>n° dossier<tab>nom<tab>chemin relatif<tab>chemin absolu
+function ix_put(a, b) local(i, n, o)
+(
+  n = b - a;
+  (n <= 0 || ix_pp + n > IX_PEND) ? -1 : (
+    o = ix_pp; i = 0;
+    loop(n, o[i] = str_getchar(#ixl, a + i, 'cu'); i += 1;);
+    ix_pp += n; o;
+  );
+);
+function ix_tab(p, L) local(i, r)
+(
+  r = L; i = p;
+  while (i < L && r == L) ( str_getchar(#ixl, i, 'cu') == 9 ? r = i; i += 1; );
+  r;
+);
+function ix_read() local(h, L, c, t1, t2, t3, fd, i)
+(
+  ix_ok = 0; ix_nf = 0; ix_nd = 0; ix_pp = IX_POOL;
+  h = file_open(slider17);
+  h >= 0 ? (
+    file_text(h);
+    file_string(h, #ixl);
+    !strncmp(#ixl, "RMIRINDEX", 9) ? (
+      ix_ok = 1;
+      while (file_avail(h) > 0) (
+        strcpy(#ixl, "");
+        file_string(h, #ixl);
+        L = strlen(#ixl);
+        while (L > 0 && str_getchar(#ixl, L - 1, 'cu') < 32) ( L -= 1; );
+        c = L > 2 ? str_getchar(#ixl, 0, 'cu') : 0;
+        (c == 'D' && ix_nd < IX_MAXD) ? (
+          IX_DO[ix_nd] = ix_put(2, L); IX_DL[ix_nd] = L - 2; IX_DN[ix_nd] = 0; IX_DF[ix_nd] = -1;
+          ix_nd += 1;
+        ) : (c == 'F' && ix_nf < IX_MAXF) ? (
+          t1 = ix_tab(2, L); t2 = ix_tab(t1 + 1, L); t3 = ix_tab(t2 + 1, L);
+          t3 < L ? (
+            fd = 0; i = 2; loop(t1 - 2, fd = fd*10 + str_getchar(#ixl, i, 'cu') - '0'; i += 1;);
+            (fd >= 0 && fd < ix_nd) ? (
+              IX_FI[ix_nf] = fd;
+              IX_NO[ix_nf] = ix_put(t1 + 1, t2); IX_NL[ix_nf] = t2 - t1 - 1;
+              IX_RO[ix_nf] = ix_put(t2 + 1, t3); IX_RL[ix_nf] = t3 - t2 - 1;
+              IX_PO[ix_nf] = ix_put(t3 + 1, L);  IX_PL[ix_nf] = L - t3 - 1;
+              IX_PO[ix_nf] >= 0 ? (
+                IX_DF[fd] < 0 ? IX_DF[fd] = ix_nf;
+                IX_DN[fd] += 1; ix_nf += 1;
+              );
+            );
+          );
+        );
+      );
+    );
+    file_close(h);
+  );
+);
+// texte d'une entrée du pool -> #ixs
+function ix_str(off, n) local(i)
+(
+  strcpy(#ixs, "");
+  off >= 0 ? ( i = 0; loop(n, sprintf(#ixc, "%c", off[i]); strcat(#ixs, #ixc); i += 1;); );
+  #ixs;
+);
+// entrée de l'index correspondant à l'IR chargée (-1 si aucune)
+function ix_match() local(i, r)
+(
+  r = -1; i = 0;
+  ir_src == 1 ? (
+    while (i < ix_nf && r < 0) ( ix_str(IX_PO[i], IX_PL[i]); strcmp(#ixs, #irpath) == 0 ? r = i; i += 1; );
+  ) : (
+    while (i < ix_nf && r < 0) ( ix_str(IX_RO[i], IX_RL[i]); stricmp(#ixs, #irname) == 0 ? r = i; i += 1; );
+  );
+  r;
+);
+function ix_load(i)
+(
+  (i >= 0 && i < ix_nf) ? (
+    ix_str(IX_PO[i], IX_PL[i]); strcpy(#irpath, #ixs);
+    ir_src = 1; ix_cur = i; need_load = 1;
+  );
+);
+ix_cur = -1; ix_lgen = -1; br_on = 0;
+
+@serialize
+ser_src = ir_src; strcpy(#ser_old, #irpath);
+file_var(0, ir_src);
+file_string(0, #irpath);
+file_avail(0) >= 0 ? (
+  (ir_src != ser_src || strcmp(#ser_old, #irpath) != 0 || !loaded) ? need_load = 1;
+);
+
+@slider
+update_params();
+
+@block
+update_params();
+// liste du dossier REAPER/Data/RM IR
+slider15 != sl15_last ? (
+  sl15_seen ? ( ir_src = 0; need_load = 1; );
+  sl15_last = slider15;
+);
+sl15_seen = 1;
+need_load ? ( need_load = 0; ld_st = 1; ld_pct = 0; );
+ld_st > 0 ? load_step();
+ld_st == 0 && loaded ? (
+  zm = slider13 >= 0.5;
+  zm != zmode ? ( zmode = zm; shift = zmode ? 0 : ECO_D; ready = 0; layout(); build_start(); ) :
+  ( slider1 != sh_a || slider3 != sh_d ) ? build_start();
+);
+building ? build_step(65536);
+pdc_delay = zmode ? 0 : ECO_D; pdc_bot_ch = 0; pdc_top_ch = 2;
+
+@sample
+x0 = spl0; x1 = spl1;
+pin0 = max(pin0, abs(x0)); pin1 = max(pin1, abs(x1));
+
+// predelay
+pdw = (pdw + 1) & 65535;
+PDB0[pdw] = x0; PDB1[pdw] = x1;
+rp_ = (pdw - pdn) & 65535;
+a0 = PDB0[rp_]; a1 = PDB1[rp_];
+
+// convolution
+w0 = 0; w1 = 0;
+lay_on ? (
+  zmode ? (
+    fwp = (fwp + 1) & 63;
+    FHB0[fwp] = a0; FHB0[fwp + 64] = a0; FHB1[fwp] = a1; FHB1[fwp + 64] = a1;
+    fp_ = FHB0 + fwp + 1; fq_ = FIRC0; fa_ = 0; loop(64, fa_ += fp_[0]*fq_[0]; fp_ += 1; fq_ += 1;); w0 = fa_;
+    fp_ = FHB1 + fwp + 1; fq_ = FIRC1; fa_ = 0; loop(64, fa_ += fp_[0]*fq_[0]; fp_ += 1; fq_ += 1;); w1 = fa_;
+    LVT[26] ? lev_sample(LVT, a0, a1);
+  );
+  LVT[64 + 26] ? lev_sample(LVT + 64, a0, a1);
+  LVT[128 + 26] ? lev_sample(LVT + 128, a0, a1);
+  LVT[192 + 26] ? lev_sample(LVT + 192, a0, a1);
+);
+
+// MOD : chorus léger sur la queue
+mod_m > 0 ? (
+  chw = (chw + 1) & 4095;
+  CHB0[chw] = w0; CHB1[chw] = w1;
+  ch_p0 += ch_inc0; ch_p0 >= 1 ? ch_p0 -= 1;
+  ch_p1 += ch_inc1; ch_p1 >= 1 ? ch_p1 -= 1;
+  cm0 = hread(CHB0, chw, ch_base + ch_dep*sin(2*$pi*ch_p0));
+  cm1 = hread(CHB1, chw, ch_base + ch_dep*cos(2*$pi*ch_p1));
+  w0 = w0*(1 - 0.5*mod_m) + cm0*0.5*mod_m;
+  w1 = w1*(1 - 0.5*mod_m) + cm1*0.5*mod_m;
+);
+
+// WIDTH
+wid != 1 ? ( wm_ = 0.5*(w0 + w1); ws_ = 0.5*(w0 - w1)*wid; w0 = wm_ + ws_; w1 = wm_ - ws_; );
+
+// EQ de sortie (traité seulement)
+hp_on ? ( w0 = bq1(w0, C_HP, EQS);      w1 = bq1(w1, C_HP, EQS + 2); );
+ls_on ? ( w0 = bq1(w0, C_LS, EQS + 4);  w1 = bq1(w1, C_LS, EQS + 6); );
+pk_on ? ( w0 = bq1(w0, C_PK, EQS + 8);  w1 = bq1(w1, C_PK, EQS + 10); );
+hs_on ? ( w0 = bq1(w0, C_HS, EQS + 12); w1 = bq1(w1, C_HS, EQS + 14); );
+lp_on ? ( w0 = bq1(w0, C_LP, EQS + 16); w1 = bq1(w1, C_LP, EQS + 18); );
+
+// sec (retardé en ECO pour rester aligné)
+zmode ? ( d0 = x0; d1 = x1; ) : (
+  ddw = (ddw + 1) & 2047;
+  DDB0[ddw] = x0; DDB1[ddw] = x1;
+  d0 = DDB0[(ddw - ECO_D) & 2047]; d1 = DDB1[(ddw - ECO_D) & 2047];
+);
+// DUCKER : le sec (aligné sur le traité) comprime le traité ; ratio 3, genou souple 10 dB
+dk_on ? (
+  dk_x = lin2db(max(abs(d0), abs(d1)));
+  dk_o = dk_x - dk_thr;
+  dk_t = dk_o <= -DK_W/2 ? 0 : dk_o >= DK_W/2 ? dk_o*(1 - 1/DK_R) : sqr(dk_o + DK_W/2)/(2*DK_W)*(1 - 1/DK_R);
+  dk_f += (dk_t - dk_f)*(dk_t > dk_f ? dk_att : dk_rf);
+  dk_s += (dk_f - dk_s)*(dk_f > dk_s ? dk_sa : dk_sr);
+  dk_gr = max(dk_f, dk_s);
+  dk_g = db2lin(-dk_gr);
+  w0 *= dk_g; w1 *= dk_g;
+  dk_grm = max(dk_grm, dk_gr);
+) : ( dk_gr = 0; dk_f = 0; dk_s = 0; );
+spl0 = (d0*mix_d + w0*mix_w)*vol;
+spl1 = (d1*mix_d + w1*mix_w)*vol;
+pout0 = max(pout0, abs(spl0)); pout1 = max(pout1, abs(spl1));
+
+@gfx 1220 470
+// thème : orange ou vert (double-clic sur le nom du plug-in), mémorisé dans slider18
+slider18 >= 0.5 ? (
+  thc0r = 0.424; thc0g = 0.851; thc0b = 0.78;
+  thc1r = 0.6; thc1g = 0.92; thc1b = 0.86;
+  thc2r = 0.55; thc2g = 0.9; thc2b = 0.83;
+  thc5r = 0.02; thc5g = 0.1; thc5b = 0.09;
+) : (
+  thc0r = 1.0; thc0g = 0.58; thc0b = 0.12;
+  thc1r = 1.0; thc1g = 0.7; thc1b = 0.35;
+  thc2r = 1.0; thc2g = 0.7; thc2b = 0.2;
+  thc5r = 0.1; thc5g = 0.06; thc5b = 0.02;
+);
+function PX(x) ( ox + x*S; );
+function PY(y) ( oy + y*S; );
+function col(r,g,b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function rct(x,y,w,h,f) ( gfx_rect(PX(x), PY(y), ceil(w*S), ceil(h*S), f); );
+function ln(x1,y1,x2,y2) ( gfx_line(PX(x1), PY(y1), PX(x2), PY(y2), 1); );
+function text_c(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w*0.5; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_l(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x); gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function text_r(x,y,str) local(w,h) ( gfx_measurestr(str,w,h); gfx_x = PX(x) - w; gfx_y = PY(y) - h*0.5; gfx_drawstr(str); );
+function knob_pt(cx,cy,rad,frac) local(an)
+(
+  an = (225 - 270*frac)*$pi/180;
+  kx = cx + rad*cos(an);
+  ky = cy - rad*sin(an);
+);
+function arc(cx,cy,r,f1,f2,th) local(i, a1, a2)
+(
+  a1 = (-135 + 270*min(f1,f2))*$pi/180;
+  a2 = (-135 + 270*max(f1,f2))*$pi/180;
+  i = 0;
+  loop(max(1, ceil(th*S)), gfx_arc(PX(cx), PY(cy), r*S + i, a1, a2, 1); i += 1;);
+);
+function draw_knob(cx,cy,r,frac,fz) local(i, x1, y1, t)
+(
+  col(0.07,0.07,0.08); arc(cx, cy, r + 9, 0, 1, 4);
+  col(thc0r,thc0g,thc0b); arc(cx, cy, r + 9, fz, frac, 4);
+  col(0.03,0.03,0.035); gfx_circle(PX(cx), PY(cy + 3), (r + 2)*S, 1, 1);
+  i = 0;
+  loop(10,
+    t = 0.30 + 0.05*i;
+    col(t, t, t + 0.01); gfx_circle(PX(cx), PY(cy), r*(1 - i*0.035)*S, 1, 1);
+    i += 1;
+  );
+  col(0.72,0.73,0.75); gfx_circle(PX(cx), PY(cy), r*0.62*S, 1, 1);
+  col(0.80,0.81,0.83); gfx_circle(PX(cx - r*0.1), PY(cy - r*0.12), r*0.45*S, 1, 1);
+  col(0.66,0.67,0.69); gfx_circle(PX(cx), PY(cy), r*0.62*S, 0, 1);
+  col(0.06,0.06,0.07);
+  knob_pt(cx, cy, r*0.66, frac); x1 = kx; y1 = ky;
+  knob_pt(cx, cy, r*0.95, frac);
+  t = 0; loop(max(2, ceil(3*S)), gfx_line(PX(x1)+t-1, PY(y1), PX(kx)+t-1, PY(ky), 1); t += 1;);
+);
+function draw_btn(x,y,w,h,on,str)
+(
+  on ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18);
+  rct(x,y,w,h,1);
+  col(0.03,0.03,0.035); rct(x,y,w,h,0);
+  on ? col(thc5r,thc5g,thc5b) : col(0.72,0.73,0.76);
+  text_c(x + w*0.5, y + h*0.5, str);
+);
+function in_rect(x,y,w,h) ( mx >= x && mx < x+w && my >= y && my < y+h; );
+function in_circ(cx,cy,r) ( sqr(mx - cx) + sqr(my - cy) <= r*r; );
+function set_sl(idx, v) ( v != slider(idx) ? ( slider(idx) = v; slider_automate(2^(idx-1)); ); );
+
+// ---- Table des potards : 1 ATTACK, 2 PREDELAY, 3 DECAY, 4 MOD, 5 WIDTH, 6 HPF, 7 LOW, 8 MID, 9 HIGH, 10 LPF, 11 VOLUME, 12 MIX
+function k_sl(i) ( i == 13 ? 16 : i; );
+function k_lo(i) ( i == 13 ? -60 : i == 3 ? 10 : i == 6 ? 20 : (i >= 7 && i <= 9) ? -12 : i == 10 ? 1000 : i == 11 ? -24 : 0; );
+function k_hi(i) ( i == 13 ? 0 : i == 1 ? 500 : i == 2 ? 250 : (i == 3 || i == 4 || i == 12) ? 100 : i == 5 ? 200 : i == 6 ? 1000 : (i >= 7 && i <= 9) ? 12 : i == 10 ? 20000 : 12; );
+function k_df(i) ( i == 3 ? 100 : i == 5 ? 100 : i == 6 ? 20 : i == 10 ? 20000 : i == 12 ? 30 : 0; );
+function k_st(i) ( ((i >= 7 && i <= 9) || i == 11 || i == 13) ? 0.1 : i == 10 ? 10 : 1; );
+function k_lg(i) ( i == 6 || i == 10; );
+function k_sq(i) ( i == 1 || i == 2; );
+function k_cx(i) ( i == 13 ? 598 : i <= 5 ? 78 + (i - 1)*104 : i <= 10 ? 676 + (i - 6)*80 : i == 11 ? 700 : 800; );
+function k_cy(i) ( (i <= 5 || i == 13) ? 336 : i <= 10 ? 150 : 368; );
+function k_r(i) ( (i <= 5 || i == 13) ? 28 : i <= 10 ? 22 : 26; );
+function k_vy(i) ( (i <= 5 || i == 13) ? 392 : i <= 10 ? 194 : 411; );
+function k_vw(i) ( (i <= 5 || i == 13) ? 86 : i <= 10 ? 74 : 86; );
+function k_frac(i) local(v, lo, hi)
+(
+  v = slider(k_sl(i)); lo = k_lo(i); hi = k_hi(i);
+  min(max(k_lg(i) ? log(v/lo)/log(hi/lo) : k_sq(i) ? sqrt(max(v - lo, 0)/(hi - lo)) : (v - lo)/(hi - lo), 0), 1);
+);
+function k_put(i, v) local(lo, hi, st)
+(
+  lo = k_lo(i); hi = k_hi(i); st = k_st(i);
+  v = min(max(v, lo), hi);
+  v = floor(v/st + 0.5)*st;
+  set_sl(k_sl(i), min(max(v, lo), hi));
+);
+function k_set_frac(i, f) local(lo, hi)
+(
+  f = min(max(f, 0), 1); lo = k_lo(i); hi = k_hi(i);
+  k_put(i, k_lg(i) ? lo*pow(hi/lo, f) : k_sq(i) ? lo + (hi - lo)*f*f : lo + (hi - lo)*f);
+);
+function k_hit() local(i, r)
+(
+  r = 0; i = 1;
+  loop(13, (r == 0 && in_circ(k_cx(i), k_cy(i), k_r(i) + 8)) ? r = i; i += 1;);
+  r;
+);
+function v_hit() local(i, r)
+(
+  r = 0; i = 1;
+  loop(13, (r == 0 && in_rect(k_cx(i) - k_vw(i)/2, k_vy(i) - 10, k_vw(i), 20)) ? r = i; i += 1;);
+  r;
+);
+function k_str(i) local(v)
+(
+  v = slider(k_sl(i));
+  (i == 1 || i == 2) ? sprintf(#ks, "%d ms", v) :
+  i == 3 ? sprintf(#ks, "%d %%", v) :
+  i == 4 ? ( v < 0.5 ? strcpy(#ks, "OFF") : sprintf(#ks, "%d %%", v); ) :
+  i == 5 ? ( v < 0.5 ? strcpy(#ks, "MONO") : sprintf(#ks, "%d %%", v); ) :
+  i == 6 ? ( v <= 20.5 ? strcpy(#ks, "OFF") : sprintf(#ks, "%.0f Hz", v); ) :
+  (i >= 7 && i <= 9) ? sprintf(#ks, "%+.1f dB", v) :
+  i == 10 ? ( v >= 19990 ? strcpy(#ks, "OFF") : sprintf(#ks, "%.1f kHz", v/1000); ) :
+  i == 11 ? sprintf(#ks, "%+.1f dB", v) :
+  i == 13 ? ( v > -0.05 ? strcpy(#ks, "OFF") : sprintf(#ks, "%.1f dB", v); ) :
+  sprintf(#ks, "%d %%", v);
+);
+function pk_y(d, y, h) ( y + h*(1 - (min(max(d, -60), 3) + 60)/63); );
+function pk_bar(x, y, w, h, d, hd) local(ii, n, yy, lit, dd)
+(
+  col(0.03,0.03,0.035); rct(x - 2, y - 2, w + 4, h + 4, 1);
+  n = 60; ii = 0;
+  loop(n,
+    dd = -60 + 63*(ii + 1)/n;
+    lit = d >= dd - 63/n;
+    lit ? ( dd > 0.01 ? col(1.00,0.22,0.18) : dd > -6 ? col(thc2r,thc2g,thc2b) : col(0.35,0.90,0.45); )
+        : col(0.10,0.11,0.12);
+    yy = y + h - (ii + 1)*h/n;
+    rct(x, yy + 1, w, h/n - 1, 1);
+    ii += 1;
+  );
+  hd > -60 ? (
+    hd > 0 ? col(1.00,0.22,0.18) : hd > -6 ? col(thc2r,thc2g,thc2b) : col(0.55,1.00,0.60);
+    rct(x, pk_y(hd, y, h) - 1, w, 2, 1);
+  );
+);
+// enveloppe affichée (mêmes formules que la construction, sans dépendre de l'état du moteur)
+function g_env(i) local(v, gna, gdk, gle, gnf)
+(
+  gna = slider1*0.001*srate;
+  gdk = slider3 < 99.9 ? 6.907755*(100/max(slider3, 10) - 1)/max(Lir, 1) : 0;
+  gle = slider3 < 99.9 ? min(Lir, ceil(Lir*slider3/100*1.4)) : Lir;
+  gnf = max(1, min(2048, floor(gle/4)));
+  v = 1;
+  i < gna ? v = 0.5 - 0.5*cos($pi*i/gna);
+  gdk > 0 ? v *= exp(-gdk*i);
+  i > gle - gnf ? v *= 0.5 + 0.5*cos($pi*min(i - (gle - gnf), gnf)/gnf);
+  i >= gle ? v = 0;
+  v;
+);
+
+// ---- saisie clavier (standard ReNo Mellow) ----------------------------------------
+function kbx_pnum() local(i, n, c, v, frac, dv)
+(
+  n = strlen(#kbx_ed); i = 0; v = 0; frac = 0; dv = 1;
+  kbx_ok = 0; kbx_neg = 0; kbx_kilo = 0; kbx_off = 0; kbx_sec = 0; kbx_mil = 0;
+  loop(n,
+    c = str_getchar(#kbx_ed, i);
+    (c >= 'A' && c <= 'Z') ? c += 32;
+    c == '-' ? kbx_neg = 1;
+    c == 'k' ? kbx_kilo = 1;
+    c == 'o' ? kbx_off = 1;
+    c == 's' ? kbx_sec = 1;
+    c == 'm' ? kbx_mil = 1;
+    (c == '.' || c == ',') ? frac = 1;
+    (c >= '0' && c <= '9') ? (
+      kbx_ok = 1;
+      frac ? ( dv *= 10; v += (c - '0')/dv; ) : ( v = v*10 + (c - '0'); );
+    );
+    i += 1;
+  );
+  kbx_kilo ? v *= 1000;
+  kbx_neg ? -v : v;
+);
+function kbx_apply(i) local(v)
+(
+  v = kbx_pnum();
+  (kbx_sec && !kbx_mil && (i == 1 || i == 2)) ? v *= 1000;
+  (kbx_off && !kbx_ok && i == 4) ? k_put(4, 0);
+  (kbx_off && !kbx_ok && i == 6) ? k_put(6, 20);
+  (kbx_off && !kbx_ok && i == 10) ? k_put(10, 20000);
+  (kbx_off && !kbx_ok && i == 13) ? k_put(13, 0);
+  (i == 13 && kbx_ok && !kbx_neg) ? v = -v;
+  kbx_ok ? k_put(i, v);
+);
+
+S  = floor(slider14 + 0.5) >= 4 ? 2 : 0.75 + 0.25*floor(slider14 + 0.5);
+ox = max(0, floor((gfx_w - 1220*S)/2));
+oy = max(0, floor((gfx_h - 470*S)/2));
+mx = (mouse_x - ox)/S;
+my = (mouse_y - oy)/S;
+
+gfx_setfont(1, "Arial", max(6, floor(12*S)), 'b');
+gfx_setfont(2, "Arial", max(10, floor(30*S)), 'b');
+gfx_setfont(3, "Arial", max(5, floor(10*S)), 'b');
+gfx_setfont(4, "Arial", max(6, floor(13*S)), 'b');
+gfx_setfont(5, "Arial", max(6, floor(11*S)));
+gfx_setfont(6, "Arial", max(5, floor(9*S)), 'b');
+
+// ---- glisser-déposer d'un fichier .wav ------------------------------------------------
+gfx_getdropfile(0, #drop) ? (
+  strcpy(#irpath, #drop); ir_src = 1; need_load = 1;
+  gfx_getdropfile(-1);
+);
+
+// ---- Façade -----------------------------------------------------------------------
+col(0.07,0.07,0.075); gfx_rect(0,0,gfx_w,gfx_h);
+col(0.115,0.12,0.13); rct(6,6,1208,418,1);
+ui = 0; loop(41, col(0.125,0.13,0.14); rct(6, 10 + ui*10, 1208, 1, 1); ui += 1;);
+col(0.20,0.21,0.23); rct(6,6,1208,2,1); col(0.04,0.04,0.045); rct(6,422,1208,2,1);
+col(0.06,0.06,0.065);
+gfx_circle(PX(18), PY(20), 4*S, 1, 1);   gfx_circle(PX(18), PY(410), 4*S, 1, 1);
+gfx_circle(PX(1202), PY(20), 4*S, 1, 1); gfx_circle(PX(1202), PY(410), 4*S, 1, 1);
+
+gfx_setfont(2); col(thc0r,thc0g,thc0b); text_l(34, 34, "RM1982Verb"); th_x1 = gfx_x; th_y0 = gfx_y; gfx_measurestr("RM1982Verb", th_w, th_h); th_x0 = th_x1 - th_w;
+t_x = 34 + th_w/S + 14;
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(t_x, 38, "CONVOLUTION  REVERB");
+gfx_setfont(4); col(0.85,0.86,0.88); text_r(1186, 34, "ReNo Mellow");
+col(thc0r,thc0g,thc0b); rct(34, 56, 1152, 2, 1);
+
+// ---- IR : choix + forme d'onde ------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(34, 74, "IMPULSE RESPONSE");
+gfx_setfont(1);
+!ix_init ? ( ix_init = 1; ix_read(); );
+ld_gen != ix_lgen ? ( ix_lgen = ld_gen; ix_cur = ix_ok ? ix_match() : -1; );
+draw_btn(34, 84, 28, 24, 0, "<"); draw_btn(66, 84, 28, 24, 0, ">");
+br_on ? col(0.08,0.085,0.09) : in_rect(102, 84, 484, 24) ? col(0.07,0.075,0.08) : col(0.05,0.05,0.055);
+rct(102, 84, 484, 24, 1); br_on ? col(thc0r,thc0g,thc0b) : col(0.03,0.03,0.035); rct(102, 84, 484, 24, 0);
+col(0.55,0.56,0.60); rct(568, 94, 7, 1, 1); rct(569, 95, 5, 1, 1); rct(570, 96, 3, 1, 1); rct(571, 97, 1, 1, 1);
+// icône dossier : aide pour ajouter son propre dossier d'IR
+draw_btn(590, 84, 30, 24, fld_help, "");
+fld_help ? col(thc5r,thc5g,thc5b) : in_rect(590, 84, 30, 24) ? col(thc1r,thc1g,thc1b) : col(0.72,0.73,0.76);
+rct(597, 90, 7, 3, 1); rct(597, 92, 16, 11, 1);
+fld_help ? col(thc0r,thc0g,thc0b) : col(0.16,0.165,0.18); rct(599, 95, 12, 6, 1);
+gfx_setfont(1);
+ix_cur >= 0 ? ( col(0.92,0.93,0.95); ix_str(IX_RO[ix_cur], IX_RL[ix_cur]); strcpy(#s, #ixs); ) :
+(loaded || ld_st > 0 || ld_err > 0) && strlen(#irname) > 0 ? ( col(0.92,0.93,0.95); strcpy(#s, #irname); ) : ( col(0.55,0.56,0.60); strcpy(#s, "No IR loaded"); );
+strlen(#s) > 62 ? ( strcpy_substr(#s2, #s, strlen(#s) - 59); strcpy(#s, "..."); strcat(#s, #s2); );
+text_l(110, 96, #s);
+(ir_src == 1 && loaded && ix_cur < 0) ? ( gfx_setfont(6); col(0.55,0.56,0.60); text_r(560, 96, "DROPPED FILE"); );
+
+col(0.05,0.05,0.055); rct(34, 116, 586, 120, 1); col(0.03,0.03,0.035); rct(34, 116, 586, 120, 0);
+col(0.13,0.135,0.15); ui = 1; loop(5, rct(34 + ui*586/6, 117, 1, 118, 1); ui += 1;); rct(35, 176, 584, 1, 1);
+loaded ? (
+  g_pd = slider2*0.001*srate; g_T = g_pd + Lir;
+  g_x0 = 37 + 580*g_pd/g_T; g_bw = max(1, 580*Lir/(NPK*g_T));
+  ui = 0;
+  loop(NPK,
+    g_i = (ui + 0.5)*Lir/NPK;
+    hgt = 56*PKA[ui]/pk_max;
+    xx = g_x0 + 580*ui*Lir/(NPK*g_T);
+    col(0.20,0.21,0.24); rct(xx, 176 - hgt, g_bw, 2*hgt, 1);
+    hgt *= g_env(g_i);
+    col(0.36,0.38,0.43); rct(xx, 176 - hgt, g_bw, 2*hgt, 1);
+    ui += 1;
+  );
+  col(thc0r,thc0g,thc0b); ui = 0;
+  loop(117,
+    g_i = ui/116*Lir; nx = g_x0 + 580*g_i/g_T; ny = 232 - 112*g_env(g_i);
+    ui > 0 ? ( ln(px, py, nx, ny); ln(px, py + 1, nx, ny + 1); );
+    px = nx; py = ny; ui += 1;
+  );
+  slider2 >= 1 ? (
+    col(thc1r,thc1g,thc1b); rct(g_x0, 118, 1, 116, 1);
+    gfx_setfont(6); sprintf(#s, "PRE %d ms", slider2);
+    g_x0 > 520 ? text_r(g_x0 - 4, 126, #s) : text_l(g_x0 + 4, 126, #s);
+  );
+);
+(ld_st > 0 || (building && !ready)) ? (
+  col(0.05,0.05,0.055); rct(214, 162, 226, 28, 1); col(thc0r,thc0g,thc0b); rct(214, 162, 226, 28, 0);
+  gfx_setfont(4); sprintf(#s, "LOADING  %d %%", ld_st > 0 ? floor(ld_pct*90) : 95); text_c(327, 176, #s);
+) : !loaded ? (
+  gfx_setfont(4); col(0.55,0.56,0.60);
+  text_c(327, 166, "Drop a .wav file here");
+  gfx_setfont(6); text_c(327, 186, "or click the IR name to browse REAPER/Data/RM IR (index made by IR Buddy)");
+);
+gfx_setfont(6);
+ld_err > 0 ? (
+  col(1.00,0.35,0.25);
+  ld_err == 1 ? strcpy(#s, "Cannot open the file") : ld_err == 2 ? strcpy(#s, "Not a WAV file") : strcpy(#s, "Empty file");
+  loaded ? strcat(#s, "  -  previous IR kept");
+) : loaded ? (
+  col(0.55,0.56,0.60);
+  ir_nch >= 2 ? strcpy(#s, "STEREO") : strcpy(#s, "MONO");
+  ir_nch > 2 ? strcat(#s, " (first 2 ch.)");
+  sprintf(#s2, "  -  %.2f s", ir_dur); strcat(#s, #s2);
+  abs(ir_fsr - srate) < 0.5 ? sprintf(#s2, "  -  %.1f kHz", srate/1000) : sprintf(#s2, "  -  IR %.1f kHz > resampled to %.1f kHz", ir_fsr/1000, srate/1000);
+  strcat(#s, #s2);
+  capped ? strcat(#s, "  -  cut at 10 s");
+  !fft_ok ? strcat(#s, "  -  FFT SELF-TEST FAILED");
+  !lay_ok ? strcat(#s, "  -  OUT OF MEMORY");
+) : ( col(0.55,0.56,0.60); strcpy(#s, "Mono or stereo WAV, up to 10 s"); );
+text_l(34, 246, #s);
+col(0.45,0.46,0.50); text_r(620, 246, "ENVELOPE : ATTACK / DECAY");
+
+// ---- Espace : 5 potards -------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(34, 272, "SPACE");
+col(0.25,0.26,0.29); rct(80, 272, 540, 1, 1);
+gfx_setfont(4); col(0.92,0.93,0.95);
+text_c(78, 290, "ATTACK"); text_c(182, 290, "PREDELAY"); text_c(286, 290, "DECAY"); text_c(390, 290, "MOD"); text_c(494, 290, "WIDTH"); text_c(598, 290, "DUCKER");
+
+// ---- EQ de sortie ---------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(650, 74, "OUTPUT EQ  (wet only)");
+col(0.25,0.26,0.29); rct(778, 74, 222, 1, 1);
+gfx_setfont(3); col(0.92,0.93,0.95);
+text_c(676, 104, "HPF"); text_c(756, 104, "LOW"); text_c(836, 104, "MID"); text_c(916, 104, "HIGH"); text_c(996, 104, "LPF");
+gfx_setfont(6); col(0.55,0.56,0.60); text_c(756, 208, "250 Hz"); text_c(836, 208, "1.2 kHz"); text_c(916, 208, "6 kHz");
+col(0.05,0.05,0.055); rct(650, 222, 350, 64, 1); col(0.03,0.03,0.035); rct(650, 222, 350, 64, 0);
+col(0.22,0.23,0.25); rct(651, 254, 348, 1, 1);
+col(0.15,0.155,0.17); ui = 0; loop(3, rct(651 + (log(ui == 0 ? 100 : ui == 1 ? 1000 : 10000)/log(10) - log(20)/log(10))/3*348, 223, 1, 62, 1); ui += 1;);
+col(thc0r,thc0g,thc0b); ui = 0;
+loop(88,
+  g_f = 20*pow(1000, ui/87); g_m = 1;
+  hp_on ? g_m *= bq_mag(C_HP, g_f); ls_on ? g_m *= bq_mag(C_LS, g_f); pk_on ? g_m *= bq_mag(C_PK, g_f);
+  hs_on ? g_m *= bq_mag(C_HS, g_f); lp_on ? g_m *= bq_mag(C_LP, g_f);
+  nx = 651 + ui/87*348; ny = min(max(254 - lin2db(g_m)*2.2, 224), 284);
+  ui > 0 ? ( ln(px, py, nx, ny); ln(px, py + 1, nx, ny + 1); );
+  px = nx; py = ny; ui += 1;
+);
+
+// ---- Sortie ------------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_l(650, 308, "OUTPUT");
+col(0.25,0.26,0.29); rct(700, 308, 300, 1, 1);
+gfx_setfont(3); col(0.92,0.93,0.95); text_c(700, 322, "VOLUME"); text_c(800, 322, "MIX");
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(925, 330, "LATENCY");
+gfx_setfont(1);
+draw_btn(872, 342, 106, 22, slider13 >= 0.5, "ZERO");
+sprintf(#s, "ECO (%.0f ms)", ECO_D/srate*1000);
+draw_btn(872, 368, 106, 22, slider13 < 0.5, #s);
+gfx_setfont(6); col(0.55,0.56,0.60); slider13 >= 0.5 ? strcpy(#s, "no latency, more CPU") : strcpy(#s, "less CPU, compensated"); text_c(925, 400, #s);
+
+// ---- Potards (dessin + valeurs) ------------------------------------------------------------
+ki = 1;
+loop(13,
+  fz = (ki >= 7 && ki <= 9) ? 0.5 : ki == 5 ? 0.5 : ki == 10 ? 1 : ki == 11 ? 24/36 : ki == 13 ? 1 : 0;
+  draw_knob(k_cx(ki), k_cy(ki), k_r(ki), k_frac(ki), fz);
+  (ki <= 5 || ki >= 11) ? gfx_setfont(1) : gfx_setfont(6);
+  col(thc1r,thc1g,thc1b);
+  k_str(ki);
+  kbx_ed != ki ? text_c(k_cx(ki), k_vy(ki), #ks);
+  ki += 1;
+);
+
+// réduction de gain du DUCKER
+g_dk = max(dk_grm, g_dk*0.85); dk_grm = 0;
+slider16 < -0.05 ? (
+  gfx_setfont(6); g_dk > 0.05 ? col(thc1r,thc1g,thc1b) : col(0.45,0.46,0.50);
+  sprintf(#s, "GR -%.1f dB", g_dk); text_c(598, 406, #s);
+);
+
+// ---- Crête-mètres IN / OUT -------------------------------------------------------------------
+g_v = max(pin0, gm_i0*pk_dg); gm_i0 = g_v; pin0 = 0; g_v = max(pin1, gm_i1*pk_dg); gm_i1 = g_v; pin1 = 0;
+g_v = max(pout0, gm_o0*pk_dg); gm_o0 = g_v; pout0 = 0; g_v = max(pout1, gm_o1*pk_dg); gm_o1 = g_v; pout1 = 0;
+pk_dg = 0.86;
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(1080, 76, "IN"); text_c(1152, 76, "OUT");
+pk_bar(1062, 90, 16, 298, lin2db(gm_i0), -100); pk_bar(1084, 90, 16, 298, lin2db(gm_i1), -100);
+pk_bar(1134, 90, 16, 298, lin2db(gm_o0), -100); pk_bar(1156, 90, 16, 298, lin2db(gm_o1), -100);
+gfx_setfont(6); col(0.55,0.56,0.60);
+text_c(1070, 400, "L"); text_c(1092, 400, "R"); text_c(1142, 400, "L"); text_c(1164, 400, "R");
+ui = 0;
+loop(7,
+  dl = ui == 0 ? 0 : ui == 1 ? -6 : ui == 2 ? -12 : ui == 3 ? -18 : ui == 4 ? -24 : ui == 5 ? -36 : -60;
+  sprintf(#s, "%d", dl); text_c(1117, pk_y(dl, 90, 298), #s);
+  ui += 1;
+);
+
+// ---- Bandeau ---------------------------------------------------------------------------------
+gfx_setfont(3); col(0.62,0.63,0.66); text_c(970, 447, "SIZE");
+gfx_setfont(1);
+sz = floor(slider14 + 0.5);
+ui = 0;
+loop(5,
+  ui == 0 ? strcpy(#s, "75%") : ui == 1 ? strcpy(#s, "100%") : ui == 2 ? strcpy(#s, "125%") : ui == 3 ? strcpy(#s, "150%") : strcpy(#s, "200%");
+  draw_btn(992 + ui*42, 435, 40, 24, sz == ui, #s);
+  ui += 1;
+);
+gfx_setfont(5); col(0.45,0.46,0.50); text_l(34, 447, "Drag: knobs (Shift = fine)  -  Ctrl-click: default  -  Value: click = type  -  Drop a .wav to load it  -  Double-click name: color");
+
+// ---- Saisie clavier : clic sur une valeur ou double-clic sur un potard --------------------
+kbx_mb = mouse_cap & 1;
+kbx_sc = PX(1) - PX(0);
+kbx_ed > 0 ? (
+  kbx_c = gfx_getchar();
+  while (kbx_c > 0) (
+    kbx_c == 13 ? ( kbx_apply(kbx_ed); kbx_ed = 0; ) :
+    kbx_c == 27 ? ( kbx_ed = 0; ) :
+    kbx_c == 8 ? ( strlen(#kbx_ed) > 0 ? str_delsub(#kbx_ed, strlen(#kbx_ed) - 1, 1); ) :
+    (kbx_c >= 32 && kbx_c < 127) ? (
+      strlen(#kbx_ed) < 12 ? ( sprintf(#kbx_ch, "%c", kbx_c); strcat(#kbx_ed, #kbx_ch); );
+    );
+    kbx_c = kbx_ed > 0 ? gfx_getchar() : 0;
+  );
+);
+br_hit = br_on && in_rect(34, 116, 610, 300);
+(kbx_mb && !kbx_lmb && !br_hit) ? (
+  kbx_h = k_hit(); kbx_v = v_hit();
+  kbx_was = kbx_ed;
+  kbx_ed > 0 ? ( kbx_apply(kbx_ed); kbx_ed = 0; );
+  (kbx_v > 0 && kbx_v != kbx_was) ? (
+    kbx_ed = kbx_v; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (kbx_v > 0) ? (
+    mouse_cap = 0;
+  ) : (kbx_h > 0 && kbx_h == kbx_lh && time_precise() - kbx_t < 0.3) ? (
+    kbx_ed = kbx_h; strcpy(#kbx_ed, ""); kbx_t = 0;
+    mouse_cap = 0;
+  ) : (
+    kbx_t = time_precise(); kbx_lh = kbx_h;
+  );
+);
+kbx_lmb = kbx_mb;
+kbx_ed > 0 ? ( mouse_wheel = 0; );
+
+// ---- Souris ----------------------------------------------------------------------------------
+mb1 = mouse_cap & 1;
+(mb1 && !last_mb) ? (
+  drag = br_hit ? 0 : k_hit();
+  drag > 0 ? (
+    (mouse_cap & 4) ? ( k_put(drag, k_df(drag)); drag = 0; ) : ( drag_f = k_frac(drag); );
+  );
+  fld_was = fld_help; fld_help = 0;
+  (in_rect(590, 84, 30, 24) && !fld_was) ? ( fld_help = 1; br_on = 0; );
+  // navigateur : clic sur le nom de l'IR
+  in_rect(102, 84, 484, 24) ? (
+    br_on = !br_on;
+    br_on ? (
+      ix_read(); ix_cur = ix_ok ? ix_match() : -1;
+      br_fold = ix_cur >= 0 ? IX_FI[ix_cur] : min(max(br_fold, 0), max(ix_nd - 1, 0));
+      br_sd = max(0, min(br_fold - 7, ix_nd - BR_N));
+      br_sf = ix_cur >= 0 ? max(0, min(ix_cur - IX_DF[br_fold] - 7, IX_DN[br_fold] - BR_N)) : 0;
+    );
+  );
+  // flèches : IR précédente / suivante du dossier (index IR Buddy)
+  (in_rect(34, 84, 28, 24) || in_rect(66, 84, 28, 24)) ? (
+    !ix_ok ? ix_read();
+    ix_nf > 0 ? (
+      ix_cur < 0 ? (
+        br_d = min(max(br_fold, 0), ix_nd - 1); ix_load(IX_DF[br_d]);
+      ) : (
+        br_d = IX_FI[ix_cur]; br_k = ix_cur - IX_DF[br_d] + (in_rect(66, 84, 28, 24) ? 1 : -1);
+        br_k < 0 ? br_k = IX_DN[br_d] - 1 : br_k >= IX_DN[br_d] ? br_k = 0;
+        ix_load(IX_DF[br_d] + br_k);
+      );
+      br_fold = IX_FI[ix_cur];
+    ) : ( br_on = 1; );
+  );
+  // navigateur ouvert : dossiers, fichiers, fermeture
+  br_hit ? (
+    in_rect(620, 119, 20, 18) ? br_on = 0 :
+    in_rect(34, 142, 182, BR_N*18) ? (
+      br_d = br_sd + floor((my - 142)/18);
+      br_d < ix_nd ? ( br_fold = br_d; br_sf = 0; );
+    ) :
+    in_rect(218, 142, 424, BR_N*18) ? (
+      br_k = br_sf + floor((my - 142)/18);
+      (ix_nd > 0 && br_k < IX_DN[br_fold]) ? ix_load(IX_DF[br_fold] + br_k);
+    );
+  );
+  in_rect(872, 342, 106, 22) ? set_sl(13, 1);
+  in_rect(872, 368, 106, 22) ? set_sl(13, 0);
+  (in_rect(1056, 84, 124, 310)) ? ( gm_i0 = gm_i1 = gm_o0 = gm_o1 = 0; );
+  ui = 0; loop(5, in_rect(992 + ui*42, 435, 40, 24) ? ( slider14 = ui; sliderchange(slider14); ); ui += 1;);
+);
+(mb1 && drag > 0) ? (
+  fine = (mouse_cap & 8) ? 0.2 : 1;
+  dy = (last_my - my)*fine;
+  dy != 0 ? ( drag_f = min(max(drag_f + dy*0.005, 0), 1); k_set_frac(drag, drag_f); );
+);
+(mouse_wheel != 0 && br_hit) ? (
+  wv = mouse_wheel > 0 ? -3 : 3;
+  mx < 216 ? br_sd = max(0, min(br_sd + wv, ix_nd - BR_N)) : ( ix_nd > 0 ? br_sf = max(0, min(br_sf + wv, IX_DN[br_fold] - BR_N)); );
+  mouse_wheel = 0;
+);
+mouse_wheel != 0 ? (
+  wv = mouse_wheel/120*((mouse_cap & 8) ? 0.2 : 1);
+  kw = k_hit();
+  kw > 0 ? k_set_frac(kw, k_frac(kw) + wv*0.02);
+  mouse_wheel = 0;
+);
+!mb1 ? (drag = 0);
+last_mb = mb1;
+last_my = (mouse_y - oy)/S;
+
+// ---- Thème : double-clic sur le nom du plug-in = orange / vert ----------------------------
+th_mb = mouse_cap & 1;
+(th_mb && !th_lmb) ? (
+  (mouse_x >= th_x0 - 6 && mouse_x <= th_x1 + 6 && mouse_y >= th_y0 - 6 && mouse_y <= th_y0 + th_h + 6) ? (
+    (time_precise() - th_t < 0.4) ? ( slider18 = slider18 >= 0.5 ? 0 : 1; sliderchange(slider18); th_t = 0; ) : ( th_t = time_precise(); );
+  );
+);
+th_lmb = th_mb;
+
+// ---- Navigateur d'IR (clic sur le nom de l'IR) --------------------------------------------
+BR_N = 15;
+br_on && !fld_help ? (
+  col(0.06,0.065,0.07); rct(34, 116, 610, 300, 1); col(thc0r,thc0g,thc0b); rct(34, 116, 610, 300, 0);
+  gfx_setfont(4); col(thc0r,thc0g,thc0b); text_l(44, 128, "IR BROWSER");
+  gfx_setfont(6); col(0.55,0.56,0.60);
+  sprintf(#s, "%d IR  -  %d folders  -  REAPER/Data/RM IR", ix_nf, ix_nd); text_l(140, 128, #s);
+  draw_btn(620, 119, 20, 18, 0, "x");
+  col(0.03,0.03,0.035); rct(34, 140, 610, 1, 1); rct(216, 141, 1, 274, 1);
+  ix_nf <= 0 ? (
+    gfx_setfont(4); col(0.92,0.93,0.95); ix_ok ? strcpy(#s, "No IR in the index") : strcpy(#s, "No IR index yet"); text_c(339, 230, #s);
+    gfx_setfont(5); col(0.62,0.63,0.66);
+    text_c(339, 256, "Run the action  ReNo Mellow - IR Buddy - Rescan RM IR  (IR Buddy script),");
+    text_c(339, 274, "then click the IR name again. The \"IR file\" list above still works without it.");
+  ) : (
+    br_fold = min(max(br_fold, 0), ix_nd - 1);
+    gfx_setfont(1); ui = 0;
+    loop(BR_N,
+      br_d = br_sd + ui;
+      br_d < ix_nd ? (
+        br_d == br_fold ? ( col(thc0r,thc0g,thc0b); rct(36, 142 + ui*18, 179, 18, 1); col(thc5r,thc5g,thc5b); ) :
+          ( (ix_cur >= 0 && IX_FI[ix_cur] == br_d) ? col(thc1r,thc1g,thc1b) : col(0.80,0.81,0.84); );
+        ix_str(IX_DO[br_d], IX_DL[br_d]); strcpy(#s, #ixs);
+        strlen(#s) > 24 ? ( strcpy_substr(#s2, #s, strlen(#s) - 22); strcpy(#s, ".."); strcat(#s, #s2); );
+        text_l(42, 151 + ui*18, #s);
+      );
+      br_k = br_sf + ui;
+      br_k < IX_DN[br_fold] ? (
+        br_i = IX_DF[br_fold] + br_k;
+        br_i == ix_cur ? ( col(thc0r,thc0g,thc0b); rct(218, 142 + ui*18, 424, 18, 1); col(thc5r,thc5g,thc5b); ) :
+          ( (in_rect(218, 142 + ui*18, 424, 18)) ? col(1,1,1) : col(0.80,0.81,0.84); );
+        ix_str(IX_NO[br_i], IX_NL[br_i]); strcpy(#s, #ixs);
+        strlen(#s) > 60 ? ( strcpy_substr(#s2, #s, 0, 58); strcpy(#s, #s2); strcat(#s, ".."); );
+        text_l(226, 151 + ui*18, #s);
+      );
+      ui += 1;
+    );
+    gfx_setfont(6); col(0.45,0.46,0.50);
+    ix_nd > BR_N ? text_c(125, 410, "wheel: more folders");
+    IX_DN[br_fold] > BR_N ? text_c(430, 410, "wheel: more IRs");
+  );
+);
+
+// ---- Aide : ajouter son propre dossier d'IR ------------------------------------------------
+fld_help ? (
+  col(0.06,0.065,0.07); rct(34, 116, 586, 120, 1); col(thc0r,thc0g,thc0b); rct(34, 116, 586, 120, 0);
+  gfx_setfont(4); col(thc0r,thc0g,thc0b); text_l(48, 132, "YOUR OWN IR FOLDER");
+  gfx_setfont(5); col(0.92,0.93,0.95);
+  text_l(48, 156, "1.  In REAPER: Actions > Show action list");
+  text_l(48, 174, "2.  Run  ReNo Mellow - IR Buddy - Add IR folder  and pick your folder");
+  text_l(48, 192, "3.  Click the IR name to browse it (after adding files by hand: IR Buddy - Rescan RM IR)");
+  gfx_setfont(6); col(0.55,0.56,0.60); text_l(48, 216, "IR Buddy is a free ReNo Mellow script (ReaPack / .ReaperPkg).  Click anywhere to close.");
+);
+
+// ---- Saisie clavier : cadre d'édition ----------------------------------------------------
+kbx_ed > 0 ? (
+  kbx_cx = k_cx(kbx_ed); kbx_cy = k_vy(kbx_ed);
+  gfx_setfont(15, "Arial", 14*kbx_sc, 'b');
+  col(0.06,0.065,0.07); gfx_a = 0.96;
+  gfx_rect(PX(kbx_cx - 46), PY(kbx_cy - 11), 92*kbx_sc, 22*kbx_sc);
+  col(thc0r,thc0g,thc0b);
+  gfx_rect(PX(kbx_cx - 46), PY(kbx_cy - 11), 92*kbx_sc, 22*kbx_sc, 0);
+  strcpy(#kbx_sh, #kbx_ed);
+  (time_precise()*2) % 2 < 1 ? strcat(#kbx_sh, "_");
+  gfx_measurestr(#kbx_sh, kbx_tw, kbx_th);
+  gfx_x = PX(kbx_cx) - kbx_tw/2; gfx_y = PY(kbx_cy) - kbx_th/2;
+  col(0.95,0.95,0.95);
+  gfx_drawstr(#kbx_sh);
+);
