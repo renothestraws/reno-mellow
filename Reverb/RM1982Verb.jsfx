@@ -1,8 +1,8 @@
 desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attack, predelay, decay, mod, width, output EQ)
 //tags: reverb convolution impulse response ir zero latency predelay decay width eq
 //@author ReNo Mellow
-//@version 1.2
-//@changelog IR Buddy 1.1: real-time capture for plug-ins running on external DSP (UAD...), which return silence offline
+//@version 1.3
+//@changelog IR Buddy 1.2: real-time capture now plays the impulse through the original plug-in instances (UAD DSP) and records them through a post-FX send, latency compensated
 //@about
 //  # RM1982Verb
 //  Convolution reverb in the 1982 series. Load your own impulse responses (WAV, mono or stereo, up to 10 s).

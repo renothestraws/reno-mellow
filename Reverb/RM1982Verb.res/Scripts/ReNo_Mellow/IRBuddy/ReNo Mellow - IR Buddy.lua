@@ -1,8 +1,8 @@
 -- @description ReNo Mellow - IR Buddy (capture an impulse response from a reverb plug-in)
 -- @author ReNo Mellow
--- @version 1.1
+-- @version 1.2
 -- @about Capture la réponse impulsionnelle (IR) des plug-ins de la piste sélectionnée et l'enregistre en WAV dans REAPER/Data/RM IR, prête pour RM1982Verb.
--- @changelog Real-time capture for DSP plug-ins (UAD...) that return silence offline
+-- @changelog Real-time capture uses the original plug-in instances (DSP plug-ins such as UAD), recorded through a post-FX send with latency compensation
 -- @provides
 --   [main] ReNo Mellow - IR Buddy - Open RM IR folder.lua
 --   [main] ReNo Mellow - IR Buddy - Add IR folder.lua
@@ -266,7 +266,10 @@ local function capture_offline()
   return L, R, got
 end
 
--- mode 2 : en temps réel (plug-ins sur DSP externe : UAD...) : la piste temporaire enregistre sa propre sortie
+-- mode 2 : en temps réel (plug-ins sur DSP externe : UAD...)
+-- On garde les instances d'origine (déjà chargées sur le DSP) : l'impulsion est posée sur la piste de la réverbe,
+-- après la fin du projet, et une piste d'enregistrement reçoit la sortie de ses effets (envoi post-FX) en mode
+-- « Record: output (stereo, latency compensated) ».
 local function capture_realtime(done)
   if r.GetPlayState() ~= 0 then r.OnStopButton() end
   save_selection()
@@ -276,17 +279,36 @@ local function capture_realtime(done)
     if r.GetMediaTrackInfo_Value(t, "I_RECARM") > 0 then armed[#armed + 1] = t; r.SetMediaTrackInfo_Value(t, "I_RECARM", 0) end
   end
   local cur0 = r.GetCursorPosition()
-  -- (pas de bloc d'annulation ouvert pendant l'enregistrement : un bloc pour la préparation, un pour le rangement)
+  local main0 = r.GetMediaTrackInfo_Value(src_tr, "B_MAINSEND")
   r.Undo_BeginBlock()
-  local P = r.GetProjectLength(0) + 2
-  local tr, it = make_temp_track(P)
-  r.SetMediaTrackInfo_Value(tr, "B_MAINSEND", 0)   -- rien n'est envoyé au master pendant la capture
-  r.SetMediaTrackInfo_Value(tr, "I_RECMODE", 1)    -- Record: output (stereo)
-  r.SetMediaTrackInfo_Value(tr, "I_RECMON", 0)
-  r.SetMediaTrackInfo_Value(tr, "I_RECARM", 1)
+  local P = r.GetProjectLength(0) + 3
+  -- impulsion sur la piste de la réverbe
+  local it = r.AddMediaItemToTrack(src_tr)
+  local tk = r.AddTakeToMediaItem(it)
+  r.SetMediaItemTake_Source(tk, r.PCM_Source_CreateFromFile(imp_path))
+  r.SetMediaItemInfo_Value(it, "D_POSITION", P)
+  r.SetMediaItemInfo_Value(it, "D_LENGTH", n_len / sr)
+  r.SetMediaItemInfo_Value(it, "B_LOOPSRC", 0)
+  r.SetMediaItemInfo_Value(it, "D_FADEINLEN", 0)
+  r.SetMediaItemInfo_Value(it, "D_FADEOUTLEN", 0)
+  r.SetMediaItemInfo_Value(it, "D_FADEINLEN_AUTO", 0)
+  r.SetMediaItemInfo_Value(it, "D_FADEOUTLEN_AUTO", 0)
+  r.SetMediaTrackInfo_Value(src_tr, "B_MAINSEND", 0)   -- rien vers le master pendant la capture
+  -- piste d'enregistrement
+  local idx = r.CountTracks(0)
+  r.InsertTrackAtIndex(idx, false)
+  local rec_tr = r.GetTrack(0, idx)
+  r.GetSetMediaTrackInfo_String(rec_tr, "P_NAME", "IR Buddy (rec)", true)
+  r.SetMediaTrackInfo_Value(rec_tr, "B_MAINSEND", 0)
+  local snd = r.CreateTrackSend(src_tr, rec_tr)
+  r.SetTrackSendInfo_Value(src_tr, 0, snd, "I_SENDMODE", 3)   -- post-FX (avant fader et pan)
+  r.SetTrackSendInfo_Value(src_tr, 0, snd, "D_VOL", 1)
+  r.SetMediaTrackInfo_Value(rec_tr, "I_RECMODE", 3)            -- Record: output (stereo, latency compensated)
+  r.SetMediaTrackInfo_Value(rec_tr, "I_RECMON", 0)
+  r.SetMediaTrackInfo_Value(rec_tr, "I_RECARM", 1)
   r.Undo_EndBlock("IR Buddy: real-time capture (setup)", -1)
   r.UpdateArrange()
-  r.SetEditCurPos(P - 0.5, true, false)
+  r.SetEditCurPos(P - 2, true, false)                          -- 2 s d'avance : le DSP est prêt avant l'impulsion
   local t_end = P + n_len / sr + 0.5
   local t_start = r.time_precise()
   r.CSurf_OnRecord()
@@ -294,21 +316,20 @@ local function capture_realtime(done)
   local function finish_rt()
     r.Main_OnCommand(40667, 0)    -- Transport: Stop (save all recorded media)
     r.Undo_BeginBlock()
-    local rec, rtk = nil, nil
-    for i = 0, r.CountTrackMediaItems(tr) - 1 do
-      local x = r.GetTrackMediaItem(tr, i)
-      if x ~= it then rec = x end
-    end
+    local rec = nil
+    for i = 0, r.CountTrackMediaItems(rec_tr) - 1 do rec = r.GetTrackMediaItem(rec_tr, i) end
     local L, R, got = {}, {}, 0
     local path = ""
     if rec then
-      rtk = r.GetActiveTake(rec)
+      local rtk = r.GetActiveTake(rec)
       local offs = P - r.GetMediaItemInfo_Value(rec, "D_POSITION")
       if rtk and offs >= 0 then L, R, got = read_take(rtk, offs) end
       local s2 = rtk and r.GetMediaItemTake_Source(rtk)
       path = s2 and r.GetMediaSourceFileName(s2, "") or ""
     end
-    r.DeleteTrack(tr)
+    r.DeleteTrack(rec_tr)                                      -- supprime aussi l'envoi
+    if r.ValidatePtr(it, "MediaItem*") then r.DeleteTrackMediaItem(src_tr, it) end
+    r.SetMediaTrackInfo_Value(src_tr, "B_MAINSEND", main0)
     for _, t in ipairs(armed) do if r.ValidatePtr(t, "MediaTrack*") then r.SetMediaTrackInfo_Value(t, "I_RECARM", 1) end end
     restore_selection()
     r.SetEditCurPos(cur0, true, false)
