@@ -1,13 +1,16 @@
--- @description ReNo Mellow - IR Buddy (capture an impulse response from a reverb plug-in)
+-- @description ReNo Mellow - IR Buddy (impulse responses and NAM models for RM1982Verb and RMampsim)
 -- @author ReNo Mellow
--- @version 1.2
--- @about Capture la réponse impulsionnelle (IR) des plug-ins de la piste sélectionnée et l'enregistre en WAV dans REAPER/Data/RM IR, prête pour RM1982Verb.
--- @changelog Real-time capture uses the original plug-in instances (DSP plug-ins such as UAD), recorded through a post-FX send with latency compensation
+-- @version 1.3
+-- @about Companion scripts of RM1982Verb and RMampsim (install once for both). Capture la réponse impulsionnelle (IR) des plug-ins de la piste sélectionnée (REAPER/Data/RM IR), indexe les IR et les modèles NAM A2 (REAPER/Data/RM Amp), et prépare la capture NAM d'un plug-in d'ampli pour l'entraînement sur TONE3000.
+-- @changelog IR Buddy is now its own package (no longer inside RM1982Verb). Rescan also converts and indexes NAM A2 models for RMampsim (full rig flag, input level). New actions: Capture for NAM (amp only or full rig), Open RM Amp folder.
 -- @provides
 --   [main] ReNo Mellow - IR Buddy - Open RM IR folder.lua
 --   [main] ReNo Mellow - IR Buddy - Add IR folder.lua
 --   [main] ReNo Mellow - IR Buddy - Rescan RM IR.lua
+--   [main] ReNo Mellow - IR Buddy - Open RM Amp folder.lua
+--   [main] ReNo Mellow - IR Buddy - Capture for NAM.lua
 --   IRBuddy_index.lua
+--   IRBuddy_nam.lua
 
 --[[
   IR Buddy - principe

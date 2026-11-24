@@ -61,7 +61,19 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 |---|---|
 | **RM1982Delay** | Delay multi-modèles et multi-taps : 23 modèles (bandes, analogiques, numériques, lo-fi), 6 taps indépendants (entrée L / L+R / R, SYNC + ms, feedback, vintage, filtres, mod, age, pan, volume), fader ALL TAPS, mix, valeurs modifiables au clavier |
 | **RM90X** | Multi-effet numérique inspiré de la Yamaha SPX90II : les 30 programmes d'usine (réverbes calées sur des IR de l'appareil, early reflections, gate, delay, chorus, flanger, pitch, freeze…), mémoires 31 à 90, face avant opérationnelle, MIDI, traitement interne 31,25 kHz / 16 bits sans latence |
-| **RM1982Verb** | Réverbération à convolution : chargeur d'IR (WAV mono / stéréo, 10 s, rééchantillonnage automatique), navigateur d'IR par dossiers, glisser-déposer, ATTACK, PREDELAY, DECAY, MOD, WIDTH, PAN (réverbe seule), DUCKER (sidechain sur le sec), EQ de sortie (HPF, 3 bandes, LPF), VOLUME, MIX, latence ECO (21 ms compensés) ou ZERO. Livrée avec 124 IR d'usine et le script **IR Buddy** (capture l'IR de vos réverbes plug-ins, ajout de vos dossiers d'IR) – [manuel RM1982Verb + IR Buddy FR](https://github.com/renothestraws/reno-mellow-manuals/raw/main/plugins/RM1982Verb/RM1982Verb_manuel_FR.pdf) / [EN](https://github.com/renothestraws/reno-mellow-manuals/raw/main/plugins/RM1982Verb/RM1982Verb_manual_EN.pdf) |
+| **RM1982Verb** | Réverbération à convolution : chargeur d'IR (WAV mono / stéréo, 10 s, rééchantillonnage automatique), navigateur d'IR par dossiers, glisser-déposer, ATTACK, PREDELAY, DECAY, MOD, WIDTH, PAN (réverbe seule), DUCKER (sidechain sur le sec), EQ de sortie (HPF, 3 bandes, LPF), VOLUME, MIX, latence ECO (21 ms compensés) ou ZERO. Livrée avec 124 IR d'usine ; nécessite le paquet de scripts **IR Buddy** (voir plus bas) – [manuel RM1982Verb + IR Buddy FR](https://github.com/renothestraws/reno-mellow-manuals/raw/main/plugins/RM1982Verb/RM1982Verb_manuel_FR.pdf) / [EN](https://github.com/renothestraws/reno-mellow-manuals/raw/main/plugins/RM1982Verb/RM1982Verb_manual_EN.pdf) |
+
+## Amplis
+
+| Plugin | Description |
+|---|---|
+| **RMampsim** | Lecteur de modèles Neural Amp Modeler (NAM) A2, tailles LITE / FULL, latence nulle : INPUT, IN CAL (calibrage de l'entrée), EQ après l'ampli (BASS, MID, TREBLE, PRESENCE), LEVEL, chargeur d'IR de baffle avec MIC (centre / bord) ; les captures « full rig » coupent le baffle automatiquement. Livré avec 17 modèles A2 et 10 IR de baffle (ReNo Mellow) ; nécessite le paquet **IR Buddy** (Rescan, Capture for NAM : capturez vos propres plug-ins d'ampli pour TONE3000) |
+
+## Scripts
+
+| Script | Description |
+|---|---|
+| **IR Buddy** | Scripts communs à RM1982Verb et RMampsim, à installer une fois : capture de l'IR de vos réverbes plug-ins, ajout de vos dossiers d'IR, Rescan (index des IR et des modèles NAM), Open RM IR / RM Amp folder, Capture for NAM (signal T3K sweep v3, ampli seul ou full rig). ReaPack : catégorie Scripts, « ReNo Mellow - IR Buddy » |
 
 ## Modulation
 

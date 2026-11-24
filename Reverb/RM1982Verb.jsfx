@@ -1,8 +1,8 @@
 desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attack, predelay, decay, mod, width, output EQ)
 //tags: reverb convolution impulse response ir zero latency predelay decay width eq
 //@author ReNo Mellow
-//@version 1.4
-//@changelog 24 new factory IRs: Big Studio (drums, strings, amp, backing vocals, instrument, piano, vocal; close / medium / far)
+//@version 1.5
+//@changelog IR Buddy now comes as its own package "ReNo Mellow - IR Buddy" (shared with RMampsim): install it once from ReaPack (Scripts category) or packages/IR Buddy.ReaperPkg.
 //@about
 //  # RM1982Verb
 //  Convolution reverb in the 1982 series. Load your own impulse responses (WAV, mono or stereo, up to 10 s).
@@ -21,9 +21,10 @@ desc:RM1982Verb - ReNo Mellow convolution reverb (IR loader, zero latency, attac
 //  - VOLUME (wet + dry output level) and MIX (dry / wet; 100 % on a send).
 //  - LATENCY: ECO (1024 samples, lower CPU, compensated by REAPER) or ZERO (no latency at all, more CPU).
 //    Engine: non-uniform partitioned FFT convolution (64 / 512 / 4096 / 16384), direct FIR for the first 64 samples in ZERO.
-//  - Includes 124 factory IRs (Ambience, Big Studio, Chamber, Hall, Microphone, NonLin, Plate, Room, Spaces) and the IR Buddy script:
-//    actions "ReNo Mellow - IR Buddy" (capture the IR of the reverb plug-ins of the selected track), "Add IR folder",
-//    "Rescan RM IR" (update the browser index) and "Open RM IR folder". Manual: github.com/renothestraws/reno-mellow-manuals
+//  - Includes 124 factory IRs (Ambience, Big Studio, Chamber, Hall, Microphone, NonLin, Plate, Room, Spaces).
+//  - IR Buddy (separate package "ReNo Mellow - IR Buddy", shared with RMampsim): actions "ReNo Mellow - IR Buddy"
+//    (capture the IR of the reverb plug-ins of the selected track), "Add IR folder", "Rescan RM IR" (update the browser
+//    index) and "Open RM IR folder". Manual: github.com/renothestraws/reno-mellow-manuals
 //  - Click a value (or double-click a knob) to type it: 25, 1.2s, 4.5k, off. Enter = OK, Esc = cancel.
 //  - Double-click the plug-in name: orange / green.
 //

@@ -18,7 +18,7 @@ import os, re, sys, glob, datetime
 from xml.sax.saxutils import escape, quoteattr
 
 REPO_NAME = "ReNo Mellow"
-CATEGORIES = ["Dynamics", "EQ", "Color", "Utility", "Instruments", "Reverb", "Modulation", "MIDI"]          # un dossier = une catégorie ReaPack
+CATEGORIES = ["Dynamics", "EQ", "Color", "Utility", "Instruments", "Reverb", "Amp", "Modulation", "MIDI"]          # un dossier = une catégorie ReaPack
 
 
 def rtf(text):
@@ -113,6 +113,43 @@ def main():
                         sub = "/".join(rel.split("/")[-2:])
                         lib = rel.endswith("_index.lua") or rel.endswith("_lib.lua")
                         x.append('        <source type="script" file=%s%s>%s</source>' % (quoteattr(sub), "" if lib else ' main="main"', url))
+            x.append('      </version>')
+            x.append('    </reapack>')
+            n += 1
+        x.append('  </category>')
+    # paquets de scripts Lua (dossier Scripts/<Nom>/) : le fichier qui porte « -- @version » donne l'en-tête ;
+    # tous les .lua du dossier sont installés, actions [main] = fichiers « ReNo Mellow - … », les autres sont des bibliothèques
+    sdirs = sorted(d for d in glob.glob(os.path.join(root, "Scripts", "*")) if os.path.isdir(d))
+    if sdirs:
+        x.append('  <category name="Scripts">')
+        for sd in sdirs:
+            luas = sorted(glob.glob(os.path.join(sd, "*.lua")))
+            mainf, t = None, {}
+            for lp in luas:
+                src = open(lp, encoding="utf-8").read()
+                if re.search(r"^--\s*@version", src, re.M):
+                    mainf = lp
+                    for k in ("description", "author", "version", "about", "changelog"):
+                        m = re.search(r"^--\s*@%s[ \t]+(.*)$" % k, src, re.M)
+                        if m: t[k] = m.group(1).strip()
+                    break
+            if not mainf:
+                continue
+            dn = os.path.basename(sd)
+            x.append('    <reapack name=%s type="script" desc=%s>' % (quoteattr(os.path.basename(mainf)), quoteattr(t.get("description", dn))))
+            if "about" in t:
+                x.append('      <metadata>')
+                x.append('        <description><![CDATA[%s]]></description>' % rtf(t["about"]))
+                x.append('        <link rel="website" href=%s>GitHub</link>' % quoteattr(site))
+                x.append('      </metadata>')
+            x.append('      <version name=%s author=%s time=%s>' % (quoteattr(t.get("version", "1.0")), quoteattr(t.get("author", "ReNo Mellow")), quoteattr(now)))
+            if "changelog" in t:
+                x.append('        <changelog><![CDATA[%s]]></changelog>' % t["changelog"])
+            for lp in luas:
+                fn_ = os.path.basename(lp)
+                lib = not fn_.startswith("ReNo Mellow - ")
+                url = escape(raw + "Scripts/" + dn + "/" + fn_).replace(" ", "%20")
+                x.append('        <source type="script" file=%s%s>%s</source>' % (quoteattr(dn + "/" + fn_), "" if lib else ' main="main"', url))
             x.append('      </version>')
             x.append('    </reapack>')
             n += 1
