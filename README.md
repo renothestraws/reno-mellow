@@ -67,7 +67,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 
 | Plugin | Description |
 |---|---|
-| **RMampsim** | Lecteur de modèles Neural Amp Modeler (NAM) A2, tailles LITE / FULL, latence nulle : INPUT, IN CAL (calibrage de l'entrée), EQ après l'ampli (BASS, MID, TREBLE, PRESENCE), LEVEL, chargeur d'IR de baffle avec MIC (centre / bord) ; les captures « full rig » coupent le baffle automatiquement. Livré avec 17 modèles A2 et 10 IR de baffle (ReNo Mellow) ; nécessite le paquet **IR Buddy** (Rescan, Capture for NAM : capturez vos propres plug-ins d'ampli pour TONE3000) |
+| **RMampsim** | Lecteur de modèles Neural Amp Modeler (NAM) A2, tailles LITE / FULL, latence nulle : INPUT, IN CAL (calibrage de l'entrée), EQ après l'ampli (BASS, MID, TREBLE, PRESENCE), LEVEL, chargeur d'IR de baffle avec MIC (centre / bord) ; les captures « full rig » coupent le baffle automatiquement. Livré avec 17 modèles A2 et 10 IR de baffle (ReNo Mellow) ; nécessite le paquet **IR Buddy** (Rescan, Capture for NAM : capturez vos propres plug-ins d'ampli pour TONE3000) – [manuel FR](https://github.com/renothestraws/reno-mellow-manuals/raw/main/plugins/RMampsim/RMampsim_manuel_FR.pdf) / [EN](https://github.com/renothestraws/reno-mellow-manuals/raw/main/plugins/RMampsim/RMampsim_manual_EN.pdf) |
 
 ## Scripts
 
