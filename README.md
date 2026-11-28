@@ -54,6 +54,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982Sum** | Couleur de bus de sommation : DRIVE + GAIN, 5 couleurs (80, 4000, 2448, 2B, 32) |
 | **RM1982maximizer** | Sonic maximizer façon BBE : LOW CONTOUR + PROCESS (aigu dynamique piloté par CV), d'après Sonic Enhancer (GPL) |
 | **RM1982Inflat** | Inflator (comportement du Sonnox Oxford Inflator, Band Split compris), d'après RCInflator 2 de lewloiwc / RCJacH |
+| **RM808screamer** | Overdrive à bosse de médiums, modèle du circuit calibré sur une vraie TS808 (réédition, 7 captures) : OVERDRIVE / TONE / LEVEL aux courbes mesurées, IN CAL (−12..+24 dBu), commutateur ON / BYPASS avec le bypass bufferisé de la pédale, HQ, courbe de réponse, crête-mètres |
 
 ## Réverbération et multi-effet
 
