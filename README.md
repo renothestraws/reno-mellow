@@ -55,6 +55,7 @@ Collection de compresseurs, processeurs de dynamique, égaliseurs, effets de cou
 | **RM1982maximizer** | Sonic maximizer façon BBE : LOW CONTOUR + PROCESS (aigu dynamique piloté par CV), d'après Sonic Enhancer (GPL) |
 | **RM1982Inflat** | Inflator (comportement du Sonnox Oxford Inflator, Band Split compris), d'après RCInflator 2 de lewloiwc / RCJacH |
 | **RM808screamer** | Overdrive à bosse de médiums, modèle du circuit calibré sur une vraie TS808 (réédition, 7 captures) : OVERDRIVE / TONE / LEVEL aux courbes mesurées, IN CAL (−12..+24 dBu), commutateur ON / BYPASS avec le bypass bufferisé de la pédale, HQ, courbe de réponse, crête-mètres |
+| **RMrodent** | Distorsion à ampli op, modèle du circuit calibré sur la TSE R47 (8 rendus) : DISTORTION / FILTER / VOLUME aux courbes mesurées, ampli op à bande passante limitée, écrêtage dur par diodes, IN CAL (−12..+24 dBu), bypass transparent, HQ, courbe de réponse, crête-mètres |
 
 ## Réverbération et multi-effet
 
